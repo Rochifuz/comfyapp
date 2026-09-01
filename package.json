@@ -1,0 +1,19 @@
+{
+  "name": "web-application",
+  "version": "1.0.0",
+  "description": "Seguimiento de pagos y división de gastos compartidos. HTML/CSS/JS sin build, datos en Firestore (Firebase) para que varios usuarios compartan la misma información en tiempo real.",
+  "scripts": {
+    "start": "http-server public -p 8080 -c-1",
+    "deploy": "firebase deploy",
+    "habilitar-2fa": "node scripts/habilitar-2fa.js",
+    "backfill-nombres": "node scripts/backfill-nombres-usuarios.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "firebase-tools": "^13.0.0",
+    "firebase-admin": "^12.0.0"
+  }
+}

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Conectando…</title>
+</head>
+<body>
+    <p>Conectando con Google Calendar…</p>
+    <script>
+        // Google redirige acá después de que la persona da (o niega) el
+        // permiso de Calendar en el popup que abre conectarCalendar()
+        // (ver calendario.js). Esta página no se ve nunca de verdad —
+        // se cierra sola apenas termina — solo le pasa el resultado
+        // (code, o error) a la pestaña de AgendaApp que abrió el popup,
+        // vía postMessage (más simple y más seguro que leer la URL desde
+        // la otra pestaña, que además ni siquiera podría por CORS).
+        var parametros = new URLSearchParams(window.location.search);
+        if (window.opener) {
+            window.opener.postMessage({
+                tipo: 'google-calendar-callback',
+                code: parametros.get('code'),
+                error: parametros.get('error'),
+            }, window.location.origin);
+        }
+        window.close();
+    </script>
+</body>
+</html>

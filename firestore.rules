@@ -1,0 +1,332 @@
+rules_version = '2';
+
+// Reglas de seguridad de Firestore. Esto es lo que de verdad protege los
+// datos (la config de firebase-config.js es pública, así que la seguridad
+// no puede depender de "ocultarla").
+//
+// Punto de partida pensado para testeo con pocos grupos de confianza, no
+// para un lanzamiento público masivo — antes de invitar a mucha gente
+// conviene revisar en particular la regla de "update" de /grupos, que es
+// la más permisiva de todas (ver comentario ahí abajo).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+
+    function esMiembro(grupoId) {
+      return estaAutenticado() &&
+        request.auth.uid in get(/databases/$(database)/documents/grupos/$(grupoId)).data.miembros;
+    }
+
+    // Mismo criterio que esMiembro(), pero para los grupos de TareasApp
+    // (colección aparte, ver el bloque "--- TareasApp ---" más abajo) —
+    // hace falta una función separada porque son dos colecciones
+    // distintas (grupos/ vs tareasGrupos/), y la usa también la regla de
+    // notificaciones de acá abajo (un compañero de grupo de TareasApp
+    // avisándote que te asignó una tarea).
+    function esMiembroTareas(grupoId) {
+      return estaAutenticado() &&
+        request.auth.uid in get(/databases/$(database)/documents/tareasGrupos/$(grupoId)).data.miembros;
+    }
+
+    // Mismo criterio, pero para los torneos de GamingApp (usa
+    // "participantes" en vez de "miembros") — la usa la regla de
+    // notificaciones de acá abajo para el aviso "alguien se unió a tu
+    // torneo".
+    function esParticipanteTorneo(codigo) {
+      return estaAutenticado() &&
+        request.auth.uid in get(/databases/$(database)/documents/torneos/$(codigo)).data.participantes;
+    }
+
+    // El panel de administración (admin.html) es del dueño de la app
+    // (comparado directo contra su UID — Firebase Console → Authentication
+    // → Users → columna "User UID") O de cualquier otra cuenta que él
+    // mismo haya marcado como admin desde ahí (campo `esAdmin` en su
+    // propio usuarios/{uid}, ver la regla de "permisos por app" más
+    // abajo). El UID hardcodeado NUNCA se saca — es la red de seguridad
+    // para no perder el acceso si el campo de Firestore se borra o se
+    // configura mal por error. Reemplazar 'TU_UID_DE_FIREBASE' por el
+    // UID real (Firebase Console → Authentication → Users) antes de
+    // desplegar estas reglas.
+    function esAdmin() {
+      return estaAutenticado() && (
+        request.auth.uid == 'TU_UID_DE_FIREBASE' ||
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.esAdmin == true
+      );
+    }
+
+    // usuarios/{uid}: perfil (nombre, grupos, presupuesto, tarjeta, etc.) y
+    // TODO lo que cuelga de ahí (pagos personales, pagos de tarjeta,
+    // ingresos/sueldo...) — es información 100% privada de cada quien, así
+    // que un solo match recursivo alcanza en vez de listar cada
+    // subcolección una por una.
+    match /usuarios/{uid} {
+      allow read, write: if estaAutenticado() && request.auth.uid == uid;
+      // Además del propio dueño, el admin puede LEER la lista completa
+      // — es lo que usa admin.html para el resumen de sesiones/uso por
+      // persona.
+      allow read: if esAdmin();
+      // Y puede ESCRIBIR, pero solo estos 2 campos puntuales (sistema
+      // de permisos por app, 2026-08-30, ver permisos.js) — nunca el
+      // resto del perfil de otra persona (plata, presupuesto, etc.).
+      allow update: if esAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['appsPermitidas', 'esAdmin']);
+
+      match /{document=**} {
+        allow read, write: if estaAutenticado() && request.auth.uid == uid;
+      }
+
+      // usuarios/{uid}/notificaciones: el centro de notificaciones
+      // compartido por todas las apps (ver notificacionesCentro.js) —
+      // el dueño ya puede leer/escribir lo suyo por la regla de arriba,
+      // esto agrega el caso de un COMPAÑERO DE GRUPO/TORNEO creándole
+      // una notificación a otro miembro (ej. "fulano te saldó su parte
+      // de un gasto", "fulano te asignó una tarea", "alguien se unió a
+      // tu torneo"). Nunca puede leer, editar ni borrar las de otro —
+      // solo crear una nueva, recién hecha (leida tiene que arrancar en
+      // false) y con un grupoId de un grupo/torneo REAL (de GastosApp,
+      // TareasApp o GamingApp — tres colecciones distintas, se prueban
+      // las tres) del que ambos (quien crea y el dueño de la
+      // notificación) sean parte — si no, cualquiera podría inventarse
+      // un grupoId cualquiera y mandarle notificaciones a quien sea.
+      match /notificaciones/{notifId} {
+        allow create: if estaAutenticado()
+          && request.auth.uid != uid
+          && request.resource.data.leida == false
+          && request.resource.data.grupoId is string
+          && (
+            (esMiembro(request.resource.data.grupoId)
+              && uid in get(/databases/$(database)/documents/grupos/$(request.resource.data.grupoId)).data.miembros)
+            ||
+            (esMiembroTareas(request.resource.data.grupoId)
+              && uid in get(/databases/$(database)/documents/tareasGrupos/$(request.resource.data.grupoId)).data.miembros)
+            ||
+            (esParticipanteTorneo(request.resource.data.grupoId)
+              && uid in get(/databases/$(database)/documents/torneos/$(request.resource.data.grupoId)).data.participantes)
+          );
+      }
+    }
+
+    // grupos/{grupoId}: solo lo leen/editan sus miembros.
+    match /grupos/{grupoId} {
+      allow read: if esMiembro(grupoId);
+      allow create: if estaAutenticado() && request.auth.uid in request.resource.data.miembros;
+
+      // "update" tiene que permitir dos casos distintos:
+      //  1) un miembro actual edita el grupo (ej. le cambia el nombre).
+      //  2) alguien que TODAVÍA NO es miembro se une a sí mismo vía
+      //     unirseAGrupo() en grupos.js — ahí no puede pasar esMiembro()
+      //     todavía (es justo lo que está por dejar de ser cierto), así
+      //     que se permite si el único cambio es agregar el propio uid a
+      //     la lista de miembros.
+      allow update: if esMiembro(grupoId) || (
+        estaAutenticado() &&
+        request.auth.uid in request.resource.data.miembros &&
+        request.resource.data.miembros.size() == resource.data.miembros.size() + 1
+      );
+
+      // Borrar el grupo entero (botón "🗑️ Eliminar grupo") — cualquier
+      // miembro puede hacerlo, mismo criterio de confianza que el resto
+      // de la app entre integrantes de un mismo grupo.
+      allow delete: if esMiembro(grupoId);
+
+      // grupos/{grupoId}/expenses y /pagosDeuda: los gastos y los pagos
+      // entre personas del grupo (sección "División de Gastos").
+      match /expenses/{expenseId} {
+        allow read, write: if esMiembro(grupoId);
+      }
+      match /pagosDeuda/{pagoId} {
+        allow read, write: if esMiembro(grupoId);
+      }
+
+      // grupos/{grupoId}/mensajes: el chat del grupo. A diferencia de
+      // gastos/pagos, acá solo el propio autor puede borrar su mensaje
+      // (nadie borra lo que escribió otro) — y nadie edita mensajes ya
+      // mandados, ni siquiera el propio autor.
+      match /mensajes/{mensajeId} {
+        allow read: if esMiembro(grupoId);
+        allow create: if esMiembro(grupoId) && request.auth.uid == request.resource.data.autorUid;
+        allow delete: if esMiembro(grupoId) && request.auth.uid == resource.data.autorUid;
+      }
+    }
+
+    // invitaciones/{codigo}: mapeo código → grupoId para poder unirse sin
+    // hacer una query. Cualquier usuario autenticado puede crear un código
+    // (al crear un grupo) o leerlo (al intentar unirse con uno). También se
+    // puede borrar (al eliminar el grupo, para no dejar códigos huérfanos).
+    match /invitaciones/{codigo} {
+      allow read, create: if estaAutenticado();
+      allow delete: if estaAutenticado();
+    }
+
+    // eventos/{eventoId}: errores de JavaScript capturados solos (ver
+    // analitica.js), no algo que el usuario haya escrito a mano. Se puede
+    // CREAR el propio (uid tiene que coincidir con quien está
+    // autenticado), pero no leer/editar/borrar ninguno — ni siquiera el
+    // propio: son para revisar después desde la consola de Firebase, no
+    // para mostrarlos dentro de la app.
+    match /eventos/{eventoId} {
+      allow create: if estaAutenticado() && request.auth.uid == request.resource.data.uid;
+      allow read: if esAdmin(); // admin.html — nadie más puede leer, ni el que lo generó
+    }
+
+    // reportesBugs/{reporteId}: lo que un usuario cuenta a mano desde la
+    // burbuja de ayuda (💬, ver asistente.js) — mismo criterio que
+    // eventos: se puede crear, no leer (salvo el admin).
+    match /reportesBugs/{reporteId} {
+      allow create: if estaAutenticado() && request.auth.uid == request.resource.data.uid;
+      allow read: if esAdmin();
+    }
+
+    // sugerencias/{sugerenciaId}: ideas de mejora que un usuario manda a
+    // mano desde Gastón — mismo criterio que reportesBugs y eventos.
+    match /sugerencias/{sugerenciaId} {
+      allow create: if estaAutenticado() && request.auth.uid == request.resource.data.uid;
+      allow read: if esAdmin();
+    }
+
+    // --- GamingApp — separado a propósito de todo lo de arriba (no
+    // depende de datos de GastosApp, ver gaming/index.html) ---
+
+    // gaming/{uid}: lo mismo que usuarios/{uid} para GastosApp, pero en
+    // su propia colección — torneos en los que cada quien participa o
+    // creó, la cuenta de Riot conectada (Tracker), y todo lo que cuelga
+    // de ahí (composiciones de TFT guardadas, historial de rango) — es
+    // 100% privado de cada quien, mismo criterio recursivo que
+    // usuarios/{uid} en vez de listar cada subcolección nueva a mano:
+    //   - tftComps/{compId}: composiciones de TFT armadas y guardadas
+    //     por la persona (ver riot.js) — se guardan por "temporada" (un
+    //     campo de texto libre adentro del documento, no una
+    //     subcolección por set) para poder comparar entre sets sin
+    //     perder las viejas.
+    //   - rangoHistorialLoL/{fecha} y rangoHistorialTFT/{fecha}: una
+    //     "foto" del rango (tier/división/PL) por día, para poder
+    //     graficar el progreso en el tiempo — el id del documento ES la
+    //     fecha (YYYY-MM-DD), así que visitar el Tracker más de una vez
+    //     el mismo día pisa la foto de ese día en vez de duplicarla.
+    match /gaming/{uid} {
+      allow read, write: if estaAutenticado() && request.auth.uid == uid;
+      match /{document=**} {
+        allow read, write: if estaAutenticado() && request.auth.uid == uid;
+      }
+    }
+
+    // tftPedidosComps/{clusterId}: el Tracker de TFT muestra 25 comps
+    // completas (tablero/ítems/por nivel) y otras 28 solo con el
+    // cabezal (ver META_TFT_RESTO en metaCurada.js) — acá se junta
+    // quién tocó "pedir datos completos" en alguna de esas 28, para
+    // saber cuáles conviene sumar completas más adelante (a mano, como
+    // siempre). El id del documento ES el cluster_id de metatft.com.
+    // Cualquier autenticado puede leer (para mostrar el contador y si
+    // YA la pediste), pero solo puede sumar/sacar SU PROPIO uid del
+    // array — nunca tocar el pedido de otra persona ni ningún otro
+    // campo del documento.
+    match /tftPedidosComps/{clusterId} {
+      allow read: if estaAutenticado();
+      allow create: if estaAutenticado()
+        && request.resource.data.keys().hasOnly(['pedidosPor'])
+        && request.resource.data.pedidosPor == [request.auth.uid];
+      allow update: if estaAutenticado()
+        && request.resource.data.keys().hasOnly(['pedidosPor'])
+        && (
+          request.resource.data.pedidosPor == resource.data.pedidosPor.concat([request.auth.uid])
+          || request.resource.data.pedidosPor == resource.data.pedidosPor.removeAll([request.auth.uid])
+        );
+    }
+
+    // torneos/{codigo}: el código de invitación (6 caracteres, ej.
+    // "AB3XQ9") ES el id del documento — no hace falta una colección de
+    // mapeo aparte como invitaciones/{codigo} en GastosApp, alcanza con
+    // un getDoc directo para "unirse con código".
+    match /torneos/{codigo} {
+      // Cualquier autenticado puede leer un torneo puntual SI YA SABE el
+      // código (no hay forma de listar todos los torneos desde la app,
+      // así que esto no expone nada a quien no lo tenga) — hace falta
+      // para poder mostrar el nombre/juego antes de confirmar "unirse".
+      allow read: if estaAutenticado();
+      allow create: if estaAutenticado()
+        && request.auth.uid == request.resource.data.creadoPor
+        && request.resource.data.participantes == [request.auth.uid];
+
+      // "update" permite tres casos:
+      //  1) el creador edita el torneo (nombre, premio, estado, generar
+      //     los partidos de la liga, finalizarla...).
+      //  2) alguien se suma a sí mismo con el código — el único cambio
+      //     tiene que ser agregar el propio uid a "participantes".
+      //  3) cualquier participante YA ADENTRO carga el resultado de un
+      //     partido/cruce (de la liga, de un grupo, o de un cruce de
+      //     eliminación) — se confía en que cada quien carga bien el
+      //     suyo (mismo criterio de confianza que el resto de la app
+      //     entre gente de un mismo grupo/torneo), pero se exige que lo
+      //     único que cambie sea "partidos"/"partidosGrupos" (siempre) y,
+      //     de paso, "estado"/"campeon" cuando el resultado cargado es
+      //     el de la final (ver registrarResultadoEliminacion en
+      //     torneos.js) — nunca el nombre, el premio, ni sumarse a sí
+      //     mismo de nuevo por acá.
+      allow update: if estaAutenticado() && (
+        request.auth.uid == resource.data.creadoPor ||
+        (
+          request.auth.uid in request.resource.data.participantes &&
+          request.resource.data.participantes.size() == resource.data.participantes.size() + 1
+        ) ||
+        (
+          request.auth.uid in resource.data.participantes &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['partidos', 'partidosGrupos', 'estado', 'campeon'])
+        )
+      );
+
+      allow delete: if estaAutenticado() && request.auth.uid == resource.data.creadoPor;
+    }
+
+    // --- TareasApp — separada a propósito de todo lo de arriba (no
+    // depende de datos de GastosApp/GamingApp/AgendaApp, ver
+    // tareas/index.html) ---
+
+    // tareasPersonales/{uid}: lo mismo que usuarios/{uid} para GastosApp,
+    // pero en su propia colección — el documento en sí guarda "mis
+    // grupos de tareas" (lista denormalizada, mismo patrón que
+    // usuarios/{uid}.grupos), y debajo cuelga la subcolección de tareas
+    // 100% personales (nunca compartidas con nadie).
+    match /tareasPersonales/{uid} {
+      allow read, write: if estaAutenticado() && request.auth.uid == uid;
+      match /{document=**} {
+        allow read, write: if estaAutenticado() && request.auth.uid == uid;
+      }
+    }
+
+    // tareasGrupos/{codigo}: el código de invitación (6 caracteres) ES el
+    // id del documento — mismo criterio que torneos/{codigo} de
+    // GamingApp, no hace falta una colección de mapeo aparte como
+    // invitaciones/{codigo} de GastosApp.
+    match /tareasGrupos/{codigo} {
+      allow read: if esMiembroTareas(codigo);
+      allow create: if estaAutenticado() && request.resource.data.miembros == [request.auth.uid];
+
+      // Mismo criterio que grupos/{grupoId} de GastosApp: un miembro
+      // actual edita el grupo (ej. le cambia el nombre), o alguien
+      // TODAVÍA NO miembro se suma a sí mismo (el único cambio permitido
+      // en ese caso es agregar su propio uid a la lista).
+      allow update: if esMiembroTareas(codigo) || (
+        estaAutenticado() &&
+        request.auth.uid in request.resource.data.miembros &&
+        request.resource.data.miembros.size() == resource.data.miembros.size() + 1
+      );
+
+      // Borrar el grupo entero — cualquier miembro puede hacerlo, mismo
+      // criterio de confianza que el resto del mega sistema entre
+      // integrantes de un mismo grupo.
+      allow delete: if esMiembroTareas(codigo);
+
+      // tareasGrupos/{codigo}/tareas: la lista compartida de tareas del
+      // grupo — cualquier miembro puede leer y escribir cualquier tarea
+      // (crearla, marcarla completada, asignarla, borrarla), mismo nivel
+      // de confianza que gastos/pagos de GastosApp entre compañeros de
+      // grupo.
+      match /tareas/{tareaId} {
+        allow read, write: if esMiembroTareas(codigo);
+      }
+    }
+  }
+}

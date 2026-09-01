@@ -1,0 +1,10 @@
+name = "gastosapp-steam-proxy"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# La Steam API key NO va acá (esto se commitea a git) — se carga aparte,
+# una sola vez, con:
+#   npx wrangler secret put STEAM_API_KEY
+# (te va a pedir que la pegues, y queda guardada del lado de Cloudflare,
+# nunca en ningún archivo del repo). Ver README.md de esta carpeta para
+# el paso a paso completo.

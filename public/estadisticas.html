@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Más datos · GastosApp</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <meta name="theme-color" content="#0f0e0c">
+    <script>
+        var tema = localStorage.getItem('tema') || 'oscuro';
+        document.documentElement.setAttribute('data-tema', tema);
+        if (tema === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@twemoji/api@17.0.3/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div id="pantalla-carga" class="pantalla-carga"><div class="spinner"></div></div>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page">
+        <div class="card">
+            <h2>📊 Más datos</h2>
+            <p style="margin: 0;">Cómo venís gastando, en qué, y cuándo — combinando tus gastos personales y lo que pagaste en tus grupos.</p>
+        </div>
+
+        <div class="card">
+            <h3>Filtros</h3>
+            <form class="form" id="filtros-estadisticas">
+                <div>
+                    <label for="filtro-periodo">Período</label>
+                    <select id="filtro-periodo">
+                        <option value="mes-actual">Este mes</option>
+                        <option value="mes-pasado">Mes pasado</option>
+                        <option value="3-meses">Últimos 3 meses</option>
+                        <option value="ano-actual">Este año</option>
+                        <option value="todo">Todo</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="filtro-origen-est">Mostrar</label>
+                    <select id="filtro-origen-est">
+                        <option value="todos">Todos</option>
+                        <option value="personal">Solo personales</option>
+                        <option value="grupos">Solo grupos</option>
+                    </select>
+                </div>
+                <div id="contenedor-filtro-grupo-est" style="display:none;">
+                    <label for="filtro-grupo-est">Grupo</label>
+                    <select id="filtro-grupo-est"><option value="">Todos los grupos</option></select>
+                </div>
+                <div>
+                    <label for="filtro-categoria-est">Categoría</label>
+                    <select id="filtro-categoria-est"><option value="">Todas</option></select>
+                </div>
+                <div>
+                    <label for="filtro-moneda-est">Moneda</label>
+                    <select id="filtro-moneda-est"><option value="todas">Todas</option></select>
+                </div>
+            </form>
+        </div>
+
+        <div class="stats-row" id="stats-row-est" style="display:none;">
+            <div class="stat-tile">
+                <div class="stat-valor" id="est-total">$0.00</div>
+                <div class="stat-etiqueta">Total del período</div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-valor" id="est-promedio-diario">$0.00</div>
+                <div class="stat-etiqueta">Promedio diario</div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-valor" id="est-comparativa">—</div>
+                <div class="stat-etiqueta" id="est-comparativa-etiqueta">vs. período anterior</div>
+            </div>
+            <div class="stat-tile" id="est-proyeccion-tile" style="display:none;">
+                <div class="stat-valor" id="est-proyeccion">$0.00</div>
+                <div class="stat-etiqueta">Proyección fin de mes</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Gasto por categoría</h3>
+            <div class="grafico-contenedor" id="grafico-categorias"></div>
+        </div>
+
+        <div class="card">
+            <h3>Gasto por mes</h3>
+            <p class="texto-muted" style="font-size:.8rem; margin-top:-8px;">Últimos 6 meses — no cambia con el filtro de período de arriba, es para ver la tendencia general.</p>
+            <div class="grafico-contenedor" id="grafico-meses"></div>
+        </div>
+
+        <div class="card" id="card-ingresos-vs-gastos" style="display:none;">
+            <h3>Ingresos vs. gastos por mes</h3>
+            <p class="texto-muted" style="font-size:.8rem; margin-top:-8px;">Últimos 6 meses, igual que el de arriba — para ver si el mes cierra en verde o en rojo.</p>
+            <div class="grafico-contenedor" id="grafico-ingresos-vs-gastos"></div>
+        </div>
+
+        <div class="card">
+            <h3>¿Qué día de la semana gastás más?</h3>
+            <div class="grafico-contenedor" id="grafico-dias"></div>
+        </div>
+
+        <div class="card">
+            <h3>Gasto por método de pago</h3>
+            <div class="grafico-contenedor" id="grafico-metodo-pago"></div>
+        </div>
+
+        <div class="card" id="card-gasto-inusual" style="display:none;">
+            <h3>🔺 Gasto inusual</h3>
+            <p class="texto-muted" style="font-size:.8rem; margin-top:-8px;">Categorías donde este mes gastaste bastante más que tu propio promedio de los 3 meses anteriores.</p>
+            <div id="gasto-inusual-contenido"></div>
+        </div>
+
+        <div class="card">
+            <h3>Top 5 gastos más grandes</h3>
+            <div id="top-gastos"></div>
+        </div>
+
+        <div class="card">
+            <h3>🔁 Compras que se repiten</h3>
+            <p class="texto-muted" style="font-size:.8rem; margin-top:-8px;">Detectadas por descripción repetida dentro del período filtrado — cada cuánto las cargás y cuándo caería la próxima.</p>
+            <div id="compras-recurrentes"></div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 GastosApp</p>
+    </footer>
+
+    <script type="module">
+        import { iniciarNavbar } from './nav.js';
+        import { iniciarWidgetDeSesion, requerirSesion } from './auth.js';
+        import { escucharPagos } from './storage.js';
+        import { escucharGastos } from './expenses.js';
+        import { obtenerMisGrupos, escucharGrupo } from './grupos.js';
+        import { opcionesDeCategorias, etiquetaDeCategoria } from './categorias.js';
+        import { graficoBarrasHorizontal, graficoBarrasVertical, graficoBarrasComparativo, agregarVistaDeTabla } from './graficos.js';
+        import { esc, avisar } from './ui.js';
+        import { construirMovimientosUnificados } from './movimientos.js';
+        import { MONEDAS, simboloDeMoneda, obtenerCotizaciones } from './monedas.js';
+        import { agregarRecurrente, escucharRecurrentes } from './recurrentes.js';
+        import { escucharIngresos } from './finanzas.js';
+
+        iniciarNavbar('estadisticas.html');
+        iniciarWidgetDeSesion('estadisticas.html');
+
+        document.getElementById('filtro-categoria-est').innerHTML = '<option value="">Todas</option>' + opcionesDeCategorias();
+        document.getElementById('filtro-moneda-est').innerHTML += MONEDAS.map(m => `<option value="${m.valor}">${m.simbolo} ${m.texto}</option>`).join('');
+
+        let uid = null;
+        let gastosPersonales = [];
+        let ingresosPersonales = [];
+        let misGrupos = [];
+        let datosGrupos = {};
+        let gastosGrupales = {};
+        let cotizaciones = null;
+        // Se usa para no ofrecer "🔁 Guardar" en una descripción que ya
+        // tiene un recurrente guardado — sin esto, tocar el botón dos
+        // veces (o volver a esta pantalla más tarde) creaba duplicados.
+        let recurrentesActuales = [];
+
+        // Solo lo que pagué yo (personal o en mis grupos) — es "cuánto
+        // gasto", no todo lo que se carga en un grupo del que soy parte
+        // (ver movimientos.js, compartido con Gastos personales e Inicio).
+        // Sale con `origen` ('personal'/'grupo'), que es lo que usa el
+        // resto de este archivo para filtrar.
+        function construirGastosUnificados() {
+            return construirMovimientosUnificados({ uid, gastosPersonales, misGrupos, gastosGrupales, datosGrupos, cotizaciones });
+        }
+
+        function rangoDeFechas(periodo) {
+            const hoy = new Date();
+            switch (periodo) {
+                case 'mes-actual':
+                    return { desde: new Date(hoy.getFullYear(), hoy.getMonth(), 1), hasta: new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0) };
+                case 'mes-pasado':
+                    return { desde: new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1), hasta: new Date(hoy.getFullYear(), hoy.getMonth(), 0) };
+                case '3-meses':
+                    return { desde: new Date(hoy.getFullYear(), hoy.getMonth() - 2, 1), hasta: new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0) };
+                case 'ano-actual':
+                    return { desde: new Date(hoy.getFullYear(), 0, 1), hasta: new Date(hoy.getFullYear(), 11, 31) };
+                default:
+                    return { desde: null, hasta: null };
+            }
+        }
+
+        // El mismo largo de rango, pero el inmediatamente anterior — para
+        // la comparativa "vs. período anterior".
+        function rangoAnterior(periodo) {
+            const hoy = new Date();
+            switch (periodo) {
+                case 'mes-actual':
+                    return rangoDeFechas('mes-pasado');
+                case 'mes-pasado':
+                    return { desde: new Date(hoy.getFullYear(), hoy.getMonth() - 2, 1), hasta: new Date(hoy.getFullYear(), hoy.getMonth() - 1, 0) };
+                case '3-meses':
+                    return { desde: new Date(hoy.getFullYear(), hoy.getMonth() - 5, 1), hasta: new Date(hoy.getFullYear(), hoy.getMonth() - 2, 0) };
+                case 'ano-actual':
+                    return { desde: new Date(hoy.getFullYear() - 1, 0, 1), hasta: new Date(hoy.getFullYear() - 1, 11, 31) };
+                default:
+                    return { desde: null, hasta: null };
+            }
+        }
+
+        function filtrarPorRango(items, desde, hasta) {
+            const origen = document.getElementById('filtro-origen-est').value;
+            const grupoId = document.getElementById('filtro-grupo-est').value;
+            const categoria = document.getElementById('filtro-categoria-est').value;
+            const moneda = document.getElementById('filtro-moneda-est').value;
+            const desdeTexto = desde ? desde.toISOString().slice(0, 10) : null;
+            const hastaTexto = hasta ? hasta.toISOString().slice(0, 10) : null;
+
+            return items.filter(item => {
+                if (desdeTexto && item.date < desdeTexto) return false;
+                if (hastaTexto && item.date > hastaTexto) return false;
+                if (origen === 'personal' && item.origen !== 'personal') return false;
+                if (origen === 'grupos' && item.origen !== 'grupo') return false;
+                if (origen === 'grupos' && grupoId && item.grupoId !== grupoId) return false;
+                if (categoria && item.categoria !== categoria) return false;
+                if (moneda !== 'todas' && (item.moneda || 'ARS') !== moneda) return false;
+                return true;
+            });
+        }
+
+        // Con el filtro de moneda en una puntual, TODO lo que pasó el
+        // filtro de arriba ya es esa misma moneda — se suma y se muestra
+        // nativo, sin convertir. Con "Todas" (mezclado) se sigue sumando
+        // en pesos (amountARS), porque ahí sí hace falta un común
+        // denominador para poder dar un solo número.
+        function campoMontoActivo() {
+            const moneda = document.getElementById('filtro-moneda-est').value;
+            return moneda === 'todas' ? 'amountARS' : 'amount';
+        }
+
+        function formatearMoneda(v) {
+            const moneda = document.getElementById('filtro-moneda-est').value;
+            const simbolo = moneda === 'todas' ? '$' : simboloDeMoneda(moneda);
+            // toLocaleString en vez de toFixed(2): separa los miles ($926.105,46
+            // en vez de $926105.46) — con totales de 6-7 cifras como los de esta
+            // pantalla, sin separador el número queda larguísimo y pegado.
+            return `${simbolo}${v.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        // --- Stat tiles ---
+
+        function renderStats(itemsFiltrados) {
+            const statsRow = document.getElementById('stats-row-est');
+            if (itemsFiltrados.length === 0 && gastosPersonales.length === 0 && Object.keys(gastosGrupales).length === 0) {
+                statsRow.style.display = 'none';
+                return;
+            }
+            // No hardcodear 'flex' acá: un estilo inline le gana SIEMPRE a la
+            // regla de main.css que en celular (@media max-width:640px) pasa
+            // esta fila a grilla de 2 columnas — con 'flex' fijo por JS, esa
+            // regla quedaba pisada y las 4 tarjetas se apretaban en una sola
+            // fila angosta (los números se veían enormes y cortados en varias
+            // líneas). removeProperty() saca el inline y deja que la hoja de
+            // estilos decida (flex en escritorio, grid 2x2 en celular).
+            statsRow.style.removeProperty('display');
+
+            const periodo = document.getElementById('filtro-periodo').value;
+            const { desde, hasta } = rangoDeFechas(periodo);
+            const campo = campoMontoActivo();
+            const total = itemsFiltrados.reduce((s, i) => s + i[campo], 0);
+
+            const hoy = new Date();
+            let dias;
+            if (periodo === 'todo') {
+                const fechaMinima = itemsFiltrados.reduce((min, i) => (!min || i.date < min) ? i.date : min, null);
+                dias = fechaMinima ? Math.max(1, Math.round((hoy - new Date(fechaMinima)) / 86400000) + 1) : 1;
+            } else {
+                const finEfectivo = hasta && hasta < hoy ? hasta : hoy;
+                dias = Math.max(1, Math.round((finEfectivo - desde) / 86400000) + 1);
+            }
+
+            document.getElementById('est-total').textContent = formatearMoneda(total);
+            document.getElementById('est-promedio-diario').textContent = formatearMoneda(total / dias);
+
+            const anterior = rangoAnterior(periodo);
+            const totalAnterior = filtrarPorRango(construirGastosUnificados(), anterior.desde, anterior.hasta).reduce((s, i) => s + i[campo], 0);
+            const comparativa = document.getElementById('est-comparativa');
+            if (periodo === 'todo' || totalAnterior === 0) {
+                comparativa.textContent = '—';
+                comparativa.className = 'stat-valor';
+            } else {
+                const cambio = ((total - totalAnterior) / totalAnterior) * 100;
+                comparativa.textContent = `${cambio >= 0 ? '+' : ''}${cambio.toFixed(0)}%`;
+                comparativa.className = 'stat-valor ' + (cambio > 0 ? 'monto negativo' : 'monto positivo');
+            }
+
+            const tileProyeccion = document.getElementById('est-proyeccion-tile');
+            if (periodo === 'mes-actual') {
+                const diaDelMes = hoy.getDate();
+                const diasEnElMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+                const proyeccion = (total / diaDelMes) * diasEnElMes;
+                document.getElementById('est-proyeccion').textContent = formatearMoneda(proyeccion);
+                tileProyeccion.style.display = 'block';
+            } else {
+                tileProyeccion.style.display = 'none';
+            }
+        }
+
+        // --- Gasto por categoría ---
+
+        function renderGraficoCategorias(itemsFiltrados) {
+            const campo = campoMontoActivo();
+            const porCategoria = {};
+            itemsFiltrados.forEach(i => {
+                const clave = i.categoria || 'otros';
+                porCategoria[clave] = (porCategoria[clave] || 0) + i[campo];
+            });
+            const datos = Object.entries(porCategoria)
+                .map(([categoria, valor]) => ({ etiqueta: etiquetaDeCategoria(categoria), valor }))
+                .sort((a, b) => b.valor - a.valor);
+
+            graficoBarrasHorizontal('grafico-categorias', datos, formatearMoneda);
+            agregarVistaDeTabla('grafico-categorias', datos, 'Categoría', formatearMoneda);
+        }
+
+        // --- Gasto por mes (últimos 6, sin importar el filtro de período) ---
+
+        function renderGraficoMeses() {
+            const items = filtrarPorRango(construirGastosUnificados(), null, null);
+            const campo = campoMontoActivo();
+            const hoy = new Date();
+            const meses = [];
+            for (let i = 5; i >= 0; i--) {
+                const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+                const clave = fecha.toISOString().slice(0, 7);
+                const etiqueta = fecha.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '');
+                meses.push({ clave, etiqueta: etiqueta.charAt(0).toUpperCase() + etiqueta.slice(1), valor: 0 });
+            }
+            items.forEach(i => {
+                const mes = meses.find(m => m.clave === i.date.slice(0, 7));
+                if (mes) mes.valor += i[campo];
+            });
+
+            graficoBarrasVertical('grafico-meses', meses, (v) => formatearMoneda(Math.round(v)));
+            agregarVistaDeTabla('grafico-meses', meses, 'Mes', formatearMoneda);
+        }
+
+        // --- Ingresos vs. gastos por mes ---
+        //
+        // A propósito NO pasa por filtrarPorRango — los ingresos no
+        // tienen categoría/origen/moneda con qué cruzarlos, así que
+        // este gráfico siempre muestra el total real de los dos lados
+        // (mismo criterio que "Gasto por mes", que tampoco cambia con
+        // el período elegido arriba). Los ingresos en esta app son
+        // siempre en pesos (no tienen selector de moneda), así que se
+        // comparan tal cual contra el equivalente en pesos del gasto.
+        function renderGraficoIngresosVsGastos() {
+            const card = document.getElementById('card-ingresos-vs-gastos');
+
+            const gastos = construirGastosUnificados();
+            const hoy = new Date();
+            const meses = [];
+            for (let i = 5; i >= 0; i--) {
+                const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+                const clave = fecha.toISOString().slice(0, 7);
+                const etiqueta = fecha.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '');
+                meses.push({ clave, etiqueta: etiqueta.charAt(0).toUpperCase() + etiqueta.slice(1), gasto: 0, ingreso: 0 });
+            }
+            gastos.forEach(g => {
+                const mes = meses.find(m => m.clave === g.date.slice(0, 7));
+                if (mes) mes.gasto += g.amountARS;
+            });
+            ingresosPersonales.forEach(i => {
+                const mes = meses.find(m => m.clave === i.date.slice(0, 7));
+                if (mes) mes.ingreso += parseFloat(i.amount);
+            });
+
+            // Se oculta la tarjeta entera si no hay NADA en estos 6
+            // meses — a diferencia de solo mirar si hay algún ingreso
+            // alguna vez (podría ser un ingreso viejo, de hace años, y
+            // mostrar un gráfico casi vacío sin sentido).
+            if (meses.every(m => m.gasto === 0 && m.ingreso === 0)) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+
+            graficoBarrasComparativo(
+                'grafico-ingresos-vs-gastos',
+                meses.map(m => m.etiqueta),
+                meses.map(m => m.ingreso), 'Ingresos',
+                meses.map(m => m.gasto), 'Gastos',
+                (v) => `$${Math.round(v)}`
+            );
+        }
+
+        // --- Día de la semana ---
+
+        function renderGraficoDias(itemsFiltrados) {
+            const campo = campoMontoActivo();
+            const nombres = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+            const totales = [0, 0, 0, 0, 0, 0, 0]; // índice 0 = lunes
+            itemsFiltrados.forEach(i => {
+                const diaJs = new Date(i.date + 'T00:00:00').getDay(); // 0 = domingo
+                const indice = diaJs === 0 ? 6 : diaJs - 1;
+                totales[indice] += i[campo];
+            });
+            const datos = nombres.map((etiqueta, i) => ({ etiqueta, valor: totales[i] }));
+
+            graficoBarrasVertical('grafico-dias', datos, (v) => formatearMoneda(Math.round(v)));
+            agregarVistaDeTabla('grafico-dias', datos, 'Día', formatearMoneda);
+        }
+
+        // --- Método de pago ---
+
+        function renderGraficoMetodoPago(itemsFiltrados) {
+            const campo = campoMontoActivo();
+            const etiquetas = { efectivo: '💵 Efectivo', debito: '💳 Débito', credito: '💳 Crédito', transferencia: '🏦 Transferencia' };
+            const porMetodo = {};
+            itemsFiltrados.forEach(i => {
+                // Los gastos de grupo no tienen método de pago propio
+                // (ver movimientos.js) — se agrupan como "Sin
+                // especificar" en vez de perderlos del gráfico.
+                const clave = i.metodoPago || 'sin-especificar';
+                porMetodo[clave] = (porMetodo[clave] || 0) + i[campo];
+            });
+            const datos = Object.entries(porMetodo)
+                .map(([metodo, valor]) => ({ etiqueta: etiquetas[metodo] || '❔ Sin especificar', valor }))
+                .sort((a, b) => b.valor - a.valor);
+
+            graficoBarrasHorizontal('grafico-metodo-pago', datos, formatearMoneda);
+            agregarVistaDeTabla('grafico-metodo-pago', datos, 'Método', formatearMoneda);
+        }
+
+        // --- Gasto inusual ---
+        //
+        // Compara el mes actual (el real, no el período elegido arriba)
+        // contra el promedio de los 3 anteriores, por categoría — si
+        // alguna quedó bastante por encima de lo habitual, se avisa.
+        // Es contra el propio historial de cada uno, no contra nadie
+        // más. Doble umbral (+40% Y al menos $1000 de diferencia) para
+        // no alertar por variaciones chiquitas sin importancia.
+        function renderAlertaGastoInusual() {
+            const card = document.getElementById('card-gasto-inusual');
+            const contenedor = document.getElementById('gasto-inusual-contenido');
+            const items = construirGastosUnificados();
+
+            const hoy = new Date();
+            const mesActualClave = hoy.toISOString().slice(0, 7);
+            const totalesPorMesYCategoria = {};
+            items.forEach(i => {
+                const mes = i.date.slice(0, 7);
+                const categoria = i.categoria || 'otros';
+                totalesPorMesYCategoria[mes] = totalesPorMesYCategoria[mes] || {};
+                totalesPorMesYCategoria[mes][categoria] = (totalesPorMesYCategoria[mes][categoria] || 0) + i.amountARS;
+            });
+
+            const mesesAnteriores = [];
+            for (let i = 1; i <= 3; i++) {
+                mesesAnteriores.push(new Date(hoy.getFullYear(), hoy.getMonth() - i, 1).toISOString().slice(0, 7));
+            }
+
+            const totalesMesActual = totalesPorMesYCategoria[mesActualClave] || {};
+            const categorias = new Set([
+                ...Object.keys(totalesMesActual),
+                ...mesesAnteriores.flatMap(m => Object.keys(totalesPorMesYCategoria[m] || {})),
+            ]);
+
+            const alertas = [];
+            categorias.forEach(categoria => {
+                const actual = totalesMesActual[categoria] || 0;
+                const promedioAnterior = mesesAnteriores.reduce((s, m) => s + (totalesPorMesYCategoria[m]?.[categoria] || 0), 0) / mesesAnteriores.length;
+                if (promedioAnterior > 0 && actual > promedioAnterior * 1.4 && (actual - promedioAnterior) > 1000) {
+                    alertas.push({ categoria, actual, promedioAnterior });
+                }
+            });
+            alertas.sort((a, b) => (b.actual - b.promedioAnterior) - (a.actual - a.promedioAnterior));
+
+            if (alertas.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+            contenedor.innerHTML = alertas.map(a => {
+                const cambio = Math.round(((a.actual - a.promedioAnterior) / a.promedioAnterior) * 100);
+                return `
+                    <div class="balance-item">
+                        <span>${etiquetaDeCategoria(a.categoria)}</span>
+                        <span class="monto negativo">+${cambio}% ($${a.actual.toFixed(2)} vs. $${a.promedioAnterior.toFixed(2)} promedio)</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- Top 5 ---
+
+        function renderTopGastos(itemsFiltrados) {
+            const contenedor = document.getElementById('top-gastos');
+            // Se ordena por el equivalente en pesos (así un gasto grande en
+            // dólares no queda mal rankeado contra uno chico en pesos),
+            // pero se muestra en la moneda original de cada gasto.
+            const top5 = [...itemsFiltrados].sort((a, b) => b.amountARS - a.amountARS).slice(0, 5);
+
+            if (top5.length === 0) {
+                contenedor.innerHTML = '<div class="estado-vacio"><span class="icono-grande">🧾</span>Sin gastos en este período.</div>';
+                return;
+            }
+
+            const filas = top5.map(i => `
+                <tr>
+                    <td>${i.date}</td>
+                    <td>${esc(i.description)}</td>
+                    <td class="monto">${simboloDeMoneda(i.moneda || 'ARS')}${i.amount.toFixed(2)}</td>
+                    <td>${etiquetaDeCategoria(i.categoria)}</td>
+                    <td>${i.origen === 'personal' ? '🧍 Vos' : `👥 ${esc(i.grupoNombre)}`}</td>
+                </tr>
+            `).join('');
+
+            contenedor.innerHTML = `
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Categoría</th><th>Origen</th></tr></thead>
+                        <tbody>${filas}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // --- Compras recurrentes ---
+
+        function renderComprasRecurrentes(itemsFiltrados) {
+            const contenedor = document.getElementById('compras-recurrentes');
+            const porDescripcion = {};
+            itemsFiltrados.forEach(item => {
+                const clave = (item.description || '').trim().toLowerCase();
+                if (!clave) return;
+                (porDescripcion[clave] = porDescripcion[clave] || []).push(item);
+            });
+
+            const recurrentes = Object.values(porDescripcion)
+                .filter(lista => lista.length >= 2)
+                .map(lista => {
+                    const fechas = lista.map(i => i.date).sort();
+                    const intervalos = [];
+                    for (let i = 1; i < fechas.length; i++) {
+                        intervalos.push((new Date(fechas[i]) - new Date(fechas[i - 1])) / 86400000);
+                    }
+                    const promedioIntervalo = Math.round(intervalos.reduce((s, x) => s + x, 0) / intervalos.length);
+                    const ultimaFecha = fechas[fechas.length - 1];
+                    const proximaEstimada = new Date(new Date(ultimaFecha + 'T00:00:00').getTime() + promedioIntervalo * 86400000);
+                    // El promedio se calcula en la moneda original (no en
+                    // pesos) — todas las repeticiones de una misma
+                    // descripción suelen ser en la misma moneda (ej.
+                    // "Netflix" siempre en dólares), así que tiene más
+                    // sentido para "marcar como recurrente" de abajo.
+                    const montoPromedio = lista.reduce((s, i) => s + i.amount, 0) / lista.length;
+                    return {
+                        descripcion: lista[0].description,
+                        cantidad: lista.length,
+                        promedioIntervalo,
+                        proximaEstimada: proximaEstimada.toISOString().slice(0, 10),
+                        montoPromedio,
+                        moneda: lista[0].moneda || 'ARS',
+                        categoria: lista[0].categoria || 'otros',
+                        origen: lista[0].origen,
+                    };
+                })
+                .sort((a, b) => a.promedioIntervalo - b.promedioIntervalo);
+
+            if (recurrentes.length === 0) {
+                contenedor.innerHTML = '<div class="estado-vacio"><span class="icono-grande">🔁</span>Todavía no se repite ninguna descripción al menos dos veces en este período.</div>';
+                return;
+            }
+
+            // Si ya existe un recurrente guardado con esta misma
+            // descripción (sin importar mayúsculas ni espacios de más), se
+            // muestra como ya guardado en vez de ofrecer el botón de
+            // nuevo — evita crear duplicados guardando la misma compra dos
+            // veces.
+            const yaGuardado = (descripcion) => recurrentesActuales.some(
+                r => (r.descripcion || '').trim().toLowerCase() === (descripcion || '').trim().toLowerCase()
+            );
+
+            const filas = recurrentes.map((r, indice) => {
+                let accion = '';
+                if (r.origen === 'personal') {
+                    accion = yaGuardado(r.descripcion)
+                        ? '<span class="texto-muted" style="font-size:.82rem;">✓ Ya guardado</span>'
+                        : `<button type="button" class="secundario boton-marcar-recurrente" data-indice="${indice}" style="width:auto;">🔁 Guardar</button>`;
+                }
+                return `
+                <tr>
+                    <td>${esc(r.descripcion)}</td>
+                    <td>${r.cantidad} veces</td>
+                    <td>cada ${r.promedioIntervalo} día(s)</td>
+                    <td>${r.proximaEstimada}</td>
+                    <td class="monto">${simboloDeMoneda(r.moneda)}${r.montoPromedio.toFixed(2)} prom.</td>
+                    <td>${accion}</td>
+                </tr>
+            `;
+            }).join('');
+
+            contenedor.innerHTML = `
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Descripción</th><th>Repeticiones</th><th>Frecuencia</th><th>Próxima estimada</th><th>Monto</th><th></th></tr></thead>
+                        <tbody>${filas}</tbody>
+                    </table>
+                </div>
+            `;
+
+            // Solo los gastos personales se pueden convertir en
+            // recurrente — los de grupo se cargan desde división de
+            // gastos, con otra lógica de reparto que no tiene sentido acá.
+            contenedor.querySelectorAll('.boton-marcar-recurrente').forEach(boton => {
+                boton.addEventListener('click', async () => {
+                    const r = recurrentes[boton.dataset.indice];
+                    if (!uid) return;
+                    // Por si el click llega justo entre que se guardó otro
+                    // recurrente y todavía no se volvió a renderizar esta
+                    // tabla con recurrentesActuales actualizado.
+                    if (yaGuardado(r.descripcion)) {
+                        avisar(`"${r.descripcion}" ya estaba guardado como recurrente.`, 'info');
+                        return;
+                    }
+                    try {
+                        await agregarRecurrente(uid, {
+                            descripcion: r.descripcion,
+                            monto: Math.round(r.montoPromedio * 100) / 100,
+                            moneda: r.moneda,
+                            categoria: r.categoria,
+                            metodoPago: 'efectivo',
+                            diaDelMes: new Date(r.proximaEstimada + 'T00:00:00').getDate(),
+                            activo: true,
+                        });
+                        avisar(`"${r.descripcion}" guardado como recurrente — lo vas a ver en Gastos personales.`, 'exito');
+                    } catch (error) {
+                        avisar(error.message, 'error');
+                    }
+                });
+            });
+        }
+
+        function actualizarEstadisticas() {
+            const periodo = document.getElementById('filtro-periodo').value;
+            const { desde, hasta } = rangoDeFechas(periodo);
+            const itemsFiltrados = filtrarPorRango(construirGastosUnificados(), desde, hasta);
+            renderStats(itemsFiltrados);
+            renderGraficoCategorias(itemsFiltrados);
+            renderGraficoMeses();
+            renderGraficoIngresosVsGastos();
+            renderGraficoDias(itemsFiltrados);
+            renderGraficoMetodoPago(itemsFiltrados);
+            renderAlertaGastoInusual();
+            renderTopGastos(itemsFiltrados);
+            renderComprasRecurrentes(itemsFiltrados);
+        }
+
+        // Es un <form> solo para heredar el estilo de grilla de .form (no
+        // hay botón de enviar) — por las dudas, si alguien aprieta Enter
+        // en algún campo, que no navegue a ningún lado.
+        document.getElementById('filtros-estadisticas').addEventListener('submit', (evento) => evento.preventDefault());
+
+        document.getElementById('filtros-estadisticas').addEventListener('change', (evento) => {
+            if (evento.target.id === 'filtro-origen-est') {
+                document.getElementById('contenedor-filtro-grupo-est').style.display =
+                    evento.target.value === 'grupos' ? 'block' : 'none';
+            }
+            actualizarEstadisticas();
+        });
+
+        requerirSesion(async (user) => {
+            uid = user.uid;
+            obtenerCotizaciones().then(datos => { cotizaciones = datos; actualizarEstadisticas(); });
+
+            misGrupos = await obtenerMisGrupos(uid);
+            document.getElementById('filtro-grupo-est').innerHTML =
+                '<option value="">Todos los grupos</option>' +
+                misGrupos.map(g => `<option value="${g.id}">${esc(g.nombre)}</option>`).join('');
+
+            escucharPagos(uid, (data) => {
+                gastosPersonales = data;
+                actualizarEstadisticas();
+            });
+
+            escucharIngresos(uid, (data) => {
+                ingresosPersonales = data;
+                actualizarEstadisticas();
+            });
+
+            escucharRecurrentes(uid, (data) => {
+                recurrentesActuales = data;
+                actualizarEstadisticas();
+            });
+
+            misGrupos.forEach((g) => {
+                // En tiempo real (antes era una lectura única al cargar la
+                // página) — si le cambian el nombre a un grupo o a algún
+                // integrante mientras esta pestaña sigue abierta, los
+                // gráficos y el top de gastos lo reflejan solos.
+                escucharGrupo(g.id, (datos) => {
+                    datosGrupos[g.id] = datos;
+                    actualizarEstadisticas();
+                });
+                escucharGastos(g.id, (data) => {
+                    gastosGrupales[g.id] = data;
+                    actualizarEstadisticas();
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GamingApp</title>
+    <meta name="theme-color" content="#0f0e0c">
+    <script>
+        var tema = localStorage.getItem('tema') || 'oscuro';
+        document.documentElement.setAttribute('data-tema', tema);
+        if (tema === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+    </script>
+    <!-- Mismo dominio que GastosApp (tu-proyecto.web.app/gaming/...),
+         así que esto ya no es un link cruzado a otro sitio: es el mismo
+         archivo de siempre, con una ruta relativa normal. Por el mismo
+         motivo la sesión de Firebase Auth (que el navegador guarda por
+         DOMINIO) queda compartida sola con el resto de la app — no hace
+         falta iniciar sesión de nuevo acá. Dicho esto: GamingApp no
+         tiene por qué depender de datos de GastosApp para funcionar —
+         el login compartido es solo comodidad de "un solo sistema", las
+         features de acá (Steam, torneos) son propias e independientes. -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page">
+        <div class="card" style="text-align:center;">
+            <span style="font-size: 2.4rem;">🎮</span>
+            <h1 style="margin: var(--space-3) 0 4px;">GamingApp</h1>
+            <p class="texto-muted" style="margin: 0;" id="texto-bienvenida"></p>
+        </div>
+
+        <div id="zona-cargando-sesion" style="text-align:center;">
+            <p class="texto-muted">Comprobando tu sesión…</p>
+        </div>
+
+        <div class="card" id="card-secciones" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">📱 Secciones</h3></div>
+            <div class="grid-acciones tres-columnas">
+                <div class="card-accion" id="ir-torneos" tabindex="0" role="button">
+                    <span class="icono-accion">🏆</span>
+                    <h3>Torneos</h3>
+                    <p>Armá o unite a un torneo.</p>
+                </div>
+                <div class="card-accion" id="ir-conexiones" tabindex="0" role="button">
+                    <span class="icono-accion">🔌</span>
+                    <h3>Conexiones</h3>
+                    <p>Conectá tu cuenta de Steam.</p>
+                </div>
+                <div class="card-accion" id="ir-estadisticas" tabindex="0" role="button">
+                    <span class="icono-accion">📊</span>
+                    <h3>Más datos</h3>
+                    <p>Estadísticas de tus torneos.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { iniciarNavbarGaming, requerirSesionGaming } from './nav-gaming.js';
+
+        iniciarNavbarGaming('index.html');
+
+        requerirSesionGaming('index.html', (user) => {
+            document.getElementById('zona-cargando-sesion').style.display = 'none';
+            document.getElementById('card-secciones').style.display = 'block';
+            document.getElementById('texto-bienvenida').textContent = `Conectado como ${user.displayName || user.email}`;
+        });
+
+        document.getElementById('ir-torneos').addEventListener('click', () => window.location.href = 'torneos.html');
+        document.getElementById('ir-conexiones').addEventListener('click', () => window.location.href = 'conexiones.html');
+        document.getElementById('ir-estadisticas').addEventListener('click', () => window.location.href = 'estadisticas.html');
+    </script>
+</body>
+</html>

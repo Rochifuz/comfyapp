@@ -1,0 +1,13 @@
+{
+  "name": "gastosapp-steam-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Proxy de Cloudflare Workers para las APIs de Steam (ver README.md) — GamingApp le pega a esto en vez de a Steam directo, porque Steam no tiene CORS habilitado.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

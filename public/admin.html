@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin · GastosApp</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <meta name="theme-color" content="#0f0e0c">
+    <script>
+        var tema = localStorage.getItem('tema') || 'oscuro';
+        document.documentElement.setAttribute('data-tema', tema);
+        if (tema === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@twemoji/api@17.0.3/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div id="pantalla-carga" class="pantalla-carga"><div class="spinner"></div></div>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page">
+        <div class="card">
+            <div class="card-header"><h2 style="margin:0;">🛠️ Admin</h2></div>
+            <p style="margin:0;">Los datos que la app va juntando sola (uso, bugs reportados, ideas de mejora) — no hace falta entrar a la consola de Firebase para verlos. Página sin link en el menú a propósito: se llega escribiendo la URL directo.</p>
+        </div>
+
+        <div class="card" id="card-sin-acceso" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">🔒 Sin acceso</h3></div>
+            <p>Tu cuenta no está configurada como admin. Si ya hay algún admin, pedile que te tilde el check "Admin" en la tabla de Usuarios de acá abajo. Para el primer admin (sin nadie que lo habilite todavía): copiá tu UID desde <em>Firebase Console → Authentication → Users</em> y pegalo en <code>firestore.rules</code>, en la función <code>esAdmin()</code> — después hay que volver a desplegar las reglas (<code>npm run deploy</code> o <code>firebase deploy --only firestore:rules</code>).</p>
+        </div>
+
+        <div class="card" id="card-usuarios" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">👥 Usuarios</h3></div>
+            <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Sesiones, última vez que entró, y qué tanto usó cada botón/sección. Los checks de la derecha son las apps opcionales que tiene habilitadas cada cuenta (GastosApp siempre está, no se lista) y si es admin — se guardan solos al tocarlos.</p>
+            <div id="usuarios-contenido"></div>
+        </div>
+
+        <div class="card" id="card-embudo" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">🚦 Embudo de uso</h3></div>
+            <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Cuántas cuentas llegan a cada paso — creada, con al menos un grupo, con al menos un gasto cargado.</p>
+            <div class="grafico-contenedor" id="grafico-embudo"></div>
+        </div>
+
+        <div class="card" id="card-categorias-admin" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">🏷️ Categorías más usadas</h3></div>
+            <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Sumando entre todos los usuarios — solo se cuenta la categoría, nunca el monto ni la descripción de nadie.</p>
+            <div class="grafico-contenedor" id="grafico-categorias-admin"></div>
+        </div>
+
+        <div class="card" id="card-actividad-semanal" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">📅 Usuarios activos por semana</h3></div>
+            <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Sesiones nuevas por semana, sumando entre todos — se empezó a contar recién ahora, no hay historial de antes de esto.</p>
+            <div class="grafico-contenedor" id="grafico-actividad-semanal"></div>
+        </div>
+
+        <div class="card" id="card-mas-usado" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">📊 Lo más usado</h3></div>
+            <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Sumando entre todos los usuarios.</p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4);">
+                <div>
+                    <h3>Páginas más visitadas</h3>
+                    <div id="visitas-contenido"></div>
+                </div>
+                <div>
+                    <h3>Botones/secciones más tocados</h3>
+                    <div id="clics-contenido"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="card-bugs" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">🐛 Reportes de bugs</h3></div>
+            <div id="bugs-contenido"></div>
+        </div>
+
+        <div class="card" id="card-sugerencias" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">💡 Sugerencias</h3></div>
+            <div id="sugerencias-contenido"></div>
+        </div>
+
+        <div class="card" id="card-errores" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">⚠️ Errores automáticos</h3></div>
+            <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Capturados solos, sin que nadie los reporte a mano (ver analitica.js).</p>
+            <div id="errores-contenido"></div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 GastosApp</p>
+    </footer>
+
+    <script type="module">
+        import { iniciarNavbar } from './nav.js';
+        import { iniciarWidgetDeSesion, requerirSesion } from './auth.js';
+        import { esc } from './ui.js';
+        import { db } from './firebase-config.js';
+        import { graficoBarrasHorizontal, graficoBarrasVertical } from './graficos.js';
+        import { etiquetaDeCategoria } from './categorias.js';
+        import { APPS, marcarLoginYPermisos } from './permisos.js';
+        import {
+            collection, getDocs, query, orderBy, limit, doc, setDoc,
+        } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
+
+        iniciarNavbar('admin.html');
+        iniciarWidgetDeSesion('admin.html');
+
+        function formatearFecha(timestamp) {
+            if (!timestamp || typeof timestamp.toDate !== 'function') return '—';
+            return timestamp.toDate().toLocaleString('es-AR');
+        }
+
+        function renderTablaSimple(contenedor, filas, columnas, vacioTexto) {
+            if (filas.length === 0) {
+                contenedor.innerHTML = `<div class="estado-vacio"><span class="icono-grande">📭</span>${esc(vacioTexto)}</div>`;
+                return;
+            }
+            contenedor.innerHTML = `
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr>${columnas.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
+                        <tbody>${filas.join('')}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // Cada sección se carga por separado y con su propio try/catch:
+        // si esAdmin() todavía no está configurado en firestore.rules, las
+        // 4 lecturas van a fallar por "permiso denegado" — mejor mostrar
+        // un solo cartel explicando eso, que 4 errores sueltos en la
+        // consola del navegador sin contexto.
+
+        // Lista simple "clave — cantidad", ordenada de mayor a menor —
+        // la usan tanto "Páginas más visitadas" como "Botones/secciones
+        // más tocados", sumando el mapa de todos los usuarios.
+        function renderRanking(contenedor, mapaTotales, vacioTexto, tope = 15) {
+            const entradas = Object.entries(mapaTotales).sort((a, b) => b[1] - a[1]).slice(0, tope);
+            if (entradas.length === 0) {
+                contenedor.innerHTML = `<p class="texto-muted" style="font-size:.85rem;">${esc(vacioTexto)}</p>`;
+                return;
+            }
+            contenedor.innerHTML = `
+                <div class="tabla-wrap">
+                    <table>
+                        <tbody>
+                            ${entradas.map(([clave, total]) => `
+                                <tr><td>${esc(clave)}</td><td class="monto">${total}</td></tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // Etiquetas cortas para las columnas de permisos — gastos no se
+        // lista (siempre está habilitada, ver permisos.js).
+        const ETIQUETA_APP = { gaming: '🎮', agenda: '🗓️', tareas: '🗒️' };
+
+        // Guarda un cambio puntual de permisos apenas se toca un check —
+        // sin botón "Guardar" aparte, mismo criterio inmediato que el
+        // resto de los toggles de la app (ej. el switch de tema). Solo
+        // puede escribir estos 2 campos puntuales (ver la regla nueva de
+        // firestore.rules) — nunca el resto del perfil de esa persona.
+        async function guardarPermisos(uid, cambios) {
+            try {
+                await setDoc(doc(db, 'usuarios', uid), cambios, { merge: true });
+            } catch (error) {
+                avisar('No se pudo guardar: ' + error.message, 'error');
+            }
+        }
+
+        function renderTablaUsuarios(contenedor, usuarios) {
+            if (usuarios.length === 0) {
+                contenedor.innerHTML = `<div class="estado-vacio"><span class="icono-grande">📭</span>Todavía no hay datos de uso guardados.</div>`;
+                return;
+            }
+            const columnasApps = APPS.map(app => `<th>${ETIQUETA_APP[app]}</th>`).join('');
+            contenedor.innerHTML = `
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Usuario</th><th>Sesiones</th><th>Visitas</th><th>Clics</th><th>Último ingreso</th>${columnasApps}<th>Admin</th></tr></thead>
+                        <tbody>
+                            ${usuarios.map(u => {
+                                const totalClics = Object.values(u.clics || {}).reduce((s, n) => s + n, 0);
+                                const totalVisitas = Object.values(u.visitas || {}).reduce((s, n) => s + n, 0);
+                                // undefined = acceso total (usuario viejo, ver
+                                // permisos.js) — se muestra tildado, pero ojo:
+                                // tocarlo acá recién ahí crea el array (con
+                                // ESE permiso restado, el resto se pierde) —
+                                // por eso, para un usuario SIN el campo
+                                // todavía, el primer click parte de "todo
+                                // tildado" hacia el array real explícito.
+                                const appsPermitidas = u.appsPermitidas === undefined ? APPS : u.appsPermitidas;
+                                return `
+                                    <tr data-uid="${esc(u.id)}">
+                                        <td>
+                                            ${u.nombreMostrar ? esc(u.nombreMostrar) : `<code style="font-size:.78rem;">${esc(u.id)}</code>`}
+                                            ${u.email ? `<br><span class="texto-muted" style="font-size:.72rem;">${esc(u.email)}</span>` : ''}
+                                        </td>
+                                        <td>${u.sesiones || 0}</td>
+                                        <td>${totalVisitas}</td>
+                                        <td>${totalClics}</td>
+                                        <td>${formatearFecha(u.ultimoIngreso)}</td>
+                                        ${APPS.map(app => `<td><input type="checkbox" class="check-permiso-app" data-app="${app}" style="width:auto;" ${appsPermitidas.includes(app) ? 'checked' : ''}></td>`).join('')}
+                                        <td><input type="checkbox" class="check-permiso-admin" style="width:auto;" ${u.esAdmin ? 'checked' : ''}></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            contenedor.querySelectorAll('.check-permiso-app').forEach(chk => {
+                chk.addEventListener('change', (evento) => {
+                    const fila = evento.target.closest('tr');
+                    const uid = fila.dataset.uid;
+                    // Se relee cada checkbox de apps de ESA fila (no solo
+                    // el que cambió) para armar el array completo — así
+                    // no importa si esta cuenta ya tenía el campo o no.
+                    const nuevoArray = APPS.filter(app => fila.querySelector(`.check-permiso-app[data-app="${app}"]`).checked);
+                    guardarPermisos(uid, { appsPermitidas: nuevoArray });
+                });
+            });
+            contenedor.querySelectorAll('.check-permiso-admin').forEach(chk => {
+                chk.addEventListener('change', (evento) => {
+                    const uid = evento.target.closest('tr').dataset.uid;
+                    guardarPermisos(uid, { esAdmin: evento.target.checked });
+                });
+            });
+        }
+
+        async function cargarUsuarios() {
+            const snap = await getDocs(collection(db, 'usuarios'));
+            const usuarios = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => {
+                    const fechaA = a.ultimoIngreso && a.ultimoIngreso.toDate ? a.ultimoIngreso.toDate() : new Date(0);
+                    const fechaB = b.ultimoIngreso && b.ultimoIngreso.toDate ? b.ultimoIngreso.toDate() : new Date(0);
+                    return fechaB - fechaA;
+                });
+
+            renderTablaUsuarios(document.getElementById('usuarios-contenido'), usuarios);
+
+            // "Lo más usado" suma los mapas clics/visitas de TODOS los
+            // usuarios — ya están acá (cargarUsuarios los trae completos),
+            // así que no hace falta ninguna lectura extra para esto.
+            const clicsTotales = {};
+            const visitasTotales = {};
+            usuarios.forEach(u => {
+                Object.entries(u.clics || {}).forEach(([clave, n]) => {
+                    clicsTotales[clave] = (clicsTotales[clave] || 0) + n;
+                });
+                Object.entries(u.visitas || {}).forEach(([clave, n]) => {
+                    visitasTotales[clave] = (visitasTotales[clave] || 0) + n;
+                });
+            });
+            renderRanking(document.getElementById('visitas-contenido'), visitasTotales, 'Sin visitas registradas todavía.');
+            renderRanking(document.getElementById('clics-contenido'), clicsTotales, 'Sin clics registrados todavía.');
+            document.getElementById('card-mas-usado').style.display = 'block';
+
+            renderEmbudo(usuarios);
+            renderCategoriasAdmin(usuarios);
+            renderActividadSemanal(usuarios);
+        }
+
+        // Cuántas cuentas llegan a cada paso — "creada" es simplemente
+        // estar en esta colección (todo el que inicia sesión alguna vez
+        // termina con su documento acá, ver analitica.js); "con grupo" y
+        // "con gasto" usan contadores que ya se guardaban (grupos, ver
+        // grupos.js) o que se agregaron ahora (totalGastosPersonales,
+        // ver analitica.js) — esto último solo cuenta desde que se
+        // agregó, entonces alguien que cargó gastos antes y no volvió a
+        // tocar el botón puede aparecer sin gastos igual. "Con grupo"
+        // tampoco cuenta "⚡ Cuenta rápida" ni el código liviano de
+        // alquiler compartido (a propósito no se guardan en `grupos`,
+        // ver crearCuentaRapida en grupos.js) — alguien que solo usó
+        // esos puede aparecer sin grupo igual.
+        function renderEmbudo(usuarios) {
+            const card = document.getElementById('card-embudo');
+            if (usuarios.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+
+            const conGrupo = usuarios.filter(u => (u.grupos || []).length > 0).length;
+            const conGasto = usuarios.filter(u => (u.totalGastosPersonales || 0) > 0).length;
+
+            const datos = [
+                { etiqueta: 'Cuentas creadas', valor: usuarios.length },
+                { etiqueta: 'Con al menos un grupo', valor: conGrupo },
+                { etiqueta: 'Cargaron al menos un gasto', valor: conGasto },
+            ];
+            graficoBarrasHorizontal('grafico-embudo', datos, (v) => `${v}`);
+        }
+
+        function renderCategoriasAdmin(usuarios) {
+            const card = document.getElementById('card-categorias-admin');
+            const categoriasTotales = {};
+            usuarios.forEach(u => {
+                Object.entries(u.categoriasUsadas || {}).forEach(([categoria, n]) => {
+                    categoriasTotales[categoria] = (categoriasTotales[categoria] || 0) + n;
+                });
+            });
+            const datos = Object.entries(categoriasTotales)
+                .map(([categoria, valor]) => ({ etiqueta: etiquetaDeCategoria(categoria), valor }))
+                .sort((a, b) => b.valor - a.valor);
+
+            if (datos.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+            graficoBarrasHorizontal('grafico-categorias-admin', datos, (v) => `${v} vez${v === 1 ? '' : 'es'}`);
+        }
+
+        function renderActividadSemanal(usuarios) {
+            const card = document.getElementById('card-actividad-semanal');
+            const porSemana = {};
+            usuarios.forEach(u => {
+                Object.entries(u.sesionesPorSemana || {}).forEach(([semana, n]) => {
+                    porSemana[semana] = (porSemana[semana] || 0) + n;
+                });
+            });
+            // Las claves son "lunes de esa semana" en formato AAAA-MM-DD
+            // (ver claveDeSemana() en analitica.js) — ordenan bien tal
+            // cual, como texto. Las últimas 8 semanas alcanzan para ver
+            // la tendencia sin que el gráfico se llene de barras viejas.
+            const semanas = Object.keys(porSemana).sort().slice(-8);
+
+            if (semanas.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+            const datos = semanas.map(semana => ({
+                etiqueta: new Date(`${semana}T00:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }),
+                valor: porSemana[semana],
+            }));
+            graficoBarrasVertical('grafico-actividad-semanal', datos, (v) => `${Math.round(v)} sesión${Math.round(v) === 1 ? '' : 'es'}`);
+        }
+
+        // El nombre se guarda recién desde esta versión (analitica.js) —
+        // reportes viejos, de antes de este cambio, no lo van a tener; en
+        // ese caso se muestra el UID nomás, que siempre estuvo.
+        function nombreOUid(item) {
+            return esc(item.nombre || item.uid || '—');
+        }
+
+        async function cargarBugs() {
+            const snap = await getDocs(query(collection(db, 'reportesBugs'), orderBy('creadoEn', 'desc'), limit(200)));
+            const filas = snap.docs.map(d => {
+                const r = d.data();
+                return `
+                    <tr>
+                        <td>${formatearFecha(r.creadoEn)}</td>
+                        <td>${nombreOUid(r)}</td>
+                        <td>${esc(r.pagina)}</td>
+                        <td>${esc(r.mensaje)}</td>
+                    </tr>
+                `;
+            });
+            renderTablaSimple(
+                document.getElementById('bugs-contenido'), filas,
+                ['Fecha', 'Usuario', 'Página', 'Mensaje'],
+                'Nadie reportó ningún problema todavía.'
+            );
+        }
+
+        async function cargarSugerencias() {
+            const snap = await getDocs(query(collection(db, 'sugerencias'), orderBy('creadoEn', 'desc'), limit(200)));
+            const filas = snap.docs.map(d => {
+                const s = d.data();
+                return `
+                    <tr>
+                        <td>${formatearFecha(s.creadoEn)}</td>
+                        <td>${nombreOUid(s)}</td>
+                        <td>${esc(s.pagina)}</td>
+                        <td>${esc(s.mensaje)}</td>
+                    </tr>
+                `;
+            });
+            renderTablaSimple(
+                document.getElementById('sugerencias-contenido'), filas,
+                ['Fecha', 'Usuario', 'Página', 'Idea'],
+                'Todavía no llegó ninguna sugerencia.'
+            );
+        }
+
+        async function cargarErrores() {
+            const snap = await getDocs(query(collection(db, 'eventos'), orderBy('creadoEn', 'desc'), limit(200)));
+            const filas = snap.docs.map(d => {
+                const e = d.data();
+                return `
+                    <tr>
+                        <td>${formatearFecha(e.creadoEn)}</td>
+                        <td>${esc(e.pagina)}</td>
+                        <td>${esc(e.detalle)}</td>
+                        <td>${esc(e.origen)}</td>
+                    </tr>
+                `;
+            });
+            renderTablaSimple(
+                document.getElementById('errores-contenido'), filas,
+                ['Fecha', 'Página', 'Error', 'Origen'],
+                'No se capturó ningún error todavía. 🎉'
+            );
+        }
+
+        requerirSesion(async (user) => {
+            // Guarda nombre/email del propio admin acá también (no solo
+            // en sistema.html) — quien entra directo a admin.html por URL
+            // (a propósito no tiene link en el menú) podría no haber
+            // pasado nunca por ComfyApp en esta sesión, y sin esto su
+            // propia fila quedaba mostrando el UID en vez del nombre.
+            marcarLoginYPermisos(user).catch(() => {});
+            try {
+                // Si ésta (la primera) falla por permisos, asumimos que
+                // ninguna de las otras 3 va a andar tampoco — mismo motivo
+                // (esAdmin() sin configurar) — y se corta ahí.
+                await cargarUsuarios();
+                document.getElementById('card-usuarios').style.display = 'block';
+
+                await Promise.all([cargarBugs(), cargarSugerencias(), cargarErrores()]);
+                document.getElementById('card-bugs').style.display = 'block';
+                document.getElementById('card-sugerencias').style.display = 'block';
+                document.getElementById('card-errores').style.display = 'block';
+            } catch (error) {
+                document.getElementById('card-sin-acceso').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

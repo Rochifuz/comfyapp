@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Más datos · GamingApp</title>
+    <meta name="theme-color" content="#0f0e0c">
+    <script>
+        var tema = localStorage.getItem('tema') || 'oscuro';
+        document.documentElement.setAttribute('data-tema', tema);
+        if (tema === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page">
+        <div class="card">
+            <div class="card-header"><h2 style="margin:0;">📊 Más datos</h2></div>
+            <p style="margin:0;">Estadísticas de todos tus torneos, creados o a los que te uniste.</p>
+        </div>
+
+        <div id="zona-cargando-sesion" style="text-align:center;">
+            <p class="texto-muted">Comprobando tu sesión…</p>
+        </div>
+
+        <div id="zona-cargando-datos" style="display:none; text-align:center;">
+            <p class="texto-muted">Sumando tus torneos…</p>
+        </div>
+
+        <div id="zona-sin-torneos" class="card" style="display:none;">
+            <p style="margin:0;" class="texto-muted">Todavía no tenés ningún torneo — cuando crees uno o te unas con un código, tus estadísticas van a aparecer acá.</p>
+        </div>
+
+        <div id="zona-contenido" style="display:none;">
+            <div class="stats-row">
+                <div class="stat-tile">
+                    <div class="stat-valor" id="stat-torneos-jugados">0</div>
+                    <div class="stat-etiqueta">Torneos</div>
+                </div>
+                <div class="stat-tile">
+                    <div class="stat-valor" id="stat-torneos-ganados">0</div>
+                    <div class="stat-etiqueta">Ganados</div>
+                </div>
+                <div class="stat-tile">
+                    <div class="stat-valor" id="stat-porcentaje-victorias">0%</div>
+                    <div class="stat-etiqueta">Victorias</div>
+                </div>
+            </div>
+
+            <div class="card" id="card-grafico-juegos">
+                <div class="card-header"><h3 style="margin:0;">🎮 Torneos por juego</h3></div>
+                <div class="grafico-contenedor" id="grafico-juegos"></div>
+            </div>
+
+            <div class="card" id="card-grafico-resultados">
+                <div class="card-header"><h3 style="margin:0;">⚔️ Partidos jugados</h3></div>
+                <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;" id="texto-partidos-jugados"></p>
+                <div class="grafico-contenedor" id="grafico-resultados"></div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { iniciarNavbarGaming, requerirSesionGaming } from './nav-gaming.js';
+        import { graficoBarrasHorizontal } from '../graficos.js';
+        import { obtenerMisTorneos, obtenerTorneo, etiquetaDeJuego, calcularTablaLiga } from './torneos.js';
+
+        iniciarNavbarGaming('estadisticas.html');
+
+        requerirSesionGaming('estadisticas.html', (user) => {
+            document.getElementById('zona-cargando-sesion').style.display = 'none';
+            cargarEstadisticas(user.uid);
+        });
+
+        // Sin datos propios guardados aparte (mismo criterio que la
+        // tabla de posiciones de Liga): se recalcula todo a partir de
+        // los torneos de verdad cada vez que se entra acá, así nunca
+        // puede desincronizarse. El precio es leer el torneo completo
+        // uno por uno (obtenerMisTorneos solo tiene código+nombre) — para
+        // la cantidad de torneos de una persona esto no pesa nada.
+        async function cargarEstadisticas(uid) {
+            document.getElementById('zona-cargando-datos').style.display = 'block';
+            const misTorneos = await obtenerMisTorneos(uid);
+            if (misTorneos.length === 0) {
+                document.getElementById('zona-cargando-datos').style.display = 'none';
+                document.getElementById('zona-sin-torneos').style.display = 'block';
+                return;
+            }
+
+            const torneos = (await Promise.all(misTorneos.map(t => obtenerTorneo(t.codigo)))).filter(Boolean);
+            const stats = calcularEstadisticas(uid, torneos);
+
+            document.getElementById('stat-torneos-jugados').textContent = stats.torneosJugados;
+            document.getElementById('stat-torneos-ganados').textContent = stats.torneosGanados;
+            document.getElementById('stat-porcentaje-victorias').textContent = `${stats.porcentajeVictorias}%`;
+            document.getElementById('texto-partidos-jugados').textContent =
+                `${stats.partidosJugados} partido${stats.partidosJugados === 1 ? '' : 's'} jugado${stats.partidosJugados === 1 ? '' : 's'} en total, entre todos tus torneos.`;
+
+            const datosJuegos = Object.entries(stats.porJuego)
+                .map(([etiqueta, valor]) => ({ etiqueta, valor }))
+                .sort((a, b) => b.valor - a.valor);
+            graficoBarrasHorizontal('grafico-juegos', datosJuegos, (v) => `${v}`);
+
+            const datosResultados = [
+                { etiqueta: 'Ganados', valor: stats.partidosGanados },
+                { etiqueta: 'Perdidos', valor: stats.partidosJugados - stats.partidosGanados },
+            ];
+            graficoBarrasHorizontal('grafico-resultados', datosResultados, (v) => `${v}`);
+
+            document.getElementById('zona-cargando-datos').style.display = 'none';
+            document.getElementById('zona-contenido').style.display = 'block';
+        }
+
+        // Recorre TODOS los formatos (liga y eliminación) de manera
+        // uniforme — cada uno guarda los resultados con una forma un
+        // poco distinta (liga: un resultado por partido; eliminación:
+        // varios resultados por cruce, uno por partida jugada dentro del
+        // mejor-de-N), así que hay que sumarlos por separado.
+        function calcularEstadisticas(uid, torneos) {
+            let torneosGanados = 0;
+            let partidosJugados = 0;
+            let partidosGanados = 0;
+            const porJuego = {};
+
+            torneos.forEach(torneo => {
+                const etiqueta = etiquetaDeJuego(torneo);
+                porJuego[etiqueta] = (porJuego[etiqueta] || 0) + 1;
+
+                if (torneo.formato === 'liga') {
+                    (torneo.partidos || []).forEach(p => {
+                        if (!p.resultado || p.resultado === 'empate') return;
+                        if (p.jugadorA !== uid && p.jugadorB !== uid) return;
+                        partidosJugados++;
+                        const soyA = p.jugadorA === uid;
+                        if ((p.resultado === 'A' && soyA) || (p.resultado === 'B' && !soyA)) partidosGanados++;
+                    });
+                    if (torneo.estado === 'finalizado' && calcularTablaLiga(torneo)[0]?.uid === uid) {
+                        torneosGanados++;
+                    }
+                } else if (torneo.formato === 'eliminacion') {
+                    (torneo.partidos || []).forEach(p => {
+                        if (p.jugadorA !== uid && p.jugadorB !== uid) return;
+                        const soyA = p.jugadorA === uid;
+                        (p.resultados || []).forEach(r => {
+                            partidosJugados++;
+                            if ((r === 'A' && soyA) || (r === 'B' && !soyA)) partidosGanados++;
+                        });
+                    });
+                    if (torneo.estado === 'finalizado' && torneo.campeon === uid) torneosGanados++;
+                }
+            });
+
+            return {
+                torneosJugados: torneos.length,
+                torneosGanados,
+                partidosJugados,
+                partidosGanados,
+                porcentajeVictorias: partidosJugados ? Math.round((partidosGanados / partidosJugados) * 100) : 0,
+                porJuego,
+            };
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracker · GamingApp</title>
+    <meta name="theme-color" content="#0f0e0c">
+    <script>
+        var tema = localStorage.getItem('tema') || 'oscuro';
+        document.documentElement.setAttribute('data-tema', tema);
+        if (tema === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page">
+        <div class="card">
+            <div class="card-header"><h2 style="margin:0;">🎯 Tracker</h2></div>
+            <p style="margin:0;">Seguí tu progreso y encontrá qué mejorar en cada juego — arranca con League of Legends y TFT.</p>
+        </div>
+
+        <div id="zona-cargando-sesion" style="text-align:center;">
+            <p class="texto-muted">Comprobando tu sesión…</p>
+        </div>
+
+        <div id="zona-contenido" style="display:none;">
+            <!-- Conectar la cuenta de Riot — UNA sola vez, sirve para
+                 League of Legends Y TFT a la vez (es el mismo Riot ID). -->
+            <div class="card" id="riot-sin-conectar">
+                <div class="card-header"><h3 style="margin:0;">🔗 Conectá tu cuenta de Riot</h3></div>
+                <p class="texto-muted" style="font-size:.85rem; margin-top:-8px;">Hace falta una sola vez — sirve para League of Legends y TFT juntos, es el mismo Riot ID.</p>
+                <form id="form-conectar-riot" class="form">
+                    <div>
+                        <label for="riot-gamename">Nombre</label>
+                        <input type="text" id="riot-gamename" placeholder="Ej: Roy" required>
+                    </div>
+                    <div>
+                        <label for="riot-tagline">TAG (sin el #)</label>
+                        <input type="text" id="riot-tagline" placeholder="Ej: LAS1" required>
+                    </div>
+                    <div>
+                        <label for="riot-platform">Servidor</label>
+                        <select id="riot-platform"></select>
+                    </div>
+                    <button type="submit" class="secundario">Conectar</button>
+                </form>
+                <p class="texto-muted" style="font-size:.78rem; margin: var(--space-2) 0 0;">Es el Riot ID completo que ves en el cliente (Nombre#TAG), no el nombre de invocador viejo.</p>
+            </div>
+
+            <div id="riot-cargando" style="display:none; text-align:center;">
+                <p class="texto-muted">Consultando a Riot…</p>
+            </div>
+
+            <div id="riot-error" class="card" style="display:none;">
+                <p style="margin:0;" id="riot-error-texto"></p>
+                <button type="button" class="secundario" id="riot-reintentar" style="margin-top: var(--space-3);">Probar con otra cuenta</button>
+            </div>
+
+            <div id="riot-conectado" style="display:none;">
+                <div class="card" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap: var(--space-2);">
+                    <span id="riot-cuenta-conectada"></span>
+                    <button type="button" class="secundario" id="riot-desconectar" style="width:auto;">Desconectar</button>
+                </div>
+
+                <!-- icono-lol.png/icono-tft.svg: íconos oficiales del
+                     propio cliente de League of Legends (Community
+                     Dragon) — el escudo de LoL y el ícono con el que el
+                     cliente cambia a TFT en su selector de juego, no
+                     emoji genéricos. -->
+                <nav class="tabs tracker-nav tracker-nav-juego" id="selector-juego">
+                    <a href="#lol" class="tab" data-juego="lol" style="display:inline-flex; align-items:center; gap:6px;"><img src="icono-lol.png" alt="" style="width:18px; height:18px; object-fit:contain;"> League of Legends</a>
+                    <a href="#tft" class="tab" data-juego="tft" style="display:inline-flex; align-items:center; gap:6px;"><img src="icono-tft.svg" alt="" style="width:18px; height:18px; object-fit:contain;"> TFT</a>
+                </nav>
+
+                <!-- ============ LEAGUE OF LEGENDS ============ -->
+                <section id="juego-lol">
+                    <nav class="tabs tracker-nav" id="lol-subnav">
+                        <a href="#" class="tab" data-seccion="progreso">📈 Mi progreso</a>
+                        <a href="#" class="tab" data-seccion="partidas">🕹️ Últimas partidas</a>
+                        <a href="#" class="tab" data-seccion="build">🛠️ Build y runas</a>
+                        <a href="#" class="tab" data-seccion="notas">📝 Notas y objetivos</a>
+                    </nav>
+
+                    <section id="lol-seccion-progreso" class="tracker-seccion">
+                        <div class="stats-row" id="lol-stats-row"></div>
+                        <div class="card">
+                            <div class="card-header"><h3 style="margin:0;">📈 Rango en el tiempo</h3></div>
+                            <p class="texto-muted" style="font-size:.8rem; margin-top:-8px;">Se arma solo con una foto de tu rango cada día que entrás acá — Riot no da un historial hecho de LP.</p>
+                            <div class="grafico-contenedor" id="lol-grafico-rango"></div>
+                        </div>
+                    </section>
+
+                    <section id="lol-seccion-partidas" class="tracker-seccion" style="display:none;">
+                        <div class="card">
+                            <div class="card-header"><h3 style="margin:0;">🕹️ Últimas partidas</h3></div>
+                            <div id="lol-lista-partidas"></div>
+                        </div>
+                    </section>
+
+                    <section id="lol-seccion-build" class="tracker-seccion" style="display:none;">
+                        <div class="card">
+                            <p class="texto-muted" style="font-size:.82rem; margin: 0 0 var(--space-2);">Tocá el ícono de cualquiera de los 173 campeones para ver su build (runas, ítems, orden de habilidades) — tabla curada a mano, no en vivo.</p>
+                            <input type="search" id="lol-buscar-campeon" placeholder="🔎 Buscar campeón (ej. Zed, Ahri, Garen)...">
+                            <div id="lol-grid-campeones" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:8px; max-height:280px; overflow-y:auto; margin-top: var(--space-3);"></div>
+                            <p id="lol-grid-sin-resultados" class="texto-muted" style="font-size:.82rem; display:none; margin-top: var(--space-2);">Ningún campeón coincide.</p>
+                        </div>
+                        <div id="lol-detalle-build"></div>
+                    </section>
+
+                    <section id="lol-seccion-notas" class="tracker-seccion" style="display:none;">
+                        <div class="card">
+                            <div class="card-header"><h3 style="margin:0;">📝 Notas y objetivos</h3></div>
+                            <textarea id="lol-notas" rows="6" placeholder="Ej: practicar el farmeo, mejorar visión de mapa, jugar más agresivo en early..."></textarea>
+                            <button type="button" class="secundario" id="lol-guardar-notas" style="margin-top: var(--space-2);">Guardar</button>
+                        </div>
+                    </section>
+                </section>
+
+                <!-- ============ TFT ============ -->
+                <section id="juego-tft" style="display:none;">
+                    <nav class="tabs tracker-nav" id="tft-subnav">
+                        <a href="#" class="tab" data-seccion="progreso">📈 Mi progreso</a>
+                        <a href="#" class="tab" data-seccion="partidas">🕹️ Últimas partidas</a>
+                        <a href="#" class="tab" data-seccion="meta">🧩 Composiciones meta</a>
+                        <a href="#" class="tab" data-seccion="mias">⭐ Mis composiciones</a>
+                        <a href="#" class="tab" data-seccion="notas">📝 Notas y objetivos</a>
+                    </nav>
+
+                    <section id="tft-seccion-progreso" class="tracker-seccion">
+                        <div class="stats-row" id="tft-stats-row"></div>
+                        <div class="card">
+                            <div class="card-header"><h3 style="margin:0;">📈 Rango en el tiempo</h3></div>
+                            <p class="texto-muted" style="font-size:.8rem; margin-top:-8px;">Se arma solo con una foto de tu rango cada día que entrás acá — Riot no da un historial hecho de LP.</p>
+                            <div class="grafico-contenedor" id="tft-grafico-rango"></div>
+                        </div>
+                    </section>
+
+                    <section id="tft-seccion-partidas" class="tracker-seccion" style="display:none;">
+                        <div class="card">
+                            <div class="card-header"><h3 style="margin:0;">🕹️ Últimas partidas</h3></div>
+                            <div id="tft-lista-partidas"></div>
+                        </div>
+                    </section>
+
+                    <section id="tft-seccion-meta" class="tracker-seccion" style="display:none;">
+                        <div class="card">
+                            <p class="texto-muted" style="font-size:.82rem; margin:0 0 var(--space-2);">Tablas curadas a mano (no en vivo) — cada pestaña es una fuente distinta, ver el detalle de cada una y la fecha abajo de todo.</p>
+                            <input type="search" id="tft-meta-buscador" placeholder="🔎 Buscar composición o campeón (ej. Aphelios, Fae, Rammus)...">
+                        </div>
+
+                        <div class="card" id="card-augments-top">
+                            <div class="card-header" style="justify-content:space-between;">
+                                <h3 style="margin:0;">🌟 Mejores augments del parche</h3>
+                                <button type="button" class="secundario" id="augments-top-toggle" style="width:auto; font-size:.8rem;">▾ Ver los 27</button>
+                            </div>
+                            <p class="texto-muted" style="font-size:.78rem; margin:0;">Tier S de metatft.com — no atados a ninguna comp puntual, sirven en cualquier build.</p>
+                            <div id="augments-top-grid" style="display:none; margin-top: var(--space-3); flex-wrap:wrap; gap: var(--space-2);"></div>
+                        </div>
+
+                        <nav class="tabs tracker-nav" id="fuente-subnav" style="margin: var(--space-3) 0;">
+                            <a href="#" class="tab" data-seccion="metatft">MetaTFT</a>
+                            <a href="#" class="tab" data-seccion="tftacademy">tftacademy</a>
+                            <a href="#" class="tab" data-seccion="blitz">Blitz</a>
+                        </nav>
+
+                        <div id="fuente-seccion-metatft">
+                            <div id="tft-lista-meta"></div>
+                            <p id="tft-lista-meta-sin-resultados" class="texto-muted" style="font-size:.82rem; display:none;">Ninguna coincide con la búsqueda.</p>
+
+                            <h3 style="margin: var(--space-4) 0 var(--space-2);">Otras composiciones (menos jugadas)</h3>
+                            <p class="texto-muted" style="font-size:.82rem; margin:0 0 var(--space-2);">Estas 28 solo muestran el cabezal — sin tablero ni ítems todavía. Si te interesa alguna, tocá "Pedir datos completos" y se suma a la lista de pedidos.</p>
+                            <div id="tft-lista-resto" style="display:flex; flex-wrap:wrap; gap: var(--space-2);"></div>
+                            <p id="tft-lista-resto-sin-resultados" class="texto-muted" style="font-size:.82rem; display:none;">Ninguna coincide con la búsqueda.</p>
+                        </div>
+
+                        <div id="fuente-seccion-tftacademy" style="display:none;">
+                            <div id="tft-lista-tftacademy"></div>
+                            <p id="tft-lista-tftacademy-sin-resultados" class="texto-muted" style="font-size:.82rem; display:none;">Ninguna coincide con la búsqueda.</p>
+                        </div>
+
+                        <div id="fuente-seccion-blitz" style="display:none;">
+                            <div id="tft-lista-blitz"></div>
+                            <p id="tft-lista-blitz-sin-resultados" class="texto-muted" style="font-size:.82rem; display:none;">Ninguna coincide con la búsqueda.</p>
+                        </div>
+                    </section>
+
+                    <section id="tft-seccion-mias" class="tracker-seccion" style="display:none;">
+                        <div class="card" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap: var(--space-2);">
+                            <div>
+                                <label for="tft-filtro-temporada" style="font-size:.82rem; color:var(--color-text-muted);">Temporada</label>
+                                <select id="tft-filtro-temporada" style="width:auto;"></select>
+                            </div>
+                            <button type="button" class="secundario" id="tft-nueva-comp" style="width:auto;">+ Nueva composición</button>
+                        </div>
+                        <div id="tft-lista-comps"></div>
+                    </section>
+
+                    <section id="tft-seccion-notas" class="tracker-seccion" style="display:none;">
+                        <div class="card">
+                            <div class="card-header"><h3 style="margin:0;">📝 Notas y objetivos</h3></div>
+                            <textarea id="tft-notas" rows="6" placeholder="Ej: practicar posicionamiento en late, apostar antes a un flex..."></textarea>
+                            <button type="button" class="secundario" id="tft-guardar-notas" style="margin-top: var(--space-2);">Guardar</button>
+                        </div>
+                    </section>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { db } from '../firebase-config.js';
+        import { doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
+        import { iniciarNavbarGaming, requerirSesionGaming } from './nav-gaming.js';
+        import { esc, avisar, confirmar, abrirModal, cerrarModal } from '../ui.js';
+        import { graficoLinea } from '../graficos.js';
+        import { LOL_BUILDS, META_TFT, META_TFT_RESTO, META_BLITZ, TFT_ROSTER, TFT_RASGOS, TFT_ITEMS, TFT_COVEN_RECOMPENSAS, TFT_AUGMENTS_TOP, TFT_AUGMENTS_POR_RASGO } from './metaCurada.js';
+        import { CAMPEONES_LOL } from './campeonesLoL.js';
+        import {
+            PLATAFORMAS_LOL,
+            obtenerCuentaRiotVinculada, conectarCuentaRiot, desconectarCuentaRiot,
+            obtenerRangoLoL, obtenerPartidasRecientesLoL,
+            obtenerRangoTFT, obtenerPartidasRecientesTFT,
+            registrarSnapshotRango, obtenerHistorialRango,
+            obtenerMisComposicionesTFT, guardarComposicionTFT, actualizarComposicionTFT, eliminarComposicionTFT,
+        } from './riot.js';
+
+        iniciarNavbarGaming('tracker.html');
+
+        let usuarioActual = null;
+        let riotIdActual = null;
+
+        document.getElementById('riot-platform').innerHTML = PLATAFORMAS_LOL
+            .map(p => `<option value="${p.valor}">${esc(p.etiqueta)}</option>`).join('');
+
+        requerirSesionGaming('tracker.html', (user) => {
+            usuarioActual = user;
+            document.getElementById('zona-cargando-sesion').style.display = 'none';
+            document.getElementById('zona-contenido').style.display = 'block';
+            iniciarSubnav('lol-subnav', 'lol-seccion-');
+            iniciarSubnav('tft-subnav', 'tft-seccion-');
+            iniciarSelectorDeJuego();
+            iniciarConexionRiot();
+        });
+
+        // --- Selector de juego (LoL/TFT) — vía hash, así queda linkeable
+        // (tracker.html#tft) y anda bien el adelante/atrás del navegador,
+        // mismo criterio que el acordeón de cuenta.html. ---
+        function iniciarSelectorDeJuego() {
+            const tabs = document.querySelectorAll('#selector-juego .tab');
+            let yaCargoLol = false;
+            let yaCargoTft = false;
+
+            function mostrarJuego() {
+                const juego = location.hash.replace('#', '') === 'tft' ? 'tft' : 'lol';
+                document.getElementById('juego-lol').style.display = juego === 'lol' ? 'block' : 'none';
+                document.getElementById('juego-tft').style.display = juego === 'tft' ? 'block' : 'none';
+                tabs.forEach(t => t.classList.toggle('activa', t.dataset.juego === juego));
+
+                // Los datos de cada juego recién se piden a Riot la
+                // primera vez que se entra a esa pestaña (no los dos de
+                // una al conectar la cuenta) — así conectar la cuenta es
+                // más rápido, y si a alguien solo le interesa uno de los
+                // dos juegos no se gastan pedidos de más contra la API.
+                if (!riotIdActual) return;
+                if (juego === 'lol' && !yaCargoLol) { yaCargoLol = true; cargarLoL(); }
+                if (juego === 'tft' && !yaCargoTft) { yaCargoTft = true; cargarTFT(); }
+            }
+            mostrarJuego();
+            window.addEventListener('hashchange', mostrarJuego);
+            iniciarSelectorDeJuego.mostrarJuego = mostrarJuego; // para llamarla de nuevo tras conectar
+            // Si se desconecta y se conecta OTRA cuenta en la misma
+            // sesión (sin recargar la página), hace falta volver a
+            // pedirle los datos a Riot — si no, quedarían pegados los de
+            // la cuenta anterior en pantalla.
+            iniciarSelectorDeJuego.reiniciarCargas = () => { yaCargoLol = false; yaCargoTft = false; };
+        }
+
+        // Sub-navegación DENTRO de cada juego (Progreso/Partidas/Build.../
+        // Notas) — NO usa el hash (ya lo usa el selector de juego de
+        // arriba, un solo slot) — simple mostrar/ocultar con clase
+        // "activa", arranca siempre en la primera sección.
+        function iniciarSubnav(navId, prefijoSeccion) {
+            const nav = document.getElementById(navId);
+            const tabs = [...nav.querySelectorAll('.tab')];
+            function mostrar(seccion) {
+                tabs.forEach(t => t.classList.toggle('activa', t.dataset.seccion === seccion));
+                tabs.forEach(t => {
+                    const el = document.getElementById(prefijoSeccion + t.dataset.seccion);
+                    if (el) el.style.display = t.dataset.seccion === seccion ? 'block' : 'none';
+                });
+            }
+            tabs.forEach(t => t.addEventListener('click', (evento) => {
+                evento.preventDefault();
+                mostrar(t.dataset.seccion);
+            }));
+            mostrar(tabs[0].dataset.seccion);
+        }
+
+        // --- Conectar/desconectar cuenta de Riot ---
+        async function iniciarConexionRiot() {
+            riotIdActual = await obtenerCuentaRiotVinculada(usuarioActual.uid);
+            mostrarEstadoConexion();
+            if (riotIdActual) iniciarSelectorDeJuego.mostrarJuego();
+        }
+
+        function mostrarEstadoConexion() {
+            const conectado = !!riotIdActual;
+            document.getElementById('riot-sin-conectar').style.display = conectado ? 'none' : 'block';
+            document.getElementById('riot-conectado').style.display = conectado ? 'block' : 'none';
+            if (conectado) {
+                const plataforma = PLATAFORMAS_LOL.find(p => p.valor === riotIdActual.platform);
+                document.getElementById('riot-cuenta-conectada').textContent =
+                    `🔗 Conectado como ${riotIdActual.gameName}#${riotIdActual.tagLine} (${plataforma?.etiqueta || riotIdActual.platform})`;
+            }
+        }
+
+        document.getElementById('form-conectar-riot').addEventListener('submit', async (evento) => {
+            evento.preventDefault();
+            const gameName = document.getElementById('riot-gamename').value.trim();
+            const tagLine = document.getElementById('riot-tagline').value.trim().replace(/^#/, '');
+            const platform = document.getElementById('riot-platform').value;
+            if (!gameName || !tagLine) return;
+
+            document.getElementById('riot-sin-conectar').style.display = 'none';
+            document.getElementById('riot-cargando').style.display = 'block';
+            try {
+                riotIdActual = await conectarCuentaRiot(usuarioActual.uid, gameName, tagLine, platform);
+                document.getElementById('riot-cargando').style.display = 'none';
+                mostrarEstadoConexion();
+                iniciarSelectorDeJuego.reiniciarCargas();
+                iniciarSelectorDeJuego.mostrarJuego();
+            } catch (error) {
+                document.getElementById('riot-cargando').style.display = 'none';
+                document.getElementById('riot-error-texto').textContent = error.message;
+                document.getElementById('riot-error').style.display = 'block';
+            }
+        });
+
+        document.getElementById('riot-reintentar').addEventListener('click', () => {
+            document.getElementById('riot-error').style.display = 'none';
+            document.getElementById('riot-sin-conectar').style.display = 'block';
+        });
+
+        document.getElementById('riot-desconectar').addEventListener('click', async () => {
+            if (!confirmar('¿Desconectar tu cuenta de Riot del Tracker? Tus notas y composiciones guardadas de TFT NO se borran, solo dejás de ver rango/partidas hasta que la conectes de nuevo.')) return;
+            await desconectarCuentaRiot(usuarioActual.uid);
+            riotIdActual = null;
+            mostrarEstadoConexion();
+        });
+
+        // --- League of Legends ---
+        async function cargarLoL() {
+            const contenedorStats = document.getElementById('lol-stats-row');
+            contenedorStats.innerHTML = '<p class="texto-muted">Cargando…</p>';
+
+            try {
+                const [rango, partidas] = await Promise.all([
+                    obtenerRangoLoL(riotIdActual),
+                    obtenerPartidasRecientesLoL(riotIdActual, 10),
+                ]);
+
+                if (rango) await registrarSnapshotRango(usuarioActual.uid, 'lol', rango).catch(() => {});
+
+                const jugadas = partidas.length;
+                const ganadas = partidas.filter(p => p.gano).length;
+                const kdaProm = jugadas
+                    ? ((partidas.reduce((s, p) => s + p.kills + p.assists, 0)) / Math.max(1, partidas.reduce((s, p) => s + p.deaths, 0))).toFixed(1)
+                    : '—';
+
+                contenedorStats.innerHTML = `
+                    <div class="stat-tile">
+                        <div class="stat-valor">${rango ? `${esc(tituloTier(rango.tier))} ${rango.rank || ''}`.trim() : 'Sin rango'}</div>
+                        <div class="stat-etiqueta">${rango ? `${rango.puntos} PL` : 'Solo/Duo'}</div>
+                    </div>
+                    <div class="stat-tile">
+                        <div class="stat-valor">${jugadas ? `${Math.round((ganadas / jugadas) * 100)}%` : '—'}</div>
+                        <div class="stat-etiqueta">Win rate (últimas ${jugadas})</div>
+                    </div>
+                    <div class="stat-tile">
+                        <div class="stat-valor">${kdaProm}</div>
+                        <div class="stat-etiqueta">KDA promedio</div>
+                    </div>
+                `;
+
+                renderizarPartidasLoL(partidas);
+            } catch (error) {
+                contenedorStats.innerHTML = `<p class="texto-muted" style="font-size:.85rem;">No se pudo consultar Riot ahora: ${esc(error.message)}</p>`;
+            }
+
+            // Aparte del try/catch de arriba: el gráfico de historial sale
+            // de Firestore (no de Riot), así que tiene sentido mostrarlo
+            // igual aunque el pedido en vivo a Riot haya fallado — y si
+            // FALLA este, no tiene que borrar las stats que ya se
+            // mostraron bien arriba.
+            try {
+                await renderizarGraficoRango(usuarioActual.uid, 'lol', 'lol-grafico-rango');
+            } catch { /* el gráfico queda vacío, no rompe el resto de la sección */ }
+
+            cargarSelectorDeCampeones();
+            cargarNotas('lol');
+        }
+
+        function tituloTier(tier) {
+            const nombres = {
+                IRON: 'Hierro', BRONZE: 'Bronce', SILVER: 'Plata', GOLD: 'Oro', PLATINUM: 'Platino',
+                EMERALD: 'Esmeralda', DIAMOND: 'Diamante', MASTER: 'Maestro', GRANDMASTER: 'Gran Maestro', CHALLENGER: 'Aspirante',
+            };
+            return nombres[tier] || tier;
+        }
+
+        // Riot capitaliza el "championName" a su manera (ej. "Fiddlesticks"),
+        // que no siempre coincide EXACTO con nuestro alias (ej.
+        // "FiddleSticks") — mismo desajuste ya visto al armar LOL_BUILDS, se
+        // resuelve igual: comparar en minúsculas y devolver la capitalización
+        // real que usamos nosotros (la que matchea los nombres de archivo de
+        // íconos y las claves de LOL_BUILDS).
+        function resolverAliasCampeon(championName) {
+            const real = CAMPEONES_LOL.find(c => c.alias.toLowerCase() === (championName || '').toLowerCase());
+            return real ? real.alias : null;
+        }
+
+        // Salta desde una partida jugada directo a la build de ese campeón:
+        // cambia a la pestaña "Build y runas", marca el campeón en la
+        // grilla (reutiliza el resaltado que ya tiene renderizarGridCampeonesLoL)
+        // y muestra su card de build.
+        function irABuildDesdePartida(alias) {
+            cargarSelectorDeCampeones(); // no-op si ya estaba cargada
+            document.querySelector('#lol-subnav [data-seccion="build"]').click();
+            campeonLoLElegido = alias;
+            renderizarGridCampeonesLoL(document.getElementById('lol-buscar-campeon').value || '');
+            mostrarBuildCampeon(alias);
+            document.getElementById('lol-detalle-build').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function renderizarPartidasLoL(partidas) {
+            const contenedor = document.getElementById('lol-lista-partidas');
+            if (!partidas.length) {
+                contenedor.innerHTML = '<p class="texto-muted" style="font-size:.85rem;">Todavía no hay partidas recientes para mostrar.</p>';
+                return;
+            }
+            contenedor.innerHTML = partidas.map(p => {
+                // Si por algún motivo no matchea ningún alias (no debería
+                // pasar, están los 173), la fila queda como antes: sin
+                // ícono y sin click, pero sigue mostrando la partida.
+                const alias = resolverAliasCampeon(p.campeonAlias);
+                const icono = alias
+                    ? `<img src="iconos-campeones-lol/${esc(alias)}.png" alt="" style="width:32px; height:32px; border-radius:50%; object-fit:cover; flex-shrink:0;">`
+                    : '';
+                return `
+                    <div class="balance-item"${alias ? ` data-alias="${esc(alias)}" role="button" tabindex="0" title="Ver build de ${esc(p.campeon)}" style="cursor:pointer;"` : ''}>
+                        <span style="display:flex; align-items:center; gap: var(--space-2);">
+                            ${icono}
+                            <span style="display:flex; flex-direction:column;">
+                                <strong style="color: ${p.gano ? 'var(--color-success)' : 'var(--color-danger)'};">${p.gano ? 'Victoria' : 'Derrota'}</strong>
+                                <span class="texto-muted" style="font-size:.8rem;">${esc(p.campeon)} — ${p.duracionMin} min</span>
+                            </span>
+                        </span>
+                        <span class="monto">${p.kills}/${p.deaths}/${p.assists}</span>
+                    </div>
+                `;
+            }).join('');
+            contenedor.querySelectorAll('.balance-item[data-alias]').forEach(fila => {
+                fila.addEventListener('click', () => irABuildDesdePartida(fila.dataset.alias));
+                fila.addEventListener('keydown', (evento) => {
+                    if (evento.key === 'Enter' || evento.key === ' ') { evento.preventDefault(); irABuildDesdePartida(fila.dataset.alias); }
+                });
+            });
+        }
+
+        // Wrapper reusable para un ícono con tooltip CSS (ver .tooltip-wrap
+        // en main.css) — `titulo` va en negrita arriba del texto,
+        // `descripcion` es el texto de Riot ya limpio de HTML (ver
+        // metaCurada.js). tabindex="0" para que también se pueda "activar"
+        // el tooltip con teclado/toque, no solo con el mouse.
+        function iconoConTooltip(src, alt, titulo, descripcion, tamanoPx) {
+            return `
+                <span class="tooltip-wrap" tabindex="0">
+                    <img src="${esc(src)}" alt="${esc(alt)}" style="width:${tamanoPx}px; height:${tamanoPx}px; border-radius:8px; border:2px solid var(--color-border); object-fit:cover;">
+                    <span class="tooltip-texto"><strong>${esc(titulo)}</strong>${esc(descripcion)}</span>
+                </span>
+            `;
+        }
+
+        // Selector VISUAL de campeón (ícono + nombre + buscador) para
+        // "Build y runas" — mismo criterio que el picker de campeones
+        // del armador de composiciones de TFT (más fácil clickear un
+        // ícono que escribir el nombre exacto, a pedido de Roy).
+        // Separado de LOL_BUILDS a propósito: la lista de campeones es
+        // un hecho del juego (CAMPEONES_LOL, ver campeonesLoL.js), el
+        // build en sí es un dato real de u.gg que puede faltar para
+        // algún campeón puntual (ver el aviso en mostrarBuildCampeon).
+        let campeonLoLElegido = null;
+
+        function cargarSelectorDeCampeones() {
+            const grid = document.getElementById('lol-grid-campeones');
+            if (grid.dataset.cargado) return; // no depende de datos en vivo, alcanza con armarlo una vez
+            grid.dataset.cargado = '1';
+            renderizarGridCampeonesLoL('');
+            const buscador = document.getElementById('lol-buscar-campeon');
+            buscador.addEventListener('input', () => renderizarGridCampeonesLoL(buscador.value));
+        }
+
+        function renderizarGridCampeonesLoL(filtro) {
+            const grid = document.getElementById('lol-grid-campeones');
+            const texto = filtro.trim().toLowerCase();
+            const filtrados = CAMPEONES_LOL.filter(c => !texto || c.nombre.toLowerCase().includes(texto));
+            document.getElementById('lol-grid-sin-resultados').style.display = filtrados.length ? 'none' : 'block';
+
+            grid.innerHTML = filtrados.map(c => `
+                <button type="button" class="secundario lol-elegir-campeon" data-alias="${esc(c.alias)}" style="width:auto; padding:4px; display:flex; flex-direction:column; align-items:center; gap:4px; ${c.alias === campeonLoLElegido ? 'background:var(--color-primary-soft);' : ''}" title="${esc(c.nombre)}">
+                    <img src="iconos-campeones-lol/${esc(c.alias)}.png" alt="" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">
+                    <span style="font-size:.62rem; line-height:1.1; text-align:center;">${esc(c.nombre)}</span>
+                </button>
+            `).join('');
+
+            grid.querySelectorAll('.lol-elegir-campeon').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    campeonLoLElegido = boton.dataset.alias;
+                    grid.querySelectorAll('.lol-elegir-campeon').forEach(b => { b.style.background = ''; });
+                    boton.style.background = 'var(--color-primary-soft)';
+                    mostrarBuildCampeon(boton.dataset.alias);
+                });
+            });
+        }
+
+        // Una card de build (runas + summoners + ítems por fase +
+        // orden de habilidades) — separada de mostrarBuildCampeon()
+        // para poder redibujarla al cambiar entre "Recomendado" y el
+        // estilo alternativo sin reconstruir todo de nuevo.
+        function htmlBuildLoL(build) {
+            const fasesConItems = ['Early', 'Mid', 'Late']
+                .map(fase => ({ fase, items: build.build.filter(b => b.fase === fase) }))
+                .filter(f => f.items.length);
+
+            return `
+                <p style="margin:0 0 6px;" class="texto-muted">${build.totalPartidas.toLocaleString('es-AR')} partidas reales analizadas.</p>
+
+                ${build.runas ? `
+                    <p style="margin:0 0 8px;"><strong>🔮 Runas</strong></p>
+                    <div style="display:flex; gap: var(--space-4); flex-wrap:wrap; margin-bottom: var(--space-3);">
+                        <div>
+                            <p class="texto-muted" style="font-size:.72rem; text-transform:uppercase; margin: 0 0 6px;">${esc(build.runas.arbolPrincipal)} (principal)</p>
+                            <div style="display:flex; gap: var(--space-2);">
+                                ${build.runas.perks.slice(0, 4).map(r => iconoConTooltip(`iconos-runas/${r.icono}.png`, r.nombre, r.nombre, r.desc, r === build.runas.perks[0] ? 52 : 40)).join('')}
+                            </div>
+                        </div>
+                        <div>
+                            <p class="texto-muted" style="font-size:.72rem; text-transform:uppercase; margin: 0 0 6px;">${esc(build.runas.arbolSecundario)} (secundaria)</p>
+                            <div style="display:flex; gap: var(--space-2);">
+                                ${build.runas.perks.slice(4).map(r => iconoConTooltip(`iconos-runas/${r.icono}.png`, r.nombre, r.nombre, r.desc, 40)).join('')}
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${build.summoners.length ? `
+                    <p style="margin:0 0 8px;"><strong>✨ Summoners</strong></p>
+                    <div style="display:flex; gap: var(--space-2); margin-bottom: var(--space-3);">
+                        ${build.summoners.map(s => iconoConTooltip(`iconos-summoners-lol/${s.icono}.png`, s.nombre, s.nombre, s.desc, 40)).join('')}
+                    </div>
+                ` : ''}
+
+                <p style="margin:0 0 8px;"><strong>🛠️ Build</strong></p>
+                <div style="display:flex; flex-direction:column; gap: var(--space-2); margin-bottom: var(--space-3);">
+                    ${fasesConItems.map(f => `
+                        <div>
+                            <p class="texto-muted" style="font-size:.72rem; text-transform:uppercase; margin: 0 0 6px;">${esc(f.fase)}</p>
+                            <div style="display:flex; gap: var(--space-2); flex-wrap:wrap;">
+                                ${f.items.map(it => iconoConTooltip(`iconos-items-lol/${it.icono}.png`, it.nombre, it.nombre, it.desc, 44)).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                ${build.skillPriority ? `<p class="texto-muted" style="font-size:.85rem; margin:0 0 var(--space-3);"><strong>Prioridad de habilidades:</strong> ${esc(build.skillPriority)}</p>` : ''}
+            `;
+        }
+
+        // Orden real de las posiciones en una partida (no alfabético) —
+        // se usa para el selector de rol de abajo. El mapeo de clave
+        // interna (u.gg) a nombre se confirmó a mano con 5 campeones de
+        // rol único conocido (ver comentario de porRol en metaCurada.js).
+        const ROLES_LOL = [
+            { clave: 'top', etiqueta: '🛡️ Top' },
+            { clave: 'jungla', etiqueta: '🌲 Jungla' },
+            { clave: 'medio', etiqueta: '⚔️ Medio' },
+            { clave: 'adc', etiqueta: '🏹 ADC' },
+            { clave: 'soporte', etiqueta: '💫 Soporte' },
+        ];
+
+        function mostrarBuildCampeon(alias) {
+            const contenedor = document.getElementById('lol-detalle-build');
+            const real = CAMPEONES_LOL.find(c => c.alias === alias);
+            if (!real) { contenedor.innerHTML = ''; return; }
+
+            const datos = LOL_BUILDS[real.alias];
+            const iconoCampeon = `iconos-campeones-lol/${esc(real.alias)}.png`;
+
+            if (!datos) {
+                contenedor.innerHTML = `
+                    <div class="card" style="display:flex; align-items:center; gap: var(--space-3);">
+                        <img src="${iconoCampeon}" alt="${esc(real.nombre)}" style="width:48px; height:48px; border-radius:8px; border:2px solid var(--color-border);">
+                        <p class="texto-muted" style="margin:0; font-size:.85rem;">Todavía no tenemos la build de <strong>${esc(real.nombre)}</strong> cargada — pedímelo en el chat y la sumo.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // El selector de ROL (Top/Jungla/Medio/ADC/Soporte) solo tiene
+            // sentido en campeones que de verdad se juegan en más de una
+            // posición (ej. Sett Top+Soporte, Yone Top+Medio+ADC) — para
+            // el resto (mayoría de rol único) no se muestra nada nuevo,
+            // queda igual que antes.
+            const rolesDisponibles = datos.porRol ? ROLES_LOL.filter(r => datos.porRol[r.clave]) : [];
+            const hayVariasPosiciones = rolesDisponibles.length > 1;
+
+            contenedor.innerHTML = `
+                <div class="card">
+                    <div class="card-header" style="justify-content:flex-start; gap: var(--space-2);">
+                        <img src="${iconoCampeon}" alt="${esc(real.nombre)}" style="width:40px; height:40px; border-radius:8px; border:2px solid var(--color-border);">
+                        <h3 style="margin:0;">${esc(real.nombre)}</h3>
+                    </div>
+
+                    ${hayVariasPosiciones ? `
+                        <p class="texto-muted" style="font-size:.78rem; margin: 0 0 var(--space-2);">Se juega en más de una posición — elegí en cuál para ver SU build real:</p>
+                        <nav class="tabs tracker-nav" id="lol-rol-nav" style="margin-bottom: var(--space-3); flex-wrap:wrap;">
+                            <a href="#" class="tab activa" data-rol="_recomendado">⭐ Recomendado</a>
+                            ${rolesDisponibles.map(r => `<a href="#" class="tab" data-rol="${r.clave}">${r.etiqueta}</a>`).join('')}
+                        </nav>
+                    ` : ''}
+
+                    <div id="lol-rol-contenido">
+                        ${datos.alternativo ? `
+                            <nav class="tabs tracker-nav" id="lol-build-nav" style="margin-bottom: var(--space-3);">
+                                <a href="#" class="tab activa" data-build="principal">Recomendado</a>
+                                <a href="#" class="tab" data-build="alternativo">${esc(datos.alternativo.estilo)}</a>
+                            </nav>
+                        ` : ''}
+                        <div id="lol-build-contenido">${htmlBuildLoL(datos.principal)}</div>
+                    </div>
+
+                    <p class="texto-muted" style="font-size:.75rem; margin:0; border-top:1px solid var(--color-border); padding-top: var(--space-2);">Fuente: <a href="https://u.gg/lol/champions/${esc(real.alias.toLowerCase())}/build" target="_blank" rel="noopener">u.gg</a> · parche 16.17</p>
+                </div>
+            `;
+
+            // Sub-tabs de ESTILO (Recomendado/alternativo, ej. AP vs
+            // Crit) — se re-conectan cada vez que "lol-rol-contenido" se
+            // redibuja (al volver a "⭐ Recomendado" desde un rol
+            // puntual), por eso queda en su propia función.
+            function conectarSubTabsEstilo() {
+                if (!datos.alternativo) return;
+                const tabs = [...contenedor.querySelectorAll('#lol-build-nav .tab')];
+                const contenido = contenedor.querySelector('#lol-build-contenido');
+                tabs.forEach(t => t.addEventListener('click', (evento) => {
+                    evento.preventDefault();
+                    tabs.forEach(x => x.classList.toggle('activa', x === t));
+                    contenido.innerHTML = htmlBuildLoL(datos[t.dataset.build]);
+                }));
+            }
+            conectarSubTabsEstilo();
+
+            if (hayVariasPosiciones) {
+                const tabsRol = [...contenedor.querySelectorAll('#lol-rol-nav .tab')];
+                const contenidoRol = contenedor.querySelector('#lol-rol-contenido');
+                tabsRol.forEach(t => t.addEventListener('click', (evento) => {
+                    evento.preventDefault();
+                    tabsRol.forEach(x => x.classList.toggle('activa', x === t));
+                    if (t.dataset.rol === '_recomendado') {
+                        // Vuelve a mostrar principal/alternativo con sus
+                        // propias sub-tabs de estilo (si las tiene).
+                        contenidoRol.innerHTML = `
+                            ${datos.alternativo ? `
+                                <nav class="tabs tracker-nav" id="lol-build-nav" style="margin-bottom: var(--space-3);">
+                                    <a href="#" class="tab activa" data-build="principal">Recomendado</a>
+                                    <a href="#" class="tab" data-build="alternativo">${esc(datos.alternativo.estilo)}</a>
+                                </nav>
+                            ` : ''}
+                            <div id="lol-build-contenido">${htmlBuildLoL(datos.principal)}</div>
+                        `;
+                        conectarSubTabsEstilo();
+                    } else {
+                        // Un rol puntual (Top/Jungla/Medio/ADC/Soporte) es
+                        // UN solo build (sin sub-tabs de estilo — u.gg no
+                        // nos da estilos alternativos por rol, solo el más
+                        // jugado en esa posición).
+                        contenidoRol.innerHTML = htmlBuildLoL(datos.porRol[t.dataset.rol]);
+                    }
+                }));
+            }
+        }
+
+        // --- TFT ---
+        async function cargarTFT() {
+            const contenedorStats = document.getElementById('tft-stats-row');
+            contenedorStats.innerHTML = '<p class="texto-muted">Cargando…</p>';
+
+            try {
+                const [rango, partidas] = await Promise.all([
+                    obtenerRangoTFT(riotIdActual),
+                    obtenerPartidasRecientesTFT(riotIdActual, 10),
+                ]);
+
+                if (rango) await registrarSnapshotRango(usuarioActual.uid, 'tft', rango).catch(() => {});
+
+                const jugadas = partidas.length;
+                const top4 = partidas.filter(p => p.colocacion && p.colocacion <= 4).length;
+                const colocacionProm = jugadas
+                    ? (partidas.reduce((s, p) => s + (p.colocacion || 0), 0) / jugadas).toFixed(1)
+                    : '—';
+
+                contenedorStats.innerHTML = `
+                    <div class="stat-tile">
+                        <div class="stat-valor">${rango ? `${esc(tituloTier(rango.tier))} ${rango.rank || ''}`.trim() : 'Sin rango'}</div>
+                        <div class="stat-etiqueta">${rango ? `${rango.puntos} PL` : 'Rankeada'}</div>
+                    </div>
+                    <div class="stat-tile">
+                        <div class="stat-valor">${colocacionProm}</div>
+                        <div class="stat-etiqueta">Colocación promedio</div>
+                    </div>
+                    <div class="stat-tile">
+                        <div class="stat-valor">${jugadas ? `${Math.round((top4 / jugadas) * 100)}%` : '—'}</div>
+                        <div class="stat-etiqueta">Top 4 (últimas ${jugadas})</div>
+                    </div>
+                `;
+
+                renderizarPartidasTFT(partidas);
+            } catch (error) {
+                contenedorStats.innerHTML = `<p class="texto-muted" style="font-size:.85rem;">No se pudo consultar Riot ahora: ${esc(error.message)}</p>`;
+            }
+
+            // Mismo criterio que en cargarLoL(): el gráfico sale de
+            // Firestore (no de Riot), y si falla no tiene que borrar las
+            // stats que ya se mostraron bien arriba.
+            try {
+                await renderizarGraficoRango(usuarioActual.uid, 'tft', 'tft-grafico-rango');
+            } catch { /* el gráfico queda vacío, no rompe el resto de la sección */ }
+
+            iniciarAugmentsTop();
+            renderizarListaCompsCompletas('tft-lista-meta', 'tft-meta', META_TFT.composiciones.filter(c => c.fuenteDatos === 'metatft'));
+            renderizarListaCompsCompletas('tft-lista-tftacademy', 'tft-tftacademy', META_TFT.composiciones.filter(c => c.fuenteDatos === 'tftacademy'));
+            renderizarBlitzTFT();
+            renderizarRestoTFT();
+            iniciarSubnav('fuente-subnav', 'fuente-seccion-');
+            iniciarBuscadorMeta();
+            cargarNotas('tft');
+            iniciarMisComposicionesTFT();
+        }
+
+        function renderizarPartidasTFT(partidas) {
+            const contenedor = document.getElementById('tft-lista-partidas');
+            if (!partidas.length) {
+                contenedor.innerHTML = '<p class="texto-muted" style="font-size:.85rem;">Todavía no hay partidas recientes para mostrar.</p>';
+                return;
+            }
+            contenedor.innerHTML = partidas.map(p => `
+                <div class="balance-item">
+                    <span style="display:flex; flex-direction:column;">
+                        <strong style="color: ${p.colocacion && p.colocacion <= 4 ? 'var(--color-success)' : 'var(--color-danger)'};">Puesto ${p.colocacion ?? '?'}</strong>
+                        <span class="texto-muted" style="font-size:.8rem;">Nivel ${p.nivel ?? '?'} — ${p.duracionMin} min</span>
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        // Ícono descargado (public/gaming/iconos-campeones/) si hay, o un
+        // círculo con la inicial si es una unidad exclusiva del set que
+        // todavía no tiene uno (ver el comentario grande en
+        // metaCurada.js) — nunca se hotlinkea a ningún CDN externo. Sin
+        // tooltip propio (se usa en la fila de campeones de arriba de
+        // cada card, donde ya se ve el nombre debajo en texto) — pero
+        // SÍ con una fila de mini íconos de sus ítems recomendados,
+        // superpuesta abajo del círculo (hasta 3 — con más quedaba
+        // saturado), a pedido de Roy, para verlos de un vistazo sin
+        // tener que abrir "Ver tablero" y pasar el mouse por cada ficha.
+        function iconoCampeonHtml(campeon) {
+            const insignias = campeon.items.length
+                ? `<span style="position:absolute; bottom:-3px; left:50%; transform:translateX(-50%); display:flex; gap:1px;">
+                    ${campeon.items.slice(0, 3).map(it => `<img src="iconos-items-tft/${esc(it.icono)}.png" alt="" title="${esc(it.nombre)}" style="width:14px; height:14px; border-radius:3px; border:1.5px solid var(--color-surface); box-shadow:0 0 0 1px var(--color-border);">`).join('')}
+                </span>`
+                : '';
+            const iconoBase = campeon.icono
+                ? `<img src="iconos-campeones/${esc(campeon.icono)}.png" alt="${esc(campeon.nombre)}" title="${esc(campeon.nombre)}" style="width:36px; height:36px; border-radius:50%; border:2px solid var(--color-border); object-fit:cover;">`
+                : `<span title="${esc(campeon.nombre)}" style="width:36px; height:36px; border-radius:50%; border:2px solid var(--color-border); background:var(--color-surface-2); color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; font-size:.8rem; font-weight:700;">${esc(campeon.nombre.charAt(0))}</span>`;
+            return `<span style="position:relative; display:inline-flex;">${iconoBase}${insignias}</span>`;
+        }
+
+        // Una celda del tablero de hexágonos — la forma en sí vive en
+        // .hex-borde/.hex-forma (dos capas, ver el comentario grande en
+        // main.css) DENTRO de .hex-celda, que a su vez NO tiene
+        // clip-path — así el tooltip (adentro también) puede salirse
+        // del hexágono hacia arriba para mostrarse en vez de quedar
+        // recortado por la forma. Las celdas vacías dibujan el mismo
+        // hexágono, tenue, para que se note la forma del tablero
+        // completo, no solo dónde hay ficha.
+        function celdaHex(campeon) {
+            if (!campeon) {
+                return `
+                    <div class="hex-celda hex-vacia">
+                        <span class="hex-borde"></span>
+                        <span class="hex-forma"></span>
+                    </div>
+                `;
+            }
+
+            const descripcionItems = campeon.items.length
+                ? `<span style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">${campeon.items.map(it => `
+                    <span style="display:flex; align-items:center; gap:6px;">
+                        <img src="iconos-items-tft/${esc(it.icono)}.png" alt="" style="width:18px; height:18px; border-radius:4px; flex-shrink:0;">
+                        ${esc(it.nombre)}
+                    </span>
+                `).join('')}</span>`
+                : '<span style="display:block; margin-top:4px;">Sin build fijo — flexible/situacional según la guía.</span>';
+            const contenidoIcono = campeon.icono
+                ? `<img src="iconos-campeones/${esc(campeon.icono)}.png" alt="${esc(campeon.nombre)}">`
+                : `<span style="width:74%; height:74%; border-radius:50%; background:var(--color-surface); color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; font-size:.65rem; font-weight:700; position:relative; z-index:1;">${esc(campeon.nombre.charAt(0))}</span>`;
+
+            return `
+                <div class="hex-celda hex-ocupada">
+                    <span class="hex-borde"></span>
+                    <span class="tooltip-wrap" tabindex="0">
+                        <span class="hex-forma">${contenidoIcono}</span>
+                        <span class="tooltip-texto"><strong>${esc(campeon.nombre)}</strong>${descripcionItems}</span>
+                    </span>
+                </div>
+            `;
+        }
+
+        // Tablero completo — fila 4 (frontline) arriba, fila 1
+        // (backline) abajo, mismo criterio que el tablero real (ver el
+        // comentario grande de .hex-tablero en main.css). Las celdas
+        // sin campeón quedan vacías (semi-transparentes) — la mayoría
+        // de las comps no llenan las 28.
+        function tableroHex(campeones) {
+            const filasHtml = [4, 3, 2, 1].map(fila => {
+                const corrida = fila % 2 === 0 ? 'hex-fila-corrida' : '';
+                const celdas = Array.from({ length: 7 }, (_, i) => {
+                    const columna = i + 1;
+                    const campeon = campeones.find(c => c.fila === fila && c.columna === columna);
+                    return celdaHex(campeon);
+                }).join('');
+                return `<div class="hex-fila ${corrida}">${celdas}</div>`;
+            }).join('');
+            return `<div class="hex-tablero">${filasHtml}</div>`;
+        }
+
+        // --- Tablero EDITABLE (armador visual de "Mis composiciones") ---
+        // Misma forma de hexágono que celdaHex()/tableroHex() de arriba
+        // (se reutilizan las mismas clases CSS), pero cada celda es un
+        // <button> clickeable en vez de un div con tooltip pasivo:
+        //   - celda vacía -> abre el panel de campeones para colocar uno ahí.
+        //   - celda ocupada -> abre el panel de ítems/quitar de ESE campeón.
+        function celdaHexEditable(campeon, fila, columna) {
+            if (!campeon) {
+                return `
+                    <button type="button" class="hex-celda hex-vacia hex-celda-click" data-fila="${fila}" data-columna="${columna}" title="Agregar campeón acá">
+                        <span class="hex-borde"></span>
+                        <span class="hex-forma"><span class="hex-celda-mas">+</span></span>
+                    </button>
+                `;
+            }
+            const contenidoIcono = campeon.icono
+                ? `<img src="iconos-campeones/${esc(campeon.icono)}.png" alt="${esc(campeon.nombre)}">`
+                : `<span style="width:74%; height:74%; border-radius:50%; background:var(--color-surface); color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; font-size:.65rem; font-weight:700; position:relative; z-index:1;">${esc(campeon.nombre.charAt(0))}</span>`;
+            const insignias = campeon.items.length
+                ? `<span style="position:absolute; bottom:-2px; left:50%; transform:translateX(-50%); display:flex; gap:1px; z-index:2;">${campeon.items.slice(0, 3).map(it => `<img src="iconos-items-tft/${esc(it.icono)}.png" alt="" style="width:11px; height:11px; border-radius:2px; border:1px solid var(--color-surface);">`).join('')}</span>`
+                : '';
+            return `
+                <button type="button" class="hex-celda hex-ocupada hex-celda-click" data-fila="${fila}" data-columna="${columna}" title="${esc(campeon.nombre)} — tocá para editar ítems o quitarlo">
+                    <span class="hex-borde"></span>
+                    <span class="hex-forma">${contenidoIcono}${insignias}</span>
+                </button>
+            `;
+        }
+
+        function tableroHexEditable(campeones) {
+            const filasHtml = [4, 3, 2, 1].map(fila => {
+                const corrida = fila % 2 === 0 ? 'hex-fila-corrida' : '';
+                const celdas = Array.from({ length: 7 }, (_, i) => {
+                    const columna = i + 1;
+                    const campeon = campeones.find(c => c.fila === fila && c.columna === columna);
+                    return celdaHexEditable(campeon, fila, columna);
+                }).join('');
+                return `<div class="hex-fila ${corrida}">${celdas}</div>`;
+            }).join('');
+            return `<div class="hex-tablero">${filasHtml}</div>`;
+        }
+
+        // Lista de comps con detalle COMPLETO (tablero, ítems, niveles,
+        // apertura, etapas) — la usan tanto la pestaña MetaTFT (comps con
+        // fuenteDatos:'metatft') como la pestaña tftacademy (fuenteDatos:
+        // 'tftacademy'), cada una con su propio contenedor y su propio
+        // prefijo de id (para que no choquen los ids entre pestañas).
+        function renderizarListaCompsCompletas(contenedorId, prefijo, comps) {
+            const contenedor = document.getElementById(contenedorId);
+            if (contenedor.dataset.cargado) return; // no depende de datos en vivo
+            contenedor.dataset.cargado = '1';
+            contenedor.innerHTML = comps.map((c, i) => {
+                const idDetalle = `${prefijo}-detalle-${i}`;
+                const buscar = esc(`${c.nombre} ${c.campeones.map(camp => camp.nombre).join(' ')}`.toLowerCase());
+                return `
+                <div class="card tft-buscable" data-buscar="${buscar}">
+                    <div class="card-header" style="justify-content:space-between;">
+                        <h3 style="margin:0;">${esc(c.nombre)} <span style="color:var(--color-primary);">(${c.tier})</span></h3>
+                        <a href="${esc(c.link)}" target="_blank" rel="noopener" style="font-size:.78rem; white-space:nowrap;">Ver en ${esc(c.fuenteDatos === 'metatft' ? 'metatft.com' : META_TFT.fuente)} ↗</a>
+                    </div>
+                    <p class="texto-muted" style="font-size:.85rem; margin: 0 0 var(--space-2);">${esc(c.estilo)}</p>
+                    <div style="display:flex; gap: var(--space-2); flex-wrap:wrap; align-items:flex-start; margin-bottom: var(--space-3);">
+                        ${c.campeones.map(camp => `
+                            <span style="display:flex; flex-direction:column; align-items:center; gap:10px; width:52px;">
+                                ${iconoCampeonHtml(camp)}
+                                <span class="texto-muted" style="font-size:.68rem; text-align:center; line-height:1.1;">${esc(camp.nombre)}</span>
+                            </span>
+                        `).join('')}
+                    </div>
+
+                    <button type="button" class="secundario tft-toggle-detalle" data-objetivo="${idDetalle}" style="width:auto; font-size:.8rem;">▾ Ver tablero y posicionamiento</button>
+
+                    <div id="${idDetalle}" style="display:none; margin-top: var(--space-3); padding-top: var(--space-3); border-top:1px solid var(--color-border);">
+                        <p style="margin:0 0 4px;"><strong>📍 Posicionamiento por nivel</strong></p>
+                        <p class="texto-muted" style="font-size:.78rem; margin: 0 0 8px;">Pasá el mouse (o tocá) cada ficha para ver sus ítems recomendados.</p>
+                        ${c.porNivel ? `
+                            <nav class="tabs tracker-nav" id="${prefijo}-tablero-nivel-${i}" style="margin-bottom: var(--space-2);">
+                                <a href="#" class="tab" data-nivel="4">Nivel 4</a>
+                                <a href="#" class="tab" data-nivel="5">Nivel 5</a>
+                                <a href="#" class="tab" data-nivel="6">Nivel 6</a>
+                                <a href="#" class="tab" data-nivel="7">Nivel 7</a>
+                                <a href="#" class="tab activa" data-nivel="final">🏁 Final</a>
+                            </nav>
+                            <p class="texto-muted" id="${prefijo}-tablero-nivel-stats-${i}" style="font-size:.72rem; margin: -4px 0 8px; min-height: 1.2em;"></p>
+                        ` : ''}
+                        <div style="display:flex; gap: var(--space-4); flex-wrap:wrap; align-items:flex-start;">
+                            <div style="flex:0 0 auto;" id="${prefijo}-tablero-contenedor-${i}">${tableroHex(c.campeones)}</div>
+                            <div style="flex:1 1 220px; min-width:220px;">
+                                <p style="margin:0 0 4px;"><strong>🎯 Prioridad de ítems</strong></p>
+                                <p class="texto-muted" style="font-size:.8rem; margin: 0 0 var(--space-3);">${c.ordenPrioridad ? c.ordenPrioridad.map(esc).join(' → ') : 'La guía no da un orden estricto acá — priorizá al carry principal y repartí el resto según lo que te toque.'}</p>
+
+                                <p style="margin:0 0 4px;"><strong>🔄 Apertura</strong>${c.aperturaTemprana.origen === 'claude' ? ' <span style="font-size:.7rem; font-weight:400; font-style:italic; color:var(--color-text-muted);">(✏️ sugerencia de Claude, no de la guía)</span>' : c.aperturaTemprana.origen === 'no-aplica' ? ' <span style="font-size:.7rem; font-weight:400; font-style:italic; color:var(--color-text-muted);">(✏️ análisis de Claude, no de la guía)</span>' : ''}</p>
+                                <p class="texto-muted" style="font-size:.8rem; margin: 0 0 var(--space-3);">${c.aperturaTemprana.campeones
+                                    ? `Podés arrancar con ${c.aperturaTemprana.unidades.map(esc).join(', ')} para hacer economía/racha de victorias — se van reemplazando por ${esc(c.aperturaTemprana.reemplazaCon)} a medida que subís de nivel.${c.aperturaTemprana.nota ? ` <em>${esc(c.aperturaTemprana.nota)}</em>` : ''}`
+                                    : esc(c.aperturaTemprana.nota)}</p>
+
+                                <p style="margin:0 0 6px;"><strong>⏱️ Etapas de la partida</strong></p>
+                                <nav class="tabs tracker-nav" id="${prefijo}-etapas-nav-${i}" style="margin-bottom: var(--space-2);">
+                                    <a href="#" class="tab" data-etapa="early">Early</a>
+                                    <a href="#" class="tab" data-etapa="mid">Mid</a>
+                                    <a href="#" class="tab" data-etapa="late">Late</a>
+                                </nav>
+                                <p class="texto-muted" id="${prefijo}-etapa-texto-${i}" style="font-size:.82rem;"></p>
+                                ${htmlAugmentsRecomendados(c.campeones)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            }).join('') + `
+                <p class="texto-muted" style="font-size:.75rem; margin: var(--space-2) 0 0;">${esc(META_TFT.notaItems)}</p>
+                <p class="texto-muted" style="font-size:.75rem; margin: 4px 0 0;">Fuente: <a href="${esc(comps[0]?.fuenteDatos === 'metatft' ? 'https://www.metatft.com/comps' : META_TFT.fuenteUrl)}" target="_blank" rel="noopener">${esc(comps[0]?.fuenteDatos === 'metatft' ? 'metatft.com' : META_TFT.fuente)}</a> · ${esc(META_TFT.set)}, parche ${esc(META_TFT.patch)} · cargado ${esc(META_TFT.actualizado)}</p>
+            `;
+
+            contenedor.querySelectorAll('.tft-toggle-detalle').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    const detalle = document.getElementById(boton.dataset.objetivo);
+                    const abrir = detalle.style.display === 'none';
+                    detalle.style.display = abrir ? 'block' : 'none';
+                    boton.textContent = abrir ? '▴ Ocultar tablero' : '▾ Ver tablero y posicionamiento';
+                });
+            });
+
+            // Pestañas Early/Mid/Late de cada comp — independientes
+            // entre sí (una por comp, por eso el índice "i" en cada id),
+            // arrancan siempre en "Early". No usan el patrón
+            // iniciarSubnav() de arriba porque acá no hay que
+            // mostrar/ocultar secciones, solo cambiar un párrafo de texto.
+            comps.forEach((c, i) => {
+                const nav = document.getElementById(`${prefijo}-etapas-nav-${i}`);
+                const texto = document.getElementById(`${prefijo}-etapa-texto-${i}`);
+                const tabs = [...nav.querySelectorAll('.tab')];
+                function mostrarEtapa(etapa) {
+                    tabs.forEach(t => t.classList.toggle('activa', t.dataset.etapa === etapa));
+                    texto.textContent = c.etapas[etapa];
+                }
+                tabs.forEach(t => t.addEventListener('click', (evento) => {
+                    evento.preventDefault();
+                    mostrarEtapa(t.dataset.etapa);
+                }));
+                mostrarEtapa('early');
+            });
+
+            // Selector de nivel (4/5/6/7/Final) — redibuja el tablero
+            // con el board REAL más jugado en partidas de verdad a ese
+            // nivel, según metatft.com (ver el comentario grande de
+            // META_TFT en metaCurada.js sobre esta fuente — es un dato
+            // real esta vez, no una estimación). Arranca siempre en
+            // "Final".
+            comps.forEach((c, i) => {
+                if (!c.porNivel) return;
+                const nav = document.getElementById(`${prefijo}-tablero-nivel-${i}`);
+                const destino = document.getElementById(`${prefijo}-tablero-contenedor-${i}`);
+                const statsEl = document.getElementById(`${prefijo}-tablero-nivel-stats-${i}`);
+                const tabs = [...nav.querySelectorAll('.tab')];
+                function mostrarNivel(nivel) {
+                    tabs.forEach(t => t.classList.toggle('activa', t.dataset.nivel === nivel));
+                    if (nivel === 'final') {
+                        destino.innerHTML = tableroHex(c.campeones);
+                        statsEl.textContent = '';
+                        return;
+                    }
+                    const info = c.porNivel[nivel];
+                    destino.innerHTML = tableroHex(info.campeones);
+                    statsEl.textContent = `metatft.com — ${info.partidas.toLocaleString('es-AR')} partidas reales · colocación promedio ${info.colocacionProm.toFixed(2)} · ${Math.round(info.winRate * 100)}% de victorias`;
+                }
+                tabs.forEach(t => t.addEventListener('click', (evento) => {
+                    evento.preventDefault();
+                    mostrarNivel(t.dataset.nivel);
+                }));
+            });
+        }
+
+        // --- Otras 28 comps (solo cabezal, ver META_TFT_RESTO en
+        // metaCurada.js) — cada card tiene un botón para "pedir" que
+        // se sumen los datos completos más adelante, guardado en
+        // Firestore (tftPedidosComps/{clusterId}.pedidosPor, un array
+        // de uids) para saber cuáles piden más. ---
+        async function renderizarRestoTFT() {
+            const contenedor = document.getElementById('tft-lista-resto');
+            if (contenedor.dataset.cargado) return;
+            contenedor.dataset.cargado = '1';
+
+            contenedor.innerHTML = META_TFT_RESTO.map(c => {
+                const buscar = esc(`${c.nombre} ${c.campeones.map(camp => camp.nombre).join(' ')}`.toLowerCase());
+                return `
+                <div class="card tft-buscable" data-buscar="${buscar}" style="flex:1 1 220px; min-width:220px; max-width:280px;">
+                    <p style="margin:0 0 6px; font-weight:600; font-size:.88rem;">${esc(c.nombre)}</p>
+                    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+                        ${c.campeones.map(camp => camp.icono
+                            ? `<img src="iconos-campeones/${esc(camp.icono)}.png" alt="${esc(camp.nombre)}" title="${esc(camp.nombre)}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;">`
+                            : `<span style="width:28px; height:28px; border-radius:50%; background:var(--color-surface-2); display:flex; align-items:center; justify-content:center; font-size:.6rem; text-align:center;" title="${esc(camp.nombre)}">?</span>`
+                        ).join('')}
+                    </div>
+                    <p class="texto-muted" style="font-size:.7rem; margin:0 0 8px;">${c.totalPartidas.toLocaleString('es-AR')} partidas · colocación prom. ${c.colocacionProm.toFixed(2)}</p>
+                    <button type="button" class="secundario tft-pedir-comp" data-cluster="${esc(c.id)}" style="width:100%; font-size:.75rem;">🔔 Pedir datos completos</button>
+                </div>
+            `;
+            }).join('');
+
+            // Estado inicial de cada botón (¿ya la pedí?) — se piden
+            // todos los docs relevantes de una, no uno por uno.
+            contenedor.querySelectorAll('.tft-pedir-comp').forEach(async boton => {
+                const clusterId = boton.dataset.cluster;
+                try {
+                    const snap = await getDoc(doc(db, 'tftPedidosComps', clusterId));
+                    const yaLaPedi = snap.exists() && (snap.data().pedidosPor || []).includes(usuarioActual.uid);
+                    actualizarBotonPedido(boton, yaLaPedi);
+                } catch (error) {
+                    // Si falla la lectura (ej. sin conexión) el botón
+                    // se queda en su estado por defecto — no bloquea
+                    // el resto de la página.
+                }
+                boton.addEventListener('click', () => alternarPedidoComp(boton, clusterId));
+            });
+        }
+
+        function actualizarBotonPedido(boton, pedida) {
+            boton.textContent = pedida ? '✅ Ya la pediste' : '🔔 Pedir datos completos';
+            // Sin ".secundario" el botón toma el estilo CTA metálico por
+            // defecto (ver main.css) — se usa para marcar "ya pedida".
+            boton.classList.toggle('secundario', !pedida);
+        }
+
+        async function alternarPedidoComp(boton, clusterId) {
+            const pedidaActualmente = boton.textContent.includes('Ya la pediste');
+            boton.disabled = true;
+            try {
+                const ref = doc(db, 'tftPedidosComps', clusterId);
+                if (pedidaActualmente) {
+                    await updateDoc(ref, { pedidosPor: arrayRemove(usuarioActual.uid) });
+                    actualizarBotonPedido(boton, false);
+                } else {
+                    // Si el documento no existe todavía (nadie la pidió
+                    // antes), setDoc con merge lo crea; si ya existe, lo
+                    // mismo suma el uid sin pisar a quien ya la pidió.
+                    await setDoc(ref, { pedidosPor: arrayUnion(usuarioActual.uid) }, { merge: true });
+                    actualizarBotonPedido(boton, true);
+                }
+            } catch (error) {
+                avisar('No se pudo guardar el pedido: ' + error.message, 'error');
+            } finally {
+                boton.disabled = false;
+            }
+        }
+
+        // --- Pestaña Blitz: 10 comps de blitz.gg (curadas a mano desde
+        // su API interna, misma política que metatft.com — un pull
+        // manual puntual, nada automático). A diferencia de MetaTFT acá
+        // NO hay tablero/posicionamiento (blitz.gg no expone ese dato),
+        // así que la card es más simple: campeones con sus ítems reales
+        // (de blitz.gg) en una lista desplegable en vez de un tablero. ---
+        function renderizarBlitzTFT() {
+            const contenedor = document.getElementById('tft-lista-blitz');
+            if (contenedor.dataset.cargado) return;
+            contenedor.dataset.cargado = '1';
+
+            contenedor.innerHTML = META_BLITZ.map((c, i) => {
+                const idDetalle = `tft-blitz-detalle-${i}`;
+                const buscar = esc(`${c.nombre} ${c.campeones.map(camp => camp.nombre).join(' ')}`.toLowerCase());
+                return `
+                <div class="card tft-buscable" data-buscar="${buscar}">
+                    <div class="card-header" style="justify-content:space-between;">
+                        <h3 style="margin:0;">${esc(c.nombre)} <span style="color:var(--color-primary);">(${c.tier})</span></h3>
+                        <a href="${esc(c.link)}" target="_blank" rel="noopener" style="font-size:.78rem; white-space:nowrap;">Ver en blitz.gg ↗</a>
+                    </div>
+                    <p class="texto-muted" style="font-size:.85rem; margin: 0 0 var(--space-2);">${esc(c.estilo)} · ${c.totalPartidas.toLocaleString('es-AR')} partidas · colocación prom. ${c.colocacionProm.toFixed(2)}</p>
+                    <div style="display:flex; gap: var(--space-2); flex-wrap:wrap; align-items:flex-start; margin-bottom: var(--space-3);">
+                        ${c.campeones.map(camp => `
+                            <span style="display:flex; flex-direction:column; align-items:center; gap:10px; width:52px;">
+                                ${iconoCampeonHtml(camp)}
+                                <span class="texto-muted" style="font-size:.68rem; text-align:center; line-height:1.1;">${esc(camp.nombre)}</span>
+                            </span>
+                        `).join('')}
+                    </div>
+
+                    <button type="button" class="secundario tft-toggle-detalle" data-objetivo="${idDetalle}" style="width:auto; font-size:.8rem;">▾ Ver ítems recomendados</button>
+
+                    <div id="${idDetalle}" style="display:none; margin-top: var(--space-3); padding-top: var(--space-3); border-top:1px solid var(--color-border);">
+                        <div style="display:flex; flex-direction:column; gap: var(--space-2);">
+                            ${c.campeones.filter(camp => camp.items.length).map(camp => `
+                                <div style="display:flex; gap: var(--space-2); align-items:flex-start;">
+                                    ${iconoCampeonHtml(camp)}
+                                    <div>
+                                        <p style="margin:0 0 2px; font-weight:600; font-size:.85rem;">${esc(camp.nombre)}</p>
+                                        <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                                            ${camp.items.map(it => `<span class="tooltip-wrap" style="display:inline-flex;"><img src="iconos-items-tft/${esc(it.icono)}.png" alt="${esc(it.nombre)}" style="width:22px; height:22px; border-radius:4px;"><span class="tooltip-texto">${esc(it.nombre)}: ${esc(it.desc)}</span></span>`).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('') || '<p class="texto-muted" style="font-size:.82rem;">blitz.gg no da un build fijo por campeón para esta comp.</p>'}
+                        </div>
+                        ${htmlAugmentsRecomendados(c.campeones)}
+                    </div>
+                </div>
+            `;
+            }).join('') + `
+                <p class="texto-muted" style="font-size:.75rem; margin: var(--space-2) 0 0;">blitz.gg no expone tablero/posicionamiento como metatft.com — por eso esta pestaña no tiene "Ver tablero", solo los ítems reales por campeón.</p>
+                <p class="texto-muted" style="font-size:.75rem; margin: 4px 0 0;">Fuente: <a href="https://blitz.gg/tft/comps" target="_blank" rel="noopener">blitz.gg</a> · cargado ${esc(META_TFT.actualizado)}</p>
+            `;
+
+            contenedor.querySelectorAll('.tft-toggle-detalle').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    const detalle = document.getElementById(boton.dataset.objetivo);
+                    const abrir = detalle.style.display === 'none';
+                    detalle.style.display = abrir ? 'block' : 'none';
+                    boton.textContent = abrir ? '▴ Ocultar ítems' : '▾ Ver ítems recomendados';
+                });
+            });
+        }
+
+        // --- Mejores augments del parche (tier S, no atados a ninguna
+        // comp puntual) — se cargan una sola vez, colapsados, arriba de
+        // las 3 pestañas de composiciones. ---
+        function iniciarAugmentsTop() {
+            const grid = document.getElementById('augments-top-grid');
+            const boton = document.getElementById('augments-top-toggle');
+            if (grid.dataset.cargado) return;
+            grid.dataset.cargado = '1';
+            grid.innerHTML = TFT_AUGMENTS_TOP.map(a => `
+                <span class="tooltip-wrap" style="display:flex; flex-direction:column; align-items:center; gap:4px; width:64px;">
+                    ${a.icono
+                        ? `<img src="iconos-augments-tft/${esc(a.icono)}.png" alt="${esc(a.nombre)}" style="width:36px; height:36px; border-radius:6px;">`
+                        : `<span style="width:36px; height:36px; border-radius:6px; background:var(--color-surface-2); display:flex; align-items:center; justify-content:center; font-size:.65rem; color:var(--color-text-muted);">?</span>`}
+                    <span class="texto-muted" style="font-size:.6rem; text-align:center; line-height:1.1;">${esc(a.nombre)}</span>
+                    <span class="tooltip-texto">${esc(a.desc)}</span>
+                </span>
+            `).join('');
+
+            boton.addEventListener('click', () => {
+                const abrir = grid.style.display === 'none';
+                grid.style.display = abrir ? 'flex' : 'none';
+                boton.textContent = abrir ? '▴ Ocultar' : '▾ Ver los 27';
+            });
+        }
+
+        // --- Buscador (filtra las 25 completas Y las 28 de cabezal a
+        // la vez, por nombre de comp o de campeón) ---
+        function iniciarBuscadorMeta() {
+            const input = document.getElementById('tft-meta-buscador');
+            if (input.dataset.iniciado) return;
+            input.dataset.iniciado = '1';
+            // Cada lista filtrable puede tener un mensaje "sin
+            // resultados" propio (id = contenedorId + "-sin-resultados")
+            // — se muestra solo si esa lista puntual se queda en 0 tarjetas
+            // visibles Y hay texto de búsqueda cargado.
+            const listas = ['tft-lista-meta', 'tft-lista-resto', 'tft-lista-tftacademy', 'tft-lista-blitz'];
+            input.addEventListener('input', () => {
+                const texto = input.value.trim().toLowerCase();
+                listas.forEach(listaId => {
+                    const lista = document.getElementById(listaId);
+                    if (!lista) return;
+                    let algunaVisible = false;
+                    lista.querySelectorAll('.tft-buscable').forEach(card => {
+                        const coincide = !texto || card.dataset.buscar.includes(texto);
+                        card.style.display = coincide ? '' : 'none';
+                        if (coincide) algunaVisible = true;
+                    });
+                    const mensaje = document.getElementById(`${listaId}-sin-resultados`);
+                    if (mensaje) mensaje.style.display = (!algunaVisible && texto) ? 'block' : 'none';
+                });
+            });
+        }
+
+        // --- Gráfico de rango en el tiempo (compartido LoL/TFT) ---
+        async function renderizarGraficoRango(uid, juego, contenedorId) {
+            const historial = await obtenerHistorialRango(uid, juego);
+            const etiquetasLegibles = new Map(); // valor numérico -> texto para el tooltip
+            historial.forEach(h => etiquetasLegibles.set(h.valor, `${tituloTier(h.tier)}${h.rank ? ' ' + h.rank : ''} — ${h.puntos} PL`));
+            graficoLinea(
+                contenedorId,
+                historial.map(h => h.fecha),
+                historial.map(h => h.valor),
+                (v) => etiquetasLegibles.get(v) || String(v),
+            );
+        }
+
+        // --- Notas y objetivos (por juego, guardadas en gaming/{uid}) ---
+        async function cargarNotas(juego) {
+            const campo = document.getElementById(`${juego}-notas`);
+            if (campo.dataset.cargado) return;
+            campo.dataset.cargado = '1';
+            const snap = await getDoc(doc(db, 'gaming', usuarioActual.uid));
+            campo.value = snap.exists() ? (snap.data()[`notasTracker${juego === 'lol' ? 'LoL' : 'Tft'}`] || '') : '';
+            document.getElementById(`${juego}-guardar-notas`).addEventListener('click', async () => {
+                try {
+                    await setDoc(doc(db, 'gaming', usuarioActual.uid), {
+                        [`notasTracker${juego === 'lol' ? 'LoL' : 'Tft'}`]: campo.value,
+                    }, { merge: true });
+                    avisar('Notas guardadas', 'exito');
+                } catch (error) {
+                    avisar('No se pudo guardar: ' + error.message, 'error');
+                }
+            });
+        }
+
+        // --- Mis composiciones de TFT ---
+        let misComposiciones = [];
+        let subnavTftIniciada = false;
+
+        // Compatibilidad con comps guardadas ANTES del armador visual
+        // (items como texto libre en un solo string, sin
+        // fila/columna/icono por campeón) — se descarta lo que ya no
+        // se puede mapear 1 a 1 a la forma nueva, en vez de romper el
+        // render o el armador al abrirlas para editar.
+        function normalizarCampeonesComp(campeones) {
+            return (campeones || []).map((camp, i) => ({
+                nombre: camp.nombre || '',
+                icono: camp.icono || TFT_ROSTER.find(r => r.nombre === camp.nombre)?.icono || null,
+                fila: Number.isInteger(camp.fila) ? camp.fila : (1 + (i % 4)),
+                columna: Number.isInteger(camp.columna) ? camp.columna : (1 + Math.floor(i / 4)),
+                items: Array.isArray(camp.items) ? camp.items : [],
+            }));
+        }
+
+        async function iniciarMisComposicionesTFT() {
+            misComposiciones = await obtenerMisComposicionesTFT(usuarioActual.uid);
+            actualizarFiltroTemporadas();
+            renderizarMisComposiciones();
+
+            if (!subnavTftIniciada) {
+                subnavTftIniciada = true;
+                document.getElementById('tft-filtro-temporada').addEventListener('change', renderizarMisComposiciones);
+                document.getElementById('tft-nueva-comp').addEventListener('click', () => abrirModalComposicion(null));
+            }
+        }
+
+        function actualizarFiltroTemporadas() {
+            const select = document.getElementById('tft-filtro-temporada');
+            const actual = select.value;
+            const temporadas = [...new Set(misComposiciones.map(c => c.temporada).filter(Boolean))];
+            select.innerHTML = '<option value="">Todas las temporadas</option>' + temporadas.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+            if (temporadas.includes(actual)) select.value = actual;
+        }
+
+        function renderizarMisComposiciones() {
+            const filtro = document.getElementById('tft-filtro-temporada').value;
+            const contenedor = document.getElementById('tft-lista-comps');
+            const filtradas = filtro ? misComposiciones.filter(c => c.temporada === filtro) : misComposiciones;
+
+            if (!filtradas.length) {
+                contenedor.innerHTML = '<p class="texto-muted" style="font-size:.85rem; margin-top: var(--space-3);">Todavía no guardaste ninguna composición propia — probá "+ Nueva composición".</p>';
+                return;
+            }
+
+            contenedor.innerHTML = filtradas.map(c => {
+                // normalizarCampeonesComp(): compatibilidad con comps
+                // guardadas ANTES de este armador visual (items como
+                // texto libre en vez de array de objetos, sin
+                // fila/columna/icono) — se descarta lo viejo que ya no
+                // tiene forma de mapearse 1 a 1, en vez de romper el
+                // render.
+                const campeones = normalizarCampeonesComp(c.campeones);
+                return `
+                <div class="card">
+                    <div class="card-header" style="justify-content:space-between;">
+                        <h3 style="margin:0;">${esc(c.nombre)}</h3>
+                        <span class="chip estatico">${esc(c.temporada || 'Sin temporada')}</span>
+                    </div>
+                    <div style="display:flex; gap: var(--space-2); flex-wrap:wrap; align-items:flex-start; margin-bottom: var(--space-2);">
+                        ${campeones.map(camp => `
+                            <span style="display:flex; flex-direction:column; align-items:center; gap:8px; width:46px;">
+                                ${iconoCampeonHtml(camp)}
+                                <span class="texto-muted" style="font-size:.62rem; text-align:center; line-height:1.1;">${esc(camp.nombre)}</span>
+                            </span>
+                        `).join('')}
+                    </div>
+                    ${c.notas ? `<p class="texto-muted" style="font-size:.85rem; margin: 0 0 var(--space-2);">${esc(c.notas)}</p>` : ''}
+                    <div style="display:flex; gap: var(--space-2);">
+                        <button type="button" class="secundario" style="width:auto;" data-editar="${esc(c.id)}">Editar</button>
+                        <button type="button" class="secundario" style="width:auto;" data-eliminar="${esc(c.id)}">Eliminar</button>
+                    </div>
+                </div>
+            `;
+            }).join('');
+
+            contenedor.querySelectorAll('[data-editar]').forEach(boton => {
+                boton.addEventListener('click', () => abrirModalComposicion(misComposiciones.find(c => c.id === boton.dataset.editar)));
+            });
+            contenedor.querySelectorAll('[data-eliminar]').forEach(boton => {
+                boton.addEventListener('click', async () => {
+                    if (!confirmar('¿Eliminar esta composición guardada?')) return;
+                    try {
+                        await eliminarComposicionTFT(usuarioActual.uid, boton.dataset.eliminar);
+                        misComposiciones = misComposiciones.filter(c => c.id !== boton.dataset.eliminar);
+                        actualizarFiltroTemporadas();
+                        renderizarMisComposiciones();
+                        avisar('Composición eliminada', 'info');
+                    } catch (error) {
+                        avisar('No se pudo eliminar: ' + error.message, 'error');
+                    }
+                });
+            });
+        }
+
+        // --- Sinergias en vivo (a partir de TFT_ROSTER/TFT_RASGOS) ---
+        // Cuenta cuántos campeones del tablero tienen cada rasgo, y para
+        // cada uno calcula el nivel activo y cuánto falta para el
+        // próximo umbral — datos reales de Riot (ver el comentario
+        // grande de TFT_RASGOS en metaCurada.js), no una estimación.
+        function calcularSinergias(campeones) {
+            const conteo = new Map();
+            campeones.forEach(camp => {
+                const enRoster = TFT_ROSTER.find(r => r.nombre === camp.nombre);
+                (enRoster?.rasgos || []).forEach(rasgo => conteo.set(rasgo, (conteo.get(rasgo) || 0) + 1));
+            });
+            return [...conteo.entries()].map(([rasgo, cantidad]) => {
+                const info = TFT_RASGOS.find(t => t.nombre === rasgo);
+                if (!info) return null;
+                const umbralActivo = [...info.umbrales].reverse().find(u => cantidad >= u) ?? null;
+                const siguienteUmbral = info.umbrales.find(u => u > cantidad) ?? null;
+                return { rasgo, cantidad, icono: info.icono, umbralMax: info.umbrales[info.umbrales.length - 1], umbralActivo, siguienteUmbral };
+            }).filter(Boolean).sort((a, b) => b.cantidad - a.cantidad || a.rasgo.localeCompare(b.rasgo));
+        }
+
+        // Augment(s) que potencian directamente algún rasgo YA ACTIVO en
+        // el roster de una comp curada — solo 8 de los 36 rasgos del set
+        // tienen un augment dedicado (ver el comentario grande de
+        // TFT_AUGMENTS_POR_RASGO en metaCurada.js), así que la mayoría
+        // de las comps no van a tener ninguna coincidencia — se
+        // devuelve un array vacío en ese caso, no se inventa nada.
+        function augmentsRecomendadosParaComp(campeones) {
+            const rasgosActivos = new Set(calcularSinergias(campeones).filter(s => s.umbralActivo).map(s => s.rasgo));
+            return TFT_AUGMENTS_POR_RASGO.filter(a => rasgosActivos.has(a.rasgo));
+        }
+
+        function htmlAugmentsRecomendados(campeones) {
+            const recomendados = augmentsRecomendadosParaComp(campeones);
+            if (!recomendados.length) return '';
+            return `
+                <p style="margin: var(--space-3) 0 4px;"><strong>🎲 Augments que combinan con esta comp</strong></p>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    ${recomendados.map(a => `
+                        <div class="tooltip-wrap" style="display:flex; align-items:center; gap:8px; font-size:.8rem;">
+                            ${a.icono
+                                ? `<img src="iconos-augments-tft/${esc(a.icono)}.png" alt="" style="width:22px; height:22px; border-radius:4px; flex-shrink:0;">`
+                                : `<span style="width:22px; height:22px; border-radius:4px; background:var(--color-surface-2); flex-shrink:0;"></span>`}
+                            <span>${esc(a.nombre)} <span class="texto-muted" style="font-size:.72rem;">(potencia ${esc(a.rasgo)}${a.tier ? `, tier ${esc(a.tier)}` : ''})</span></span>
+                            <span class="tooltip-texto">${esc(a.desc)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderizarSinergias(campeones) {
+            const sinergias = calcularSinergias(campeones);
+            if (!sinergias.length) {
+                return '<p class="texto-muted" style="font-size:.82rem;">Agregá campeones al tablero para ver qué sinergias se van formando.</p>';
+            }
+            const covenActiva = sinergias.find(s => s.rasgo === 'Coven' && s.umbralActivo);
+            // Esencia exacta del nivel de Coven ACTIVO (no de cualquier
+            // nivel) — TFT_COVEN_RECOMPENSAS.porNivel solo trae los 4
+            // niveles reales del rasgo (3/4/5/7), así que puede no
+            // haber una fila para el umbralActivo si en algún momento
+            // el rasgo suma un nivel intermedio nuevo — se maneja con
+            // el "?." en vez de asumir que siempre está.
+            const covenNivel = covenActiva && TFT_COVEN_RECOMPENSAS.porNivel.find(n => n.rasgoNivel === covenActiva.umbralActivo);
+            return `
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    ${sinergias.map(s => `
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <img src="iconos-rasgos-tft/${esc(s.icono)}.png" alt="" style="width:22px; height:22px; ${s.umbralActivo ? '' : 'opacity:.35;'}">
+                            <div style="flex:1; min-width:0;">
+                                <div style="display:flex; justify-content:space-between; gap:6px; font-size:.82rem;">
+                                    <span style="font-weight:${s.umbralActivo ? '700' : '400'}; color:${s.umbralActivo ? 'var(--color-primary)' : 'var(--color-text-muted)'};">${esc(s.rasgo)}</span>
+                                    <span class="texto-muted" style="white-space:nowrap;">${s.cantidad}${s.siguienteUmbral ? ` / ${s.siguienteUmbral}` : ` (máx. ${s.umbralMax})`}</span>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                ${covenActiva ? `
+                    <div style="margin-top: var(--space-3); padding-top: var(--space-3); border-top:1px solid var(--color-border);">
+                        <p style="margin:0 0 4px; font-size:.8rem;"><strong>🌙 Aquelarre (Coven) activo — nivel ${covenActiva.umbralActivo}</strong></p>
+                        <p class="texto-muted" style="font-size:.75rem; margin:0 0 4px;">Suma Esencia por matar Y por perder rondas — a este nivel:${covenNivel ? ` <strong>${covenNivel.esenciaPorKill}</strong> por kill, <strong>${covenNivel.esenciaPorDerrota}</strong> por derrota.` : ''}</p>
+                        <p class="texto-muted" style="font-size:.75rem; margin:0;">${esc(TFT_COVEN_RECOMPENSAS.nota)}</p>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        // --- Armador visual de "Mis composiciones" ---
+        // `existente`: la composición a editar, o null para crear una
+        // nueva. Flujo: tocar una celda vacía del tablero abre el panel
+        // de campeones (con buscador) para colocar uno ahí; tocar una
+        // celda ocupada abre el panel de ítems/quitar de ESE campeón.
+        // Los datos de cada campeón quedan en la MISMA forma que usa
+        // META_TFT (nombre/icono/fila/columna/items[]) — así se puede
+        // reusar tableroHexEditable() sin escribir un renderer aparte.
+        function abrirModalComposicion(existente) {
+            let campeonesComp = normalizarCampeonesComp(existente?.campeones);
+            const temporadaSugerida = existente?.temporada || META_TFT.set;
+            let celdaObjetivo = null; // {fila, columna} de la celda vacía tocada, mientras el panel de campeones está abierto
+            let indiceEditando = null; // índice en campeonesComp del campeón cuyo panel de ítems está abierto
+
+            const modal = abrirModal(`
+                <h3 style="margin-top:0;">${existente ? 'Editar' : 'Nueva'} composición</h3>
+                <form id="form-comp-tft" class="form">
+                    <div class="campo-ancho" style="display:flex; gap: var(--space-2); flex-wrap:wrap;">
+                        <div style="flex:1; min-width:160px;">
+                            <label for="comp-nombre">Nombre</label>
+                            <input type="text" id="comp-nombre" value="${esc(existente?.nombre || '')}" placeholder="Ej: Mi variante de Aphelios" required>
+                        </div>
+                        <div style="flex:1; min-width:160px;">
+                            <label for="comp-temporada">Temporada</label>
+                            <input type="text" id="comp-temporada" value="${esc(temporadaSugerida)}" placeholder="Ej: Set 18" required>
+                        </div>
+                    </div>
+
+                    <p class="texto-muted campo-ancho" style="font-size:.8rem; margin: var(--space-2) 0;">Tocá una celda vacía del tablero para agregar un campeón — tocá una ocupada para elegirle ítems o quitarla.</p>
+                    <div class="campo-ancho" style="display:flex; gap: var(--space-4); flex-wrap:wrap; align-items:flex-start; margin-bottom: var(--space-3);">
+                        <div style="flex:0 0 auto;" id="comp-tablero-contenedor"></div>
+                        <div style="flex:1 1 200px; min-width:190px;">
+                            <label style="display:block; margin-bottom:6px;">🧬 Sinergias</label>
+                            <div id="comp-sinergias"></div>
+                        </div>
+                    </div>
+
+                    <div id="comp-panel-campeones" class="campo-ancho" style="display:none; margin-bottom: var(--space-3); padding: var(--space-3); border:1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-2);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: var(--space-2);">
+                            <strong style="font-size:.85rem;">Elegir campeón</strong>
+                            <button type="button" class="secundario" id="comp-cerrar-panel-campeones" style="width:auto; padding:2px 8px; font-size:.78rem;">✕ Cerrar</button>
+                        </div>
+                        <input type="search" id="comp-buscar-campeon" placeholder="🔎 Buscar campeón..." style="margin-bottom: var(--space-2);">
+                        <div id="comp-grid-campeones" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(58px,1fr)); gap:8px; max-height:220px; overflow-y:auto;"></div>
+                    </div>
+
+                    <div id="comp-panel-items" class="campo-ancho" style="display:none; margin-bottom: var(--space-3); padding: var(--space-3); border:1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-2);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: var(--space-2);">
+                            <strong style="font-size:.85rem;" id="comp-panel-items-titulo"></strong>
+                            <button type="button" class="secundario" id="comp-cerrar-panel-items" style="width:auto; padding:2px 8px; font-size:.78rem;">✕ Cerrar</button>
+                        </div>
+                        <div id="comp-items-elegidos" style="display:flex; gap:8px; margin-bottom: var(--space-2); min-height:34px;"></div>
+                        <input type="search" id="comp-buscar-item" placeholder="🔎 Buscar ítem... (hasta 3)" style="margin-bottom: var(--space-2);">
+                        <div id="comp-grid-items" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(44px,1fr)); gap:8px; max-height:180px; overflow-y:auto; margin-bottom: var(--space-3);"></div>
+                        <button type="button" class="peligro" id="comp-quitar-campeon" style="width:100%;">🗑️ Quitar del tablero</button>
+                    </div>
+
+                    <div class="campo-ancho">
+                        <label for="comp-notas">Notas (posicionamiento, cuándo ir por esta comp, etc.)</label>
+                        <textarea id="comp-notas" rows="3">${esc(existente?.notas || '')}</textarea>
+                    </div>
+                    <button type="submit" class="campo-ancho">${existente ? 'Guardar cambios' : 'Guardar composición'}</button>
+                </form>
+            `);
+            modal.querySelector('.modal-caja').classList.add('modal-caja-ancha');
+
+            const tableroContenedor = modal.querySelector('#comp-tablero-contenedor');
+            const sinergiasContenedor = modal.querySelector('#comp-sinergias');
+            const panelCampeones = modal.querySelector('#comp-panel-campeones');
+            const panelItems = modal.querySelector('#comp-panel-items');
+            const buscarCampeonInput = modal.querySelector('#comp-buscar-campeon');
+            const buscarItemInput = modal.querySelector('#comp-buscar-item');
+
+            function rerenderTablero() {
+                tableroContenedor.innerHTML = tableroHexEditable(campeonesComp);
+                sinergiasContenedor.innerHTML = renderizarSinergias(campeonesComp);
+                tableroContenedor.querySelectorAll('.hex-celda-click').forEach(boton => {
+                    boton.addEventListener('click', () => {
+                        const fila = Number(boton.dataset.fila), columna = Number(boton.dataset.columna);
+                        const indice = campeonesComp.findIndex(c => c.fila === fila && c.columna === columna);
+                        if (indice === -1) abrirPanelCampeones(fila, columna);
+                        else abrirPanelItems(indice);
+                    });
+                });
+            }
+
+            function cerrarPaneles() {
+                panelCampeones.style.display = 'none';
+                panelItems.style.display = 'none';
+                celdaObjetivo = null;
+                indiceEditando = null;
+            }
+
+            function abrirPanelCampeones(fila, columna) {
+                cerrarPaneles();
+                celdaObjetivo = { fila, columna };
+                panelCampeones.style.display = 'block';
+                buscarCampeonInput.value = '';
+                renderizarGridCampeones('');
+                buscarCampeonInput.focus();
+                panelCampeones.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            function renderizarGridCampeones(filtro) {
+                const grid = modal.querySelector('#comp-grid-campeones');
+                const yaEnTablero = new Set(campeonesComp.map(c => c.nombre));
+                const texto = filtro.trim().toLowerCase();
+                const filtrados = TFT_ROSTER.filter(c => !texto || c.nombre.toLowerCase().includes(texto));
+                grid.innerHTML = filtrados.length ? filtrados.map(c => `
+                    <button type="button" class="secundario comp-elegir-campeon" data-nombre="${esc(c.nombre)}" style="width:auto; padding:4px; display:flex; flex-direction:column; align-items:center; gap:4px; ${yaEnTablero.has(c.nombre) ? 'opacity:.35;' : ''}" title="${esc(c.nombre)}${yaEnTablero.has(c.nombre) ? ' — ya está en el tablero' : ''}">
+                        ${c.icono
+                            ? `<img src="iconos-campeones/${esc(c.icono)}.png" alt="" style="width:32px; height:32px; border-radius:50%; object-fit:cover;">`
+                            : `<span style="width:32px; height:32px; border-radius:50%; background:var(--color-surface); display:flex; align-items:center; justify-content:center; font-size:.7rem;">${esc(c.nombre.charAt(0))}</span>`}
+                        <span style="font-size:.58rem; line-height:1.1; text-align:center;">${esc(c.nombre)}</span>
+                    </button>
+                `).join('') : '<p class="texto-muted" style="font-size:.8rem; grid-column:1/-1;">Ningún campeón coincide.</p>';
+
+                grid.querySelectorAll('.comp-elegir-campeon').forEach(boton => {
+                    boton.addEventListener('click', () => {
+                        if (!celdaObjetivo || yaEnTablero.has(boton.dataset.nombre)) return;
+                        const info = TFT_ROSTER.find(r => r.nombre === boton.dataset.nombre);
+                        campeonesComp.push({ nombre: boton.dataset.nombre, icono: info?.icono || null, fila: celdaObjetivo.fila, columna: celdaObjetivo.columna, items: [] });
+                        cerrarPaneles();
+                        rerenderTablero();
+                    });
+                });
+            }
+
+            function abrirPanelItems(indice) {
+                cerrarPaneles();
+                indiceEditando = indice;
+                panelItems.style.display = 'block';
+                modal.querySelector('#comp-panel-items-titulo').textContent = campeonesComp[indice].nombre;
+                buscarItemInput.value = '';
+                renderizarItemsElegidos();
+                renderizarGridItems('');
+                panelItems.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            function renderizarItemsElegidos() {
+                const camp = campeonesComp[indiceEditando];
+                const contenedor = modal.querySelector('#comp-items-elegidos');
+                contenedor.innerHTML = camp.items.length ? camp.items.map((it, i) => `
+                    <span style="position:relative; display:inline-block;">
+                        <img src="iconos-items-tft/${esc(it.icono)}.png" alt="${esc(it.nombre)}" title="${esc(it.nombre)}" style="width:30px; height:30px; border-radius:5px;">
+                        <button type="button" class="secundario comp-quitar-item" data-indice="${i}" style="position:absolute; top:-6px; right:-6px; width:16px; height:16px; padding:0; border-radius:50%; font-size:.6rem; line-height:1; min-width:0;">✕</button>
+                    </span>
+                `).join('') : '<p class="texto-muted" style="font-size:.78rem; margin:0;">Sin ítems todavía — elegí hasta 3 de abajo.</p>';
+
+                contenedor.querySelectorAll('.comp-quitar-item').forEach(boton => {
+                    boton.addEventListener('click', () => {
+                        campeonesComp[indiceEditando].items.splice(Number(boton.dataset.indice), 1);
+                        renderizarItemsElegidos();
+                        renderizarGridItems(buscarItemInput.value);
+                        rerenderTablero();
+                    });
+                });
+            }
+
+            function renderizarGridItems(filtro) {
+                const grid = modal.querySelector('#comp-grid-items');
+                const camp = campeonesComp[indiceEditando];
+                const texto = filtro.trim().toLowerCase();
+                const filtrados = TFT_ITEMS.filter(it => !texto || it.nombre.toLowerCase().includes(texto));
+                const lleno = camp.items.length >= 3;
+                grid.innerHTML = filtrados.length ? filtrados.map(it => `
+                    <button type="button" class="secundario comp-elegir-item" data-nombre="${esc(it.nombre)}" title="${esc(it.nombre)}" style="width:auto; padding:3px; ${lleno ? 'opacity:.35;' : ''}">
+                        <img src="iconos-items-tft/${esc(it.icono)}.png" alt="" style="width:26px; height:26px; border-radius:4px; display:block;">
+                    </button>
+                `).join('') : '<p class="texto-muted" style="font-size:.8rem; grid-column:1/-1;">Ningún ítem coincide.</p>';
+
+                grid.querySelectorAll('.comp-elegir-item').forEach(boton => {
+                    boton.addEventListener('click', () => {
+                        if (camp.items.length >= 3) { avisar('Ya tiene 3 ítems — sacá uno para agregar otro', 'info'); return; }
+                        const info = TFT_ITEMS.find(i => i.nombre === boton.dataset.nombre);
+                        camp.items.push({ nombre: info.nombre, icono: info.icono, desc: info.desc });
+                        renderizarItemsElegidos();
+                        renderizarGridItems(buscarItemInput.value);
+                        rerenderTablero();
+                    });
+                });
+            }
+
+            modal.querySelector('#comp-cerrar-panel-campeones').addEventListener('click', () => { cerrarPaneles(); });
+            modal.querySelector('#comp-cerrar-panel-items').addEventListener('click', () => { cerrarPaneles(); });
+            buscarCampeonInput.addEventListener('input', () => renderizarGridCampeones(buscarCampeonInput.value));
+            buscarItemInput.addEventListener('input', () => renderizarGridItems(buscarItemInput.value));
+            modal.querySelector('#comp-quitar-campeon').addEventListener('click', () => {
+                campeonesComp.splice(indiceEditando, 1);
+                cerrarPaneles();
+                rerenderTablero();
+            });
+
+            rerenderTablero();
+
+            modal.querySelector('#form-comp-tft').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const datos = {
+                    nombre: document.getElementById('comp-nombre').value.trim(),
+                    temporada: document.getElementById('comp-temporada').value.trim(),
+                    campeones: campeonesComp,
+                    notas: document.getElementById('comp-notas').value.trim(),
+                };
+                if (!datos.nombre || !datos.temporada) return;
+
+                try {
+                    if (existente) {
+                        await actualizarComposicionTFT(usuarioActual.uid, existente.id, datos);
+                        avisar('Composición actualizada', 'exito');
+                    } else {
+                        await guardarComposicionTFT(usuarioActual.uid, datos);
+                        avisar('Composición guardada', 'exito');
+                    }
+                    cerrarModal();
+                    misComposiciones = await obtenerMisComposicionesTFT(usuarioActual.uid);
+                    actualizarFiltroTemporadas();
+                    renderizarMisComposiciones();
+                } catch (error) {
+                    avisar('No se pudo guardar: ' + error.message, 'error');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

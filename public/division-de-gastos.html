@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grupos · GastosApp</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <meta name="theme-color" content="#0f0e0c">
+    <script>
+        var tema = localStorage.getItem('tema') || 'oscuro';
+        document.documentElement.setAttribute('data-tema', tema);
+        if (tema === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@twemoji/api@17.0.3/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div id="pantalla-carga" class="pantalla-carga"><div class="spinner"></div></div>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page" id="pagina-principal">
+        <div class="card" id="selector-grupo-card">
+            <div class="card-header"><h3 style="margin:0;">Tu grupo</h3></div>
+
+            <!-- Se muestra en vez del selector completo cuando ya hay un
+                 grupo activo — no tiene sentido ver "Crear grupo/Unirme/
+                 Cuenta rápida" desplegado cada vez que entrás a ver los
+                 gastos de un grupo que ya elegiste. -->
+            <div id="resumen-grupo-activo" style="display:none; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                <span>Viendo: <strong id="nombre-grupo-activo-resumen"></strong></span>
+                <button type="button" class="secundario" id="boton-cambiar-grupo" style="width:auto;">Cambiar grupo ▾</button>
+            </div>
+
+            <div id="cuerpo-selector-grupo">
+                <div>
+                    <label for="selector-grupo">Ver gastos de</label>
+                    <select id="selector-grupo"><option value="">Cargando tus grupos...</option></select>
+                </div>
+
+                <details style="margin-top: 12px;">
+                    <summary style="cursor:pointer; color: var(--color-text-muted); font-size:.85rem;">✨ Crear un grupo nuevo</summary>
+                    <form id="form-crear-grupo" class="form" style="margin-top: 8px;">
+                        <div class="campo-ancho">
+                            <label for="nombre-grupo-nuevo">Nombre del grupo</label>
+                            <input type="text" id="nombre-grupo-nuevo" placeholder="Ej: Depto con Juan" maxlength="60" required>
+                        </div>
+                        <button type="submit" class="campo-ancho secundario">Crear grupo</button>
+                    </form>
+                </details>
+
+                <details style="margin-top: 8px;">
+                    <summary style="cursor:pointer; color: var(--color-text-muted); font-size:.85rem;">🔑 Unirme a un grupo existente</summary>
+                    <form id="form-unirse-grupo" class="form" style="margin-top: 8px;">
+                        <div class="campo-ancho">
+                            <label for="codigo-invitacion">Código de invitación</label>
+                            <input type="text" id="codigo-invitacion" placeholder="Ej: AB3XQ9" maxlength="6" required>
+                        </div>
+                        <button type="submit" class="campo-ancho secundario">Unirme</button>
+                    </form>
+                </details>
+
+                <details style="margin-top: 8px;">
+                    <summary style="cursor:pointer; color: var(--color-text-muted); font-size:.85rem;">⚡ Cuenta rápida — para repartir algo puntual sin guardar el grupo</summary>
+                    <p class="texto-muted" style="font-size:.82rem; margin-top:8px;">Es un grupo real y compartible (con su propio código de invitación), solo que no queda en "Tus grupos" — ideal para algo de una sola vez.</p>
+                    <form id="form-cuenta-rapida" class="form" style="margin-top: 8px;">
+                        <div class="campo-ancho">
+                            <label for="nombre-cuenta-rapida">Nombre (opcional)</label>
+                            <input type="text" id="nombre-cuenta-rapida" placeholder="Ej: Taxi al aeropuerto" maxlength="60">
+                        </div>
+                        <button type="submit" class="campo-ancho secundario">⚡ Crear cuenta rápida</button>
+                    </form>
+                </details>
+            </div>
+        </div>
+
+        <div id="estado-sin-grupo" class="card estado-vacio" style="display:none;">
+            <span class="icono-grande">👥</span>
+            Elegí un grupo de la lista de arriba, o creá uno nuevo, para ver sus gastos.
+        </div>
+
+        <div id="contenido-grupo" style="display:none;">
+        <div class="card" id="grupo-info-card"></div>
+
+        <div class="grid-acciones tres-columnas">
+            <div class="card-accion" id="tarjeta-agregar-gasto" tabindex="0" role="button">
+                <span class="icono-accion">🧾</span>
+                <h3>Agregar gasto</h3>
+                <p>Cargá un gasto y elegí entre quiénes se reparte</p>
+            </div>
+            <div class="card-accion secundaria" id="tarjeta-registrar-pago" tabindex="0" role="button">
+                <span class="icono-accion">💵</span>
+                <h3>Registrar un pago</h3>
+                <p>Anotá cuando alguien le paga a otro para saldar deuda</p>
+            </div>
+            <div class="card-accion secundaria" id="tarjeta-chat" tabindex="0" role="button">
+                <span class="icono-accion">💬</span>
+                <h3>Chat</h3>
+                <p>Hablá con los demás del grupo</p>
+                <span class="badge-no-leidos" id="badge-chat-no-leidos" style="display:none;">0</span>
+            </div>
+
+            <div class="card panel-expandible" id="panel-chat" style="display:none;">
+                <div class="card-header"><h3 style="margin:0;">💬 Chat del grupo</h3></div>
+                <div class="chat-mensajes" id="chat-mensajes"></div>
+                <form id="chat-form" class="chat-form">
+                    <input type="text" id="chat-texto" placeholder="Escribí un mensaje..." maxlength="500" required>
+                    <button type="submit">Enviar</button>
+                </form>
+            </div>
+
+            <div class="card panel-expandible" id="panel-agregar-gasto" style="display:none;">
+                <div class="card-header"><h3 style="margin:0;">Agregar gasto</h3></div>
+                <form id="expenses-form" class="form">
+                    <div>
+                        <label for="expense-fecha">Fecha</label>
+                        <input type="date" id="expense-fecha" required>
+                    </div>
+                    <div class="campo-ancho">
+                        <label for="expense-description">Descripción</label>
+                        <input type="text" id="expense-description" placeholder="Ej: Supermercado, cena..." maxlength="200" required>
+                    </div>
+
+                    <div>
+                        <label for="expense-amount">Monto</label>
+                        <input type="number" id="expense-amount" min="0.01" step="0.01" required>
+                    </div>
+                    <div>
+                        <label for="expense-moneda">Moneda</label>
+                        <select id="expense-moneda"></select>
+                    </div>
+                    <div class="campo-ancho" id="campo-expense-cotizacion" style="display:none;">
+                        <label for="expense-cotizacion">Valor del cambio (opcional)</label>
+                        <input type="number" id="expense-cotizacion" min="0.01" step="0.01" placeholder="Dejalo vacío para usar el automático">
+                        <p class="texto-muted" style="font-size:.78rem; margin:4px 0 0;" id="texto-expense-cotizacion-auto"></p>
+                    </div>
+                    <div>
+                        <label for="expense-pagador">¿Quién pagó?</label>
+                        <select id="expense-pagador" required></select>
+                    </div>
+                    <div>
+                        <label for="expense-categoria">Categoría</label>
+                        <select id="expense-categoria"></select>
+                    </div>
+
+                    <div class="campo-ancho">
+                        <label>¿Entre quiénes se divide?</label>
+                        <div id="expense-participantes" class="chips"></div>
+                    </div>
+                    <div class="campo-ancho drawer-item" style="padding:0;">
+                        <span>Dividir en montos distintos</span>
+                        <sl-switch id="expense-division-desigual"></sl-switch>
+                    </div>
+                    <div class="campo-ancho" id="expense-partes-desiguales" style="display:none;"></div>
+
+                    <button type="submit" class="campo-ancho">Agregar gasto</button>
+                </form>
+            </div>
+
+            <div class="card panel-expandible" id="panel-registrar-pago" style="display:none;">
+                <div class="card-header"><h3 style="margin:0;">Registrar un pago</h3></div>
+                <p style="margin-top: -8px;">Cuando alguien le paga a otra persona del grupo para saldar deuda, se registra acá.</p>
+                <form id="payment-form" class="form">
+                    <div>
+                        <label for="payer-select">¿Quién pagó?</label>
+                        <select id="payer-select" required></select>
+                    </div>
+                    <div>
+                        <label for="payee-select">¿A quién?</label>
+                        <select id="payee-select" required></select>
+                    </div>
+                    <div>
+                        <label for="payment-amount">Monto</label>
+                        <input type="number" id="payment-amount" min="0.01" step="0.01" required>
+                    </div>
+                    <div>
+                        <label for="payment-moneda">Moneda</label>
+                        <select id="payment-moneda"></select>
+                    </div>
+                    <div class="campo-ancho" id="campo-payment-cotizacion" style="display:none;">
+                        <label for="payment-cotizacion-manual">Valor del cambio (opcional)</label>
+                        <input type="number" id="payment-cotizacion-manual" min="0.01" step="0.01" placeholder="Dejalo vacío para usar el automático">
+                        <p class="texto-muted" style="font-size:.78rem; margin:4px 0 0;" id="texto-payment-cotizacion-auto"></p>
+                    </div>
+                    <button type="submit" class="campo-ancho secundario">Registrar pago</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card" id="recurrentes-grupo-card">
+            <div class="card-header">
+                <h3 style="margin:0;">🔁 Recurrentes del grupo</h3>
+                <button type="button" class="secundario" id="boton-nuevo-recurrente-grupo" style="width:auto;">+ Nuevo</button>
+            </div>
+            <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Cosas que se pagan entre todos todos los meses (alquiler, servicios...) — guardalas acá una vez, con quiénes se dividen, y te avisamos si nadie las cargó todavía.</p>
+            <div id="recurrentes-grupo-pendientes-contenido"></div>
+            <div id="recurrentes-grupo-lista-contenido"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 style="margin:0;">Gastos del grupo</h3>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <select id="filtro-integrante" style="width:auto;">
+                        <option value="">Todos los integrantes</option>
+                    </select>
+                    <select id="filtro-categoria-grupo" style="width:auto;">
+                        <option value="todas">Todas las categorías</option>
+                    </select>
+                </div>
+            </div>
+            <div id="expenses-contenido"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h3 style="margin:0;">Balances</h3></div>
+            <div id="balances-contenido"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h3 style="margin:0;">Pagos registrados</h3></div>
+            <div id="payments-contenido"></div>
+        </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 GastosApp</p>
+    </footer>
+
+    <script type="module">
+        import { iniciarNavbar } from './nav.js';
+        import { iniciarWidgetDeSesion, requerirSesion } from './auth.js';
+        import {
+            obtenerGrupoActivo, guardarGrupoActivo, limpiarGrupoActivo, obtenerMisGrupos, crearCuentaRapida,
+            crearGrupo, unirseAGrupo,
+            escucharGrupo, copiarAlPortapapeles, actualizarColoresGrupo, asegurarNombrePropioEnGrupo,
+            esInvitado, agregarIntegranteInvitado, eliminarGrupo, quitarGrupoDeMisGrupos,
+        } from './grupos.js';
+        import { agregarGasto, actualizarGasto, eliminarGasto, escucharGastos, agregarPagoDeuda, eliminarPagoDeuda, escucharPagosDeuda } from './expenses.js';
+        import {
+            escucharRecurrentesGrupo, agregarRecurrenteGrupo, actualizarRecurrenteGrupo, eliminarRecurrenteGrupo,
+            recurrentesGrupoPendientes,
+        } from './recurrentes.js';
+        import { escucharMensajes, enviarMensaje, eliminarMensaje } from './mensajes.js';
+        import { avisar, confirmar, abrirModal, cerrarModal, esc } from './ui.js';
+        import { notificarA } from './notificacionesCentro.js';
+        import { opcionesDeCategorias, etiquetaDeCategoria, CATEGORIAS } from './categorias.js';
+        import {
+            opcionesDeMonedas, simboloDeMoneda, obtenerCotizaciones, convertir, cotizacionActual,
+            montoEnARS as convertirItemAARS,
+        } from './monedas.js';
+        import { serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js';
+
+        iniciarNavbar('division-de-gastos.html');
+        iniciarWidgetDeSesion('division-de-gastos.html');
+
+        document.getElementById('expense-categoria').innerHTML = opcionesDeCategorias();
+        document.getElementById('expense-moneda').innerHTML = opcionesDeMonedas();
+        document.getElementById('payment-moneda').innerHTML = opcionesDeMonedas();
+        document.getElementById('filtro-categoria-grupo').innerHTML += CATEGORIAS.map(c => `<option value="${c.valor}">${c.icono} ${c.texto}</option>`).join('');
+
+        // Cotizaciones USD→ARS/EUR (ver monedas.js) — se piden una sola vez
+        // al arrancar. Los balances de grupo siempre se calculan en pesos
+        // (moneda base), así que un gasto en dólares o euros se convierte
+        // antes de sumarlo/restarlo — ver calcularBalances(). Si el gasto
+        // tiene una cotización manual guardada, esa gana sobre la
+        // automática (ver monedas.js).
+        let cotizaciones = null;
+        function montoEnARS(monto, moneda, cotizacionManual) {
+            return convertirItemAARS(monto, moneda, cotizacionManual, cotizaciones);
+        }
+        obtenerCotizaciones().then(datos => {
+            cotizaciones = datos;
+            if (grupoId) { renderGastos(); renderPagos(); }
+            actualizarCampoCotizacion('expense');
+            actualizarCampoCotizacion('payment');
+        });
+
+        // Muestra/oculta el campo opcional "Valor del cambio" según la
+        // moneda elegida en cada uno de los 2 formularios que la tienen
+        // (Agregar gasto / Registrar pago) — mismo patrón en los dos, solo
+        // cambia el prefijo de los ids.
+        function actualizarCampoCotizacion(prefijo) {
+            const moneda = document.getElementById(`${prefijo}-moneda`).value;
+            const campo = document.getElementById(`campo-${prefijo}-cotizacion`);
+            if (moneda === 'ARS') { campo.style.display = 'none'; return; }
+            campo.style.display = 'block';
+            const auto = cotizacionActual(moneda, cotizaciones);
+            document.getElementById(`texto-${prefijo}-cotizacion-auto`).textContent = auto
+                ? `Automático ahora: 1 ${moneda} ≈ $${auto.toFixed(2)}` : 'Todavía no se cargó el valor automático.';
+        }
+        document.getElementById('expense-moneda').addEventListener('change', () => actualizarCampoCotizacion('expense'));
+        document.getElementById('payment-moneda').addEventListener('change', () => actualizarCampoCotizacion('payment'));
+
+        const expensesForm = document.getElementById('expenses-form');
+        const expenseFecha = document.getElementById('expense-fecha');
+        const expenseDescripcion = document.getElementById('expense-description');
+        const expenseAmount = document.getElementById('expense-amount');
+        const expensePagador = document.getElementById('expense-pagador');
+        const expenseCategoria = document.getElementById('expense-categoria');
+        const expenseParticipantes = document.getElementById('expense-participantes');
+        expenseFecha.value = new Date().toISOString().slice(0, 10);
+
+        const paymentForm = document.getElementById('payment-form');
+        const payerSelect = document.getElementById('payer-select');
+        const payeeSelect = document.getElementById('payee-select');
+        const paymentAmount = document.getElementById('payment-amount');
+        const paymentMoneda = document.getElementById('payment-moneda');
+
+        // Si el monto vino de "Saldar" (botón de una sugerencia de
+        // balances), queda guardado en pesos como referencia — al cambiar
+        // la moneda acá, el monto se recalcula para seguir representando
+        // el mismo pago, solo que en la moneda elegida.
+        paymentMoneda.addEventListener('change', () => {
+            const objetivoArs = parseFloat(paymentForm.dataset.objetivoArs);
+            if (!objetivoArs || !cotizaciones) return;
+            paymentAmount.value = convertir(objetivoArs, 'ARS', paymentMoneda.value, cotizaciones).toFixed(2);
+        });
+        // Si la persona toca el monto a mano, ya no tiene sentido seguir
+        // recalculándolo solo cuando cambie de moneda — se corta el
+        // "modo saldar" para no pisarle lo que acaba de escribir.
+        paymentAmount.addEventListener('input', () => { delete paymentForm.dataset.objetivoArs; });
+
+        // --- Tarjetas de acción: "Agregar gasto" y "Registrar un pago" —
+        // solo una abierta a la vez, igual que crear/unirse a un grupo en
+        // Inicio: abrir una cierra la otra.
+        const tarjetaGasto = document.getElementById('tarjeta-agregar-gasto');
+        const panelGasto = document.getElementById('panel-agregar-gasto');
+        const tarjetaPago = document.getElementById('tarjeta-registrar-pago');
+        const panelPago = document.getElementById('panel-registrar-pago');
+
+        function alternarPanel(tarjeta, panel, otraTarjeta, otroPanel) {
+            const abrir = panel.style.display === 'none';
+            panel.style.display = abrir ? 'block' : 'none';
+            tarjeta.classList.toggle('activa', abrir);
+            otroPanel.style.display = 'none';
+            otraTarjeta.classList.remove('activa');
+            if (abrir) panel.querySelector('input, select')?.focus();
+        }
+
+        function abrirPanelPago() {
+            panelPago.style.display = 'block';
+            tarjetaPago.classList.add('activa');
+            panelGasto.style.display = 'none';
+            tarjetaGasto.classList.remove('activa');
+        }
+
+        function abrirPanelGasto() {
+            panelGasto.style.display = 'block';
+            tarjetaGasto.classList.add('activa');
+            panelPago.style.display = 'none';
+            tarjetaPago.classList.remove('activa');
+        }
+
+        tarjetaGasto.addEventListener('click', () => alternarPanel(tarjetaGasto, panelGasto, tarjetaPago, panelPago));
+        tarjetaPago.addEventListener('click', () => alternarPanel(tarjetaPago, panelPago, tarjetaGasto, panelGasto));
+
+        // --- Chat: a propósito NO usa alternarPanel — a diferencia de
+        // Agregar gasto/Registrar pago (que se excluyen entre sí), tiene
+        // sentido poder tener el chat abierto mientras se completa un
+        // gasto (ej. preguntando "¿cuánto salió la pizza?").
+        const tarjetaChat = document.getElementById('tarjeta-chat');
+        const panelChat = document.getElementById('panel-chat');
+        const chatMensajesEl = document.getElementById('chat-mensajes');
+
+        tarjetaChat.addEventListener('click', () => {
+            const abrir = panelChat.style.display === 'none';
+            panelChat.style.display = abrir ? 'block' : 'none';
+            tarjetaChat.classList.toggle('activa', abrir);
+            if (abrir) {
+                marcarChatLeido();
+                renderBadgeChat();
+                chatMensajesEl.scrollTop = chatMensajesEl.scrollHeight;
+                document.getElementById('chat-texto').focus();
+            }
+        });
+
+        let grupoId = null;
+        let nombresPorUid = {};
+        let fotosPorUid = {};
+        let aliasesPorUid = {};
+        let preferenciasPorUid = {}; // quién quiere que le avisen cuando le saldan una deuda — ver cuenta.html/perfil.js
+        // Gastos, pagos y mensajes viven en Firestore, compartidos por
+        // todo el grupo en tiempo real. Estas variables son el "espejo"
+        // local que mantienen actualizado los listeners de más abajo.
+        let gastos = [];
+        let pagos = [];
+        let mensajes = [];
+        let recurrentesGrupoActuales = [];
+        let participantesSeleccionados = new Set();
+
+        function nombreDe(uid) {
+            return nombresPorUid[uid] || 'Alguien que ya no está en el grupo';
+        }
+
+        // Variante para insertar en HTML (tablas, chips) — nombreDe() se
+        // usa tal cual en los avisos (avisar usa textContent, no hace
+        // falta ni conviene escapar ahí) pero acá sí, porque el nombre lo
+        // eligió el usuario y termina en un innerHTML.
+        function nombreDeEsc(uid) {
+            return esc(nombreDe(uid));
+        }
+
+        // '' si no tiene foto (no todos los integrantes van a tener una
+        // cargada) — esc() acá también, mismo motivo que en auth.js: es
+        // un campo que cualquiera podría escribir directo en su propio
+        // documento, sin que las reglas de Firestore validen su formato.
+        // Un integrante sin cuenta nunca va a tener foto propia (no puede
+        // loguearse para subir una) — se marca con 👻 en su lugar, para
+        // que se note a simple vista quién tiene cuenta y quién no.
+        function avatarDe(uid) {
+            if (esInvitado(uid)) return '👻';
+            const foto = fotosPorUid[uid];
+            return foto ? `<img src="${esc(foto)}" class="avatar-mini" alt="">` : '';
+        }
+
+        // --- Info del grupo (nombre, código de invitación, miembros) ---
+
+        function renderInfoGrupo(grupo) {
+            const miembrosHtml = Object.entries(grupo.nombresPorUid || {})
+                .map(([uid, nombre]) => `<span class="chip estatico">${avatarDe(uid)}${esc(nombre)}</span>`)
+                .join('');
+
+            document.getElementById('grupo-info-card').innerHTML = `
+                <div class="card-header">
+                    <h2 style="margin:0;">👥 ${esc(grupo.nombre)}</h2>
+                </div>
+                <p style="margin-bottom: 8px;">Compartí este código para que se sumen al grupo:</p>
+                <span class="codigo-invitacion" id="codigo-invitacion">${esc(grupo.codigoInvitacion)}</span>
+                <button type="button" class="secundario icono" id="boton-copiar-codigo" title="Copiar código" style="margin-left:8px;">📋</button>
+                <div class="chips" style="margin-top: 16px;">${miembrosHtml}</div>
+
+                <details style="margin-top: 16px;">
+                    <summary style="cursor:pointer; color: var(--color-text-muted); font-size:.85rem;">👻 Agregar integrante sin cuenta</summary>
+                    <p class="texto-muted" style="font-size:.82rem; margin-top:8px;">Para anotar gastos con alguien que no tiene (o no quiere) la app — entra en los cálculos igual, pero no puede iniciar sesión ni cargar nada por su cuenta.</p>
+                    <form id="form-agregar-invitado" class="form" style="margin-top: 8px;">
+                        <div class="campo-ancho">
+                            <label for="nombre-invitado">Nombre</label>
+                            <input type="text" id="nombre-invitado" placeholder="Ej: Juan (sin cuenta)" maxlength="60" required>
+                        </div>
+                        <button type="submit" class="campo-ancho secundario">Agregar</button>
+                    </form>
+                </details>
+
+                <details style="margin-top: 8px;">
+                    <summary style="cursor:pointer; color: var(--color-text-muted); font-size:.85rem;">⚙️ Más opciones</summary>
+
+                    <p style="font-size:.85rem; font-weight:600; margin: 12px 0 8px;">🎨 Colores de este grupo</p>
+                    <form id="form-colores-grupo" class="form">
+                        <div>
+                            <label for="color-fondo">Color de fondo</label>
+                            <input type="color" id="color-fondo" value="${esc(grupo.colorFondo || '#0f0e0c')}">
+                        </div>
+                        <div>
+                            <label for="color-borde">Color de borde</label>
+                            <input type="color" id="color-borde" value="${esc(grupo.colorBorde || '#3a3527')}">
+                        </div>
+                        <button type="submit" class="secundario">Guardar</button>
+                        <button type="button" id="boton-restablecer-colores" class="secundario">Restablecer</button>
+                    </form>
+
+                    <div style="margin-top: 16px; border-top: 1px solid var(--color-border); padding-top: 12px;">
+                        <button type="button" id="boton-eliminar-grupo" class="peligro" style="width:auto;">🗑️ Eliminar grupo</button>
+                    </div>
+                </details>
+            `;
+
+            document.getElementById('boton-copiar-codigo').addEventListener('click', () => {
+                copiarAlPortapapeles(grupo.codigoInvitacion);
+            });
+
+            document.getElementById('form-agregar-invitado').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const nombreInput = document.getElementById('nombre-invitado');
+                const nombre = nombreInput.value.trim();
+                if (!nombre) return;
+                try {
+                    await agregarIntegranteInvitado(grupoId, nombre);
+                    avisar(`"${nombre}" agregado — ya podés elegirlo al cargar un gasto`, 'exito');
+                    nombreInput.value = '';
+                } catch (error) {
+                    avisar('No se pudo agregar: ' + error.message, 'error');
+                }
+            });
+
+            document.getElementById('form-colores-grupo').addEventListener('submit', (evento) => {
+                evento.preventDefault();
+                const colorFondo = document.getElementById('color-fondo').value;
+                const colorBorde = document.getElementById('color-borde').value;
+                actualizarColoresGrupo(grupoId, colorFondo, colorBorde);
+                avisar('Colores del grupo actualizados', 'exito');
+            });
+
+            document.getElementById('boton-restablecer-colores').addEventListener('click', () => {
+                actualizarColoresGrupo(grupoId, null, null);
+                avisar('Colores del grupo restablecidos', 'info');
+            });
+
+            document.getElementById('boton-eliminar-grupo').addEventListener('click', async () => {
+                const ok = confirmar(`¿Eliminar "${grupo.nombre}" para siempre? Se borran todos sus gastos y pagos registrados. Esto NO se puede deshacer.`);
+                if (!ok) return;
+
+                // Dejar de escuchar ANTES de borrar — si no, el propio
+                // listener de este grupo se entera solo del borrado (via
+                // escucharGrupo) y dispara el mismo aviso de "ya no
+                // existe" de más arriba, duplicando el mensaje.
+                dejarDeEscuchar.forEach(fn => fn());
+                dejarDeEscuchar = [];
+
+                try {
+                    await eliminarGrupo(grupoId, grupo.codigoInvitacion);
+                    await quitarGrupoDeMisGrupos(usuarioActual.uid, grupoId).catch(() => {});
+                    limpiarGrupoActivo();
+                    contenidoGrupo.style.display = 'none';
+                    estadoSinGrupo.style.display = 'block';
+                    mostrarSelectorCompleto();
+                    await poblarSelectorDeGrupos(null);
+                    avisar('Grupo eliminado', 'info');
+                } catch (error) {
+                    avisar('No se pudo eliminar el grupo: ' + error.message, 'error');
+                }
+            });
+
+            aplicarColoresDeGrupo(grupo);
+        }
+
+        // Los colores del grupo se aplican como variables CSS inline sobre
+        // el contenedor principal — las tarjetas y el fondo de la página
+        // las heredan solas (usan var(--color-bg) / var(--color-border) en
+        // main.css), así que alcanza con pisarlas acá arriba. Si el grupo
+        // no definió colores, se limpia el estilo inline y queda el tema
+        // general (oscuro/claro) sin modificar.
+        function aplicarColoresDeGrupo(grupo) {
+            const pagina = document.getElementById('pagina-principal');
+            pagina.style.setProperty('--color-bg', grupo.colorFondo || '');
+            pagina.style.setProperty('--color-border', grupo.colorBorde || '');
+        }
+
+        // --- Selectores que dependen de los miembros del grupo ---
+
+        // Mismo "👻 " que avatarDe(), pero como texto plano — para donde
+        // no se puede meter un <img> (adentro de un <option>, por ej.).
+        function etiquetaDeIntegrante(uid, nombre) {
+            return (esInvitado(uid) ? '👻 ' : '') + esc(nombre);
+        }
+
+        function renderSelectoresDeMiembros() {
+            const opciones = Object.entries(nombresPorUid)
+                .map(([uid, nombre]) => `<option value="${uid}">${etiquetaDeIntegrante(uid, nombre)}</option>`)
+                .join('');
+
+            expensePagador.innerHTML = opciones;
+            payerSelect.innerHTML = opciones;
+            payeeSelect.innerHTML = opciones;
+
+            // El filtro de "Gastos del grupo" mantiene su selección actual
+            // al re-renderizar (ej. cuando se suma un miembro nuevo), en
+            // vez de volver siempre a "Todos".
+            const filtroIntegrante = document.getElementById('filtro-integrante');
+            const seleccionPrevia = filtroIntegrante.value;
+            filtroIntegrante.innerHTML = '<option value="">Todos los integrantes</option>' + opciones;
+            filtroIntegrante.value = seleccionPrevia;
+
+            // Por defecto un gasto se divide entre TODOS los miembros del
+            // grupo — es el caso más común — pero se puede destildar a
+            // quien no participó de ese gasto en particular.
+            participantesSeleccionados = new Set(Object.keys(nombresPorUid));
+            renderChipsParticipantes();
+        }
+
+        function renderChipsParticipantes() {
+            expenseParticipantes.innerHTML = Object.entries(nombresPorUid).map(([uid, nombre]) => `
+                <button type="button" class="chip" data-uid="${uid}" aria-pressed="${participantesSeleccionados.has(uid)}">${etiquetaDeIntegrante(uid, nombre)}</button>
+            `).join('');
+
+            expenseParticipantes.querySelectorAll('.chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    const uid = chip.dataset.uid;
+                    if (participantesSeleccionados.has(uid)) {
+                        participantesSeleccionados.delete(uid);
+                    } else {
+                        participantesSeleccionados.add(uid);
+                    }
+                    chip.setAttribute('aria-pressed', participantesSeleccionados.has(uid));
+                    renderPartesDesigualesExpense();
+                });
+            });
+        }
+
+        // --- División desigual (montos distintos por persona) ---
+        //
+        // Por defecto un gasto se reparte por igual entre los tildados,
+        // pero no siempre corresponde (ej. cada quien pidió algo
+        // distinto en un restaurante) — con el switch "Dividir en
+        // montos distintos" aparece un input de monto por persona en
+        // vez de repartir automático. Se usa tanto en "Agregar gasto"
+        // como en "Editar gasto" (dos formularios separados con la
+        // misma lógica); estas dos funciones de acá son las partes sin
+        // estado propio, compartidas entre los dos.
+
+        // Muestra si las partes ya suman el total o cuánto falta/sobra
+        // — se llama después de cada tecla, para poder corregir antes
+        // de intentar guardar.
+        function actualizarSumaPartes(elementoTexto, partesObjeto, uids, monto) {
+            if (!elementoTexto) return;
+            const suma = uids.reduce((s, uid) => s + (partesObjeto[uid] || 0), 0);
+            const diferencia = monto - suma;
+            if (Math.abs(diferencia) < 0.01) {
+                elementoTexto.textContent = `✅ Suma $${suma.toFixed(2)} de $${monto.toFixed(2)}`;
+                elementoTexto.style.color = 'var(--color-success)';
+            } else {
+                elementoTexto.textContent = diferencia > 0
+                    ? `Faltan $${diferencia.toFixed(2)} por repartir`
+                    : `Te pasaste por $${Math.abs(diferencia).toFixed(2)} — bajá algún monto`;
+                elementoTexto.style.color = 'var(--color-danger)';
+            }
+        }
+
+        // Se llama recién al guardar. `null` = modo "por igual" (no se
+        // guarda el campo partes, como hasta ahora); un objeto
+        // { uid: monto } si las partes cargadas son válidas;
+        // `undefined` si está en modo desigual pero la suma no cierra
+        // — señal para que el submit lo bloquee y avise.
+        function validarPartesDesiguales(activo, partesObjeto, uids, monto) {
+            if (!activo) return null;
+            const suma = uids.reduce((s, uid) => s + (partesObjeto[uid] || 0), 0);
+            if (Math.abs(monto - suma) > 0.01) return undefined;
+            const resultado = {};
+            uids.forEach(uid => { resultado[uid] = partesObjeto[uid] || 0; });
+            return resultado;
+        }
+
+        let divisionDesigual = false;
+        let partesDesiguales = {}; // { uid: monto }, en la misma moneda que el gasto
+        const expenseSwitchDesigual = document.getElementById('expense-division-desigual');
+        const expensePartesContenedor = document.getElementById('expense-partes-desiguales');
+
+        function renderPartesDesigualesExpense() {
+            if (!divisionDesigual) {
+                expensePartesContenedor.style.display = 'none';
+                expensePartesContenedor.innerHTML = '';
+                return;
+            }
+            expensePartesContenedor.style.display = 'block';
+            const uids = Array.from(participantesSeleccionados);
+            const monto = parseFloat(expenseAmount.value) || 0;
+            // A quien todavía no tenga un monto propio cargado, se le
+            // sugiere la parte igual como punto de partida — más fácil
+            // ajustar de ahí que empezar de $0.
+            const parteSugerida = uids.length ? monto / uids.length : 0;
+            uids.forEach(uid => { if (partesDesiguales[uid] === undefined) partesDesiguales[uid] = parteSugerida; });
+
+            expensePartesContenedor.innerHTML = `
+                ${uids.map(uid => `
+                    <div class="fila-parte-desigual">
+                        <span>${etiquetaDeIntegrante(uid, nombresPorUid[uid])}</span>
+                        <input type="number" min="0" step="0.01" class="input-parte-desigual" data-uid="${uid}" value="${partesDesiguales[uid].toFixed(2)}">
+                    </div>
+                `).join('')}
+                <p class="texto-muted" style="font-size:.8rem; margin: var(--space-2) 0 0;" id="expense-suma-partes"></p>
+            `;
+
+            const textoSuma = document.getElementById('expense-suma-partes');
+            expensePartesContenedor.querySelectorAll('.input-parte-desigual').forEach(input => {
+                input.addEventListener('input', () => {
+                    partesDesiguales[input.dataset.uid] = parseFloat(input.value) || 0;
+                    actualizarSumaPartes(textoSuma, partesDesiguales, uids, parseFloat(expenseAmount.value) || 0);
+                });
+            });
+            actualizarSumaPartes(textoSuma, partesDesiguales, uids, monto);
+        }
+
+        expenseSwitchDesigual.addEventListener('sl-change', (evento) => {
+            divisionDesigual = evento.target.checked;
+            renderPartesDesigualesExpense();
+        });
+
+        // --- Balances: cuánto puso de más o de menos cada uno ---
+
+        // Los balances siempre se calculan en pesos (moneda base) — un
+        // gasto cargado en dólares o euros se convierte antes de sumarlo,
+        // así se puede comparar/sumar todo junto sin importar en qué
+        // moneda pagó cada uno.
+        function calcularBalances() {
+            const balancePorUid = {};
+            Object.keys(nombresPorUid).forEach(uid => { balancePorUid[uid] = 0; });
+
+            gastos.forEach(gasto => {
+                const participantes = (gasto.divididoEntre && gasto.divididoEntre.length)
+                    ? gasto.divididoEntre
+                    : [gasto.pagadoPor];
+                const montoARS = montoEnARS(gasto.monto, gasto.moneda, gasto.cotizacionManual);
+
+                balancePorUid[gasto.pagadoPor] = (balancePorUid[gasto.pagadoPor] || 0) + montoARS;
+
+                if (gasto.partes) {
+                    // Montos distintos por persona, guardados en la
+                    // misma moneda que el gasto — se convierten a pesos
+                    // en la misma proporción que el total (una sola
+                    // cotización para todo el gasto, no una por
+                    // persona).
+                    participantes.forEach(uid => {
+                        const proporcion = gasto.monto > 0 ? (gasto.partes[uid] || 0) / gasto.monto : 0;
+                        balancePorUid[uid] = (balancePorUid[uid] || 0) - (montoARS * proporcion);
+                    });
+                } else {
+                    const parte = montoARS / participantes.length;
+                    participantes.forEach(uid => {
+                        balancePorUid[uid] = (balancePorUid[uid] || 0) - parte;
+                    });
+                }
+            });
+
+            // Los pagos de deuda ya registrados achican el balance antes de
+            // mostrar el resultado.
+            pagos.forEach(pago => {
+                const montoARS = montoEnARS(pago.monto, pago.moneda, pago.cotizacionManual);
+                balancePorUid[pago.pagadoPor] = (balancePorUid[pago.pagadoPor] || 0) + montoARS;
+                balancePorUid[pago.recibidoPor] = (balancePorUid[pago.recibidoPor] || 0) - montoARS;
+            });
+
+            return balancePorUid;
+        }
+
+        function renderBalances() {
+            const contenedor = document.getElementById('balances-contenido');
+            const balancePorUid = calcularBalances();
+            const UMBRAL = 0.01;
+
+            // Además del balance (deuda), se muestra cuánto aportó cada
+            // uno en total — así "al día" no se confunde con "no gastó
+            // nada": puede haber gastado igual, solo que se dividió solo
+            // entre sí mismo (o entre gente que ya se lo devolvió) y no
+            // generó deuda con nadie.
+            const aportadoPorUid = {};
+            gastos.forEach(gasto => {
+                aportadoPorUid[gasto.pagadoPor] = (aportadoPorUid[gasto.pagadoPor] || 0) + montoEnARS(gasto.monto, gasto.moneda, gasto.cotizacionManual);
+            });
+
+            // Si hay algo cargado en otra moneda, se aclara que los
+            // balances de abajo están todos convertidos a pesos — si no,
+            // "le deben $500" podría confundirse con "500 de la moneda que
+            // sea" cuando en realidad ya está todo unificado.
+            const hayOtraMoneda = gastos.some(g => (g.moneda || 'ARS') !== 'ARS') || pagos.some(p => (p.moneda || 'ARS') !== 'ARS');
+            const notaMoneda = hayOtraMoneda
+                ? '<p class="texto-muted" style="font-size:.8rem; margin-top:-8px;">💱 Convertido a pesos con la cotización del día.</p>' : '';
+
+            const filas = Object.entries(balancePorUid).map(([uid, balance]) => {
+                const clase = balance > UMBRAL ? 'positivo' : (balance < -UMBRAL ? 'negativo' : 'neutro');
+                const texto = balance > UMBRAL
+                    ? `le deben $${balance.toFixed(2)}`
+                    : (balance < -UMBRAL ? `debe $${Math.abs(balance).toFixed(2)}` : 'está al día');
+                const aportado = aportadoPorUid[uid] || 0;
+                const subtexto = aportado > UMBRAL ? `<br><small class="texto-muted">aportó $${aportado.toFixed(2)} en total</small>` : '';
+                return `
+                    <div class="balance-item">
+                        <span>${avatarDe(uid)} ${nombreDeEsc(uid)}${subtexto}</span>
+                        <span class="monto ${clase}">${texto}</span>
+                    </div>
+                `;
+            }).join('');
+
+            // Algoritmo simple de liquidación: el/la que más le deben cobra
+            // primero de quien más debe, así se arma la menor cantidad de
+            // pagos posible para saldar todo.
+            const deudores = Object.entries(balancePorUid)
+                .filter(([, b]) => b < -UMBRAL)
+                .map(([uid, b]) => ({ uid, balance: b }));
+            const acreedores = Object.entries(balancePorUid)
+                .filter(([, b]) => b > UMBRAL)
+                .map(([uid, b]) => ({ uid, balance: b }));
+
+            const sugerencias = [];
+            deudores.forEach(deudor => {
+                acreedores.forEach(acreedor => {
+                    if (deudor.balance >= -UMBRAL || acreedor.balance <= UMBRAL) return;
+                    const monto = Math.min(-deudor.balance, acreedor.balance);
+                    if (monto > UMBRAL) {
+                        sugerencias.push({ de: deudor.uid, para: acreedor.uid, monto });
+                        deudor.balance += monto;
+                        acreedor.balance -= monto;
+                    }
+                });
+            });
+
+            // El botón de Mercado Pago solo se muestra cuando el que debe
+            // sos VOS (no tiene sentido ofrecerte pagar la deuda de otra
+            // persona) y quien cobra cargó un alias/CVU/link en cuenta.html
+            // — ver aliasesPorUid más arriba (copia denormalizada, porque
+            // las reglas de Firestore no dejan leer el perfil de nadie más).
+            const sugerenciasHtml = sugerencias.length
+                ? sugerencias.map((s, indice) => {
+                    const aliasCobrador = aliasesPorUid[s.para];
+                    const botonMP = (s.de === usuarioActual?.uid && aliasCobrador)
+                        ? `<button type="button" class="secundario boton-pagar-mp" data-indice="${indice}" title="Pagarle a ${nombreDeEsc(s.para)} con Mercado Pago">💳 Pagar con MP</button>`
+                        : '';
+                    return `
+                        <div class="sugerencia-pago">
+                            <span>${avatarDe(s.de)} ${nombreDeEsc(s.de)} → ${avatarDe(s.para)} ${nombreDeEsc(s.para)}</span>
+                            <span class="monto negativo">$${s.monto.toFixed(2)}</span>
+                            ${botonMP}
+                            <button type="button" class="secundario boton-saldar" data-de="${s.de}" data-para="${s.para}" data-monto="${s.monto.toFixed(2)}">Saldar</button>
+                        </div>
+                    `;
+                }).join('')
+                : '<p style="color: var(--color-text-muted);">Todos están al día — no hay deudas pendientes. 🎉</p>';
+
+            contenedor.innerHTML = `${notaMoneda}${filas}<h3 style="margin-top: 20px;">Sugerencias para saldar deudas</h3>${sugerenciasHtml}`;
+
+            // Un link completo se abre directo en Mercado Pago (ahí la
+            // persona ve cuánto le corresponde cobrar y confirma el pago);
+            // un alias/CVU no es "clickeable" en sí mismo, así que en vez
+            // de abrir nada se copia al portapapeles para pegarlo en la
+            // app de Mercado Pago. Esto NO marca nada como pagado solo —
+            // eso lo sigue haciendo el botón "Saldar" de al lado, a mano,
+            // porque sin un backend propio no hay forma gratis de
+            // confirmar automáticamente que el pago de verdad se hizo (ver
+            // el comentario largo en perfil.js).
+            contenedor.querySelectorAll('.boton-pagar-mp').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    const s = sugerencias[parseInt(boton.dataset.indice, 10)];
+                    const alias = aliasesPorUid[s.para];
+                    if (/^https?:\/\//i.test(alias)) {
+                        window.open(alias, '_blank', 'noopener');
+                    } else {
+                        copiarAlPortapapeles(alias);
+                        avisar(`Alias de ${nombreDe(s.para)} copiado — pegalo en tu Mercado Pago.`, 'info');
+                    }
+                });
+            });
+
+            contenedor.querySelectorAll('.boton-saldar').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    abrirPanelPago();
+                    payerSelect.value = boton.dataset.de;
+                    payeeSelect.value = boton.dataset.para;
+                    // La sugerencia siempre viene en pesos (moneda base de
+                    // los balances) — se guarda ese monto "objetivo" para
+                    // poder recalcularlo si la persona cambia la moneda del
+                    // pago (ver el 'change' de payment-moneda, más abajo).
+                    paymentForm.dataset.objetivoArs = boton.dataset.monto;
+                    paymentMoneda.value = 'ARS';
+                    paymentAmount.value = boton.dataset.monto;
+                    actualizarCampoCotizacion('payment');
+                    paymentForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+            });
+        }
+
+        // --- Gastos ---
+
+        // Cuánto le toca a `uid` en un gasto puntual (en la moneda
+        // original del gasto, no en pesos) — mismo criterio que usa
+        // calcularBalances() para repartir, solo que acá se pide por
+        // una sola persona en vez de para todos a la vez. 0 si esa
+        // persona ni siquiera participa del gasto.
+        function calcularParteDe(gasto, uid) {
+            const participantes = (gasto.divididoEntre && gasto.divididoEntre.length) ? gasto.divididoEntre : [gasto.pagadoPor];
+            if (!participantes.includes(uid)) return 0;
+            if (gasto.partes) return gasto.partes[uid] || 0;
+            return gasto.monto / participantes.length;
+        }
+
+        // "Saldar mi parte": atajo para no tener que ir al panel
+        // "Registrar un pago" y calcular el monto a mano — registra
+        // directamente un pago de deuda por lo que le toca a quien está
+        // logueado en ESE gasto puntual, en la misma moneda que el
+        // gasto (así entra igual a como se restó en calcularBalances()).
+        async function saldarMiParte(gasto) {
+            const monto = calcularParteDe(gasto, usuarioActual.uid);
+            if (monto <= 0) return;
+            const recibidoPor = gasto.pagadoPor;
+            await agregarPagoDeuda(grupoId, {
+                pagadoPor: usuarioActual.uid,
+                recibidoPor,
+                monto,
+                moneda: gasto.moneda || 'ARS',
+                cotizacionManual: gasto.cotizacionManual || null,
+                creadoEn: serverTimestamp(),
+            });
+            await avisarDeudaSaldada(recibidoPor, usuarioActual.uid, monto, gasto.moneda || 'ARS');
+        }
+
+        // Le avisa a quien recibió el pago (con la campanita 🔔, ver
+        // notificacionesCentro.js) — no hace falta si alguien registra un
+        // pago DE SÍ MISMO hacia otro (recibidoPor === quien está
+        // logueado no puede pasar acá, pero sí más abajo en el formulario
+        // manual de "Registrar un pago"). Un error acá (ej. sin conexión)
+        // no debería tirar abajo el pago ya guardado, por eso el try/catch
+        // en vez de dejarlo explotar.
+        async function avisarDeudaSaldada(recibidoPor, pagadoPor, monto, moneda) {
+            if (recibidoPor === pagadoPor) return;
+            // Respeta la preferencia de quien RECIBE el pago (configurable
+            // en cuenta.html) — "!== false" en vez de "=== true" porque
+            // grupos viejos, o alguien que nunca tocó esa preferencia,
+            // todavía no tienen este campo guardado: por defecto avisa
+            // igual, hasta que decida apagarlo a mano.
+            if (preferenciasPorUid[recibidoPor]?.deudaSaldada === false) return;
+            try {
+                await notificarA(recibidoPor, {
+                    tipo: 'deuda-saldada',
+                    titulo: '💸 Te saldaron una deuda',
+                    cuerpo: `${nombreDe(pagadoPor)} te pagó ${simboloDeMoneda(moneda)}${monto.toFixed(2)}`,
+                    destino: '/division-de-gastos.html',
+                    grupoId,
+                });
+            } catch (error) {
+                console.error('No se pudo mandar la notificación de deuda saldada:', error);
+            }
+        }
+
+        function renderGastos() {
+            const contenedor = document.getElementById('expenses-contenido');
+
+            // Los filtros de acá solo afectan qué se MUESTRA — los
+            // balances siempre se calculan sobre gastos (todos), nunca
+            // sobre gastosFiltrados, para no romper el cálculo de deudas.
+            const filtroUid = document.getElementById('filtro-integrante').value;
+            const filtroCategoria = document.getElementById('filtro-categoria-grupo').value;
+            const gastosFiltrados = gastos.filter(g =>
+                (!filtroUid || g.pagadoPor === filtroUid) &&
+                (filtroCategoria === 'todas' || g.categoria === filtroCategoria)
+            );
+
+            if (gastosFiltrados.length === 0) {
+                contenedor.innerHTML = `
+                    <div class="estado-vacio">
+                        <span class="icono-grande">🧾</span>
+                        ${filtroUid || filtroCategoria !== 'todas' ? 'Ningún gasto coincide con el filtro elegido.' : 'Todavía no hay gastos cargados en este grupo.'}
+                    </div>
+                `;
+                renderBalances();
+                return;
+            }
+
+            const filas = gastosFiltrados.map(gasto => {
+                const participantes = (gasto.divididoEntre && gasto.divididoEntre.length)
+                    ? gasto.divididoEntre
+                    : [gasto.pagadoPor];
+                // Se muestra en la moneda original del gasto — si no es
+                // peso, se agrega el equivalente en pesos chico al lado
+                // (lo que realmente se usa en Balances).
+                const esOtraMoneda = (gasto.moneda || 'ARS') !== 'ARS';
+                const equivalente = esOtraMoneda
+                    ? `<br><small class="texto-muted">≈ $${montoEnARS(gasto.monto, gasto.moneda, gasto.cotizacionManual).toFixed(2)}</small>` : '';
+
+                // Con montos distintos por persona se muestra cuánto le
+                // toca a cada quien en vez de solo la lista de nombres
+                // — así se ve de un vistazo que no fue un reparto parejo.
+                const participantesTexto = gasto.partes
+                    ? participantes.map(uid => `${nombreDeEsc(uid)} (${simboloDeMoneda(gasto.moneda || 'ARS')}${(gasto.partes[uid] || 0).toFixed(2)})`).join(', ')
+                    : participantes.map(nombreDeEsc).join(', ');
+
+                // "Saldar mi parte" solo tiene sentido si quien está
+                // logueado le debe algo a otro por ESTE gasto — no si
+                // pagó él mismo, ni si ni siquiera participa.
+                const miParte = calcularParteDe(gasto, usuarioActual.uid);
+                const botonSaldar = (gasto.pagadoPor !== usuarioActual.uid && miParte > 0)
+                    ? `<button class="icono" data-saldar-id="${gasto.id}" title="Saldar mi parte ($${miParte.toFixed(2)})">💸</button>`
+                    : '';
+
+                return `
+                    <tr>
+                        <td>${gasto.fecha || '—'}</td>
+                        <td>${esc(gasto.descripcion)}</td>
+                        <td class="monto">${simboloDeMoneda(gasto.moneda || 'ARS')}${gasto.monto.toFixed(2)}${equivalente}</td>
+                        <td>${etiquetaDeCategoria(gasto.categoria)}</td>
+                        <td>${avatarDe(gasto.pagadoPor)} ${nombreDeEsc(gasto.pagadoPor)}</td>
+                        <td>${participantesTexto}</td>
+                        <td>
+                            ${botonSaldar}
+                            <button class="icono" data-editar-id="${gasto.id}" title="Editar">✏️</button>
+                            <button class="icono" data-id="${gasto.id}" title="Eliminar">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // El total (arriba de la tabla, cuando hay filtro por
+            // integrante) también se suma en pesos por la misma razón que
+            // los balances.
+            const totalFiltrado = gastosFiltrados.reduce((suma, g) => suma + montoEnARS(g.monto, g.moneda, g.cotizacionManual), 0);
+
+            contenedor.innerHTML = `
+                ${filtroUid ? `<p class="texto-muted" style="font-size:.85rem;">${nombreDeEsc(filtroUid)} pagó $${totalFiltrado.toFixed(2)} en ${gastosFiltrados.length} gasto(s).</p>` : ''}
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Categoría</th><th>Pagó</th><th>Se divide entre</th><th></th></tr></thead>
+                        <tbody>${filas}</tbody>
+                    </table>
+                </div>
+            `;
+
+            contenedor.querySelectorAll('button[data-id]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    if (!confirmar('¿Eliminar este gasto?')) return;
+                    eliminarGasto(grupoId, boton.dataset.id);
+                });
+            });
+
+            contenedor.querySelectorAll('button[data-editar-id]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    const gasto = gastos.find(g => g.id === boton.dataset.editarId);
+                    if (gasto) abrirModalEditarGasto(gasto);
+                });
+            });
+
+            contenedor.querySelectorAll('button[data-saldar-id]').forEach(boton => {
+                boton.addEventListener('click', async () => {
+                    const gasto = gastos.find(g => g.id === boton.dataset.saldarId);
+                    if (!gasto) return;
+                    const monto = calcularParteDe(gasto, usuarioActual.uid);
+                    if (!confirmar(`¿Registrar que le pagaste ${simboloDeMoneda(gasto.moneda || 'ARS')}${monto.toFixed(2)} a ${nombreDe(gasto.pagadoPor)} por "${gasto.descripcion}"?`)) return;
+                    try {
+                        await saldarMiParte(gasto);
+                        avisar('Pago registrado', 'exito');
+                    } catch (error) {
+                        avisar(error.message, 'error');
+                    }
+                });
+            });
+
+            renderBalances();
+        }
+
+        // --- Edición (modal) de un gasto del grupo ---
+        function abrirModalEditarGasto(gasto) {
+            const participantesActuales = new Set(
+                (gasto.divididoEntre && gasto.divididoEntre.length) ? gasto.divididoEntre : [gasto.pagadoPor]
+            );
+            // Estado local del modal (no de módulo, como en "Agregar
+            // gasto") — cada vez que se abre es una instancia nueva, así
+            // que alcanza con variables normales acá adentro.
+            let divisionDesigualEditar = !!gasto.partes;
+            let partesDesigualesEditar = { ...(gasto.partes || {}) };
+
+            abrirModal(`
+                <h3 style="margin-top:0;">Editar gasto</h3>
+                <form id="form-editar-gasto-grupo" class="form">
+                    <div>
+                        <label for="editar-gasto-fecha">Fecha</label>
+                        <input type="date" id="editar-gasto-fecha" value="${gasto.fecha || new Date().toISOString().slice(0, 10)}" required>
+                    </div>
+                    <div class="campo-ancho">
+                        <label for="editar-gasto-descripcion">Descripción</label>
+                        <input type="text" id="editar-gasto-descripcion" value="${esc(gasto.descripcion)}" maxlength="200" required>
+                    </div>
+                    <div>
+                        <label for="editar-gasto-monto">Monto</label>
+                        <input type="number" id="editar-gasto-monto" min="0.01" step="0.01" value="${gasto.monto}" required>
+                    </div>
+                    <div>
+                        <label for="editar-gasto-moneda">Moneda</label>
+                        <select id="editar-gasto-moneda">${opcionesDeMonedas()}</select>
+                    </div>
+                    <div class="campo-ancho" id="campo-editar-gasto-cotizacion" style="display:none;">
+                        <label for="editar-gasto-cotizacion">Valor del cambio (opcional)</label>
+                        <input type="number" id="editar-gasto-cotizacion" min="0.01" step="0.01" placeholder="Dejalo vacío para usar el automático" value="${gasto.cotizacionManual || ''}">
+                        <p class="texto-muted" style="font-size:.78rem; margin:4px 0 0;" id="texto-editar-gasto-cotizacion-auto"></p>
+                    </div>
+                    <div>
+                        <label for="editar-gasto-pagador">¿Quién pagó?</label>
+                        <select id="editar-gasto-pagador" required></select>
+                    </div>
+                    <div>
+                        <label for="editar-gasto-categoria">Categoría</label>
+                        <select id="editar-gasto-categoria"></select>
+                    </div>
+                    <div class="campo-ancho">
+                        <label>¿Entre quiénes se divide?</label>
+                        <div id="editar-gasto-participantes" class="chips"></div>
+                    </div>
+                    <div class="campo-ancho drawer-item" style="padding:0;">
+                        <span>Dividir en montos distintos</span>
+                        <sl-switch id="editar-gasto-division-desigual" ${gasto.partes ? 'checked' : ''}></sl-switch>
+                    </div>
+                    <div class="campo-ancho" id="editar-gasto-partes-desiguales" style="display:none;"></div>
+                    ${(gasto.pagadoPor !== usuarioActual.uid && calcularParteDe(gasto, usuarioActual.uid) > 0) ? `
+                        <button type="button" class="campo-ancho secundario" id="boton-saldar-mi-parte">💸 Saldar mi parte ($${calcularParteDe(gasto, usuarioActual.uid).toFixed(2)})</button>
+                    ` : ''}
+                    <button type="submit" class="campo-ancho">Guardar cambios</button>
+                </form>
+            `);
+
+            document.getElementById('boton-saldar-mi-parte')?.addEventListener('click', async () => {
+                const monto = calcularParteDe(gasto, usuarioActual.uid);
+                if (!confirmar(`¿Registrar que le pagaste ${simboloDeMoneda(gasto.moneda || 'ARS')}${monto.toFixed(2)} a ${nombreDe(gasto.pagadoPor)} por "${gasto.descripcion}"?`)) return;
+                try {
+                    await saldarMiParte(gasto);
+                    avisar('Pago registrado', 'exito');
+                    cerrarModal();
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+
+            const opciones = Object.entries(nombresPorUid).map(([uid, nombre]) => `<option value="${uid}">${etiquetaDeIntegrante(uid, nombre)}</option>`).join('');
+            document.getElementById('editar-gasto-pagador').innerHTML = opciones;
+            document.getElementById('editar-gasto-pagador').value = gasto.pagadoPor;
+            document.getElementById('editar-gasto-categoria').innerHTML = opcionesDeCategorias();
+            document.getElementById('editar-gasto-categoria').value = gasto.categoria || 'otros';
+            document.getElementById('editar-gasto-moneda').value = gasto.moneda || 'ARS';
+
+            function actualizarCampoCotizacionEditarGasto() {
+                const moneda = document.getElementById('editar-gasto-moneda').value;
+                const campo = document.getElementById('campo-editar-gasto-cotizacion');
+                if (moneda === 'ARS') { campo.style.display = 'none'; return; }
+                campo.style.display = 'block';
+                const auto = cotizacionActual(moneda, cotizaciones);
+                document.getElementById('texto-editar-gasto-cotizacion-auto').textContent = auto
+                    ? `Automático ahora: 1 ${moneda} ≈ $${auto.toFixed(2)}` : 'Todavía no se cargó el valor automático.';
+            }
+            actualizarCampoCotizacionEditarGasto();
+            document.getElementById('editar-gasto-moneda').addEventListener('change', actualizarCampoCotizacionEditarGasto);
+
+            const contenedorChips = document.getElementById('editar-gasto-participantes');
+            function renderChipsEdicion() {
+                contenedorChips.innerHTML = Object.entries(nombresPorUid).map(([uid, nombre]) => `
+                    <button type="button" class="chip" data-uid="${uid}" aria-pressed="${participantesActuales.has(uid)}">${etiquetaDeIntegrante(uid, nombre)}</button>
+                `).join('');
+                contenedorChips.querySelectorAll('.chip').forEach(chip => {
+                    chip.addEventListener('click', () => {
+                        const uid = chip.dataset.uid;
+                        if (participantesActuales.has(uid)) participantesActuales.delete(uid);
+                        else participantesActuales.add(uid);
+                        chip.setAttribute('aria-pressed', participantesActuales.has(uid));
+                        renderPartesDesigualesEditar();
+                    });
+                });
+            }
+            renderChipsEdicion();
+
+            const editarMontoInput = document.getElementById('editar-gasto-monto');
+            const editarSwitchDesigual = document.getElementById('editar-gasto-division-desigual');
+            const editarPartesContenedor = document.getElementById('editar-gasto-partes-desiguales');
+
+            function renderPartesDesigualesEditar() {
+                if (!divisionDesigualEditar) {
+                    editarPartesContenedor.style.display = 'none';
+                    editarPartesContenedor.innerHTML = '';
+                    return;
+                }
+                editarPartesContenedor.style.display = 'block';
+                const uids = Array.from(participantesActuales);
+                const monto = parseFloat(editarMontoInput.value) || 0;
+                const parteSugerida = uids.length ? monto / uids.length : 0;
+                uids.forEach(uid => { if (partesDesigualesEditar[uid] === undefined) partesDesigualesEditar[uid] = parteSugerida; });
+
+                editarPartesContenedor.innerHTML = `
+                    ${uids.map(uid => `
+                        <div class="fila-parte-desigual">
+                            <span>${etiquetaDeIntegrante(uid, nombresPorUid[uid])}</span>
+                            <input type="number" min="0" step="0.01" class="input-parte-desigual" data-uid="${uid}" value="${partesDesigualesEditar[uid].toFixed(2)}">
+                        </div>
+                    `).join('')}
+                    <p class="texto-muted" style="font-size:.8rem; margin: var(--space-2) 0 0;" id="editar-gasto-suma-partes"></p>
+                `;
+
+                const textoSuma = document.getElementById('editar-gasto-suma-partes');
+                editarPartesContenedor.querySelectorAll('.input-parte-desigual').forEach(input => {
+                    input.addEventListener('input', () => {
+                        partesDesigualesEditar[input.dataset.uid] = parseFloat(input.value) || 0;
+                        actualizarSumaPartes(textoSuma, partesDesigualesEditar, uids, parseFloat(editarMontoInput.value) || 0);
+                    });
+                });
+                actualizarSumaPartes(textoSuma, partesDesigualesEditar, uids, monto);
+            }
+            renderPartesDesigualesEditar();
+
+            editarSwitchDesigual.addEventListener('sl-change', (evento) => {
+                divisionDesigualEditar = evento.target.checked;
+                renderPartesDesigualesEditar();
+            });
+
+            document.getElementById('form-editar-gasto-grupo').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const monto = parseFloat(document.getElementById('editar-gasto-monto').value);
+                const divididoEntre = Array.from(participantesActuales);
+                const datos = {
+                    fecha: document.getElementById('editar-gasto-fecha').value,
+                    descripcion: document.getElementById('editar-gasto-descripcion').value.trim(),
+                    monto,
+                    moneda: document.getElementById('editar-gasto-moneda').value,
+                    cotizacionManual: parseFloat(document.getElementById('editar-gasto-cotizacion').value) || null,
+                    pagadoPor: document.getElementById('editar-gasto-pagador').value,
+                    categoria: document.getElementById('editar-gasto-categoria').value,
+                    divididoEntre,
+                };
+                if (!datos.fecha || !datos.descripcion || !datos.monto || datos.monto <= 0 || !datos.pagadoPor) {
+                    avisar('Completá todos los campos con valores válidos.', 'error');
+                    return;
+                }
+                if (datos.divididoEntre.length === 0) {
+                    avisar('Elegí entre quiénes se divide el gasto.', 'error');
+                    return;
+                }
+                const partes = validarPartesDesiguales(divisionDesigualEditar, partesDesigualesEditar, divididoEntre, monto);
+                if (partes === undefined) {
+                    avisar('Los montos por persona no suman el total del gasto — ajustalos antes de guardar.', 'error');
+                    return;
+                }
+                datos.partes = partes;
+                try {
+                    await actualizarGasto(grupoId, gasto.id, datos);
+                    avisar('Gasto actualizado', 'exito');
+                    cerrarModal();
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+        }
+
+        // --- Recurrentes del grupo (alquiler compartido, servicios de la
+        // casa, etc.) — misma idea que los recurrentes personales de
+        // Gastos personales, pero vive en el grupo: cualquier integrante
+        // los ve, los edita, y "Cargar ahora" precarga el formulario de
+        // arriba con la descripción/monto/categoría Y con quiénes se
+        // divide (reutilizando el mismo mecanismo de montos distintos).
+        function abrirModalRecurrenteGrupo(recurrente = null) {
+            const participantes = new Set(
+                recurrente ? ((recurrente.divididoEntre && recurrente.divididoEntre.length) ? recurrente.divididoEntre : Object.keys(nombresPorUid))
+                    : Object.keys(nombresPorUid)
+            );
+            let divisionDesigualRecurrente = !!(recurrente && recurrente.partes);
+            let partesDesigualesRecurrente = { ...((recurrente && recurrente.partes) || {}) };
+
+            abrirModal(`
+                <h3 style="margin-top:0;">${recurrente ? 'Editar' : 'Nuevo'} recurrente del grupo</h3>
+                <form id="form-recurrente-grupo" class="form">
+                    <div class="campo-ancho">
+                        <label for="recurrente-grupo-descripcion">Descripción</label>
+                        <input type="text" id="recurrente-grupo-descripcion" maxlength="200" required value="${recurrente ? esc(recurrente.descripcion) : ''}" placeholder="Ej: Alquiler, Luz, Internet...">
+                    </div>
+                    <div>
+                        <label for="recurrente-grupo-monto">Monto</label>
+                        <input type="number" id="recurrente-grupo-monto" min="0.01" step="0.01" required value="${recurrente ? recurrente.monto : ''}">
+                    </div>
+                    <div>
+                        <label for="recurrente-grupo-moneda">Moneda</label>
+                        <select id="recurrente-grupo-moneda">${opcionesDeMonedas()}</select>
+                    </div>
+                    <div>
+                        <label for="recurrente-grupo-categoria">Categoría</label>
+                        <select id="recurrente-grupo-categoria">${opcionesDeCategorias()}</select>
+                    </div>
+                    <div>
+                        <label for="recurrente-grupo-dia">Día del mes (aprox.)</label>
+                        <input type="number" id="recurrente-grupo-dia" min="1" max="31" required value="${recurrente ? recurrente.diaDelMes : ''}">
+                    </div>
+                    <div class="campo-ancho">
+                        <label>¿Entre quiénes se divide?</label>
+                        <div id="recurrente-grupo-participantes" class="chips"></div>
+                    </div>
+                    <div class="campo-ancho drawer-item" style="padding:0;">
+                        <span>Dividir en montos distintos</span>
+                        <sl-switch id="recurrente-grupo-division-desigual" ${divisionDesigualRecurrente ? 'checked' : ''}></sl-switch>
+                    </div>
+                    <div class="campo-ancho" id="recurrente-grupo-partes-desiguales" style="display:none;"></div>
+                    <button type="submit" class="campo-ancho">${recurrente ? 'Guardar cambios' : 'Agregar'}</button>
+                </form>
+            `);
+            document.getElementById('recurrente-grupo-moneda').value = recurrente ? (recurrente.moneda || 'ARS') : 'ARS';
+            document.getElementById('recurrente-grupo-categoria').value = recurrente ? (recurrente.categoria || 'otros') : 'otros';
+
+            const contenedorChips = document.getElementById('recurrente-grupo-participantes');
+            function renderChipsRecurrenteGrupo() {
+                contenedorChips.innerHTML = Object.entries(nombresPorUid).map(([uid, nombre]) => `
+                    <button type="button" class="chip" data-uid="${uid}" aria-pressed="${participantes.has(uid)}">${etiquetaDeIntegrante(uid, nombre)}</button>
+                `).join('');
+                contenedorChips.querySelectorAll('.chip').forEach(chip => {
+                    chip.addEventListener('click', () => {
+                        const uid = chip.dataset.uid;
+                        if (participantes.has(uid)) participantes.delete(uid);
+                        else participantes.add(uid);
+                        chip.setAttribute('aria-pressed', participantes.has(uid));
+                        renderPartesRecurrenteGrupo();
+                    });
+                });
+            }
+            renderChipsRecurrenteGrupo();
+
+            const montoInput = document.getElementById('recurrente-grupo-monto');
+            const switchDesigual = document.getElementById('recurrente-grupo-division-desigual');
+            const partesContenedor = document.getElementById('recurrente-grupo-partes-desiguales');
+
+            function renderPartesRecurrenteGrupo() {
+                if (!divisionDesigualRecurrente) {
+                    partesContenedor.style.display = 'none';
+                    partesContenedor.innerHTML = '';
+                    return;
+                }
+                partesContenedor.style.display = 'block';
+                const uids = Array.from(participantes);
+                const monto = parseFloat(montoInput.value) || 0;
+                const parteSugerida = uids.length ? monto / uids.length : 0;
+                uids.forEach(uid => { if (partesDesigualesRecurrente[uid] === undefined) partesDesigualesRecurrente[uid] = parteSugerida; });
+
+                partesContenedor.innerHTML = `
+                    ${uids.map(uid => `
+                        <div class="fila-parte-desigual">
+                            <span>${etiquetaDeIntegrante(uid, nombresPorUid[uid])}</span>
+                            <input type="number" min="0" step="0.01" class="input-parte-desigual" data-uid="${uid}" value="${partesDesigualesRecurrente[uid].toFixed(2)}">
+                        </div>
+                    `).join('')}
+                    <p class="texto-muted" style="font-size:.8rem; margin: var(--space-2) 0 0;" id="recurrente-grupo-suma-partes"></p>
+                `;
+
+                const textoSuma = document.getElementById('recurrente-grupo-suma-partes');
+                partesContenedor.querySelectorAll('.input-parte-desigual').forEach(input => {
+                    input.addEventListener('input', () => {
+                        partesDesigualesRecurrente[input.dataset.uid] = parseFloat(input.value) || 0;
+                        actualizarSumaPartes(textoSuma, partesDesigualesRecurrente, uids, parseFloat(montoInput.value) || 0);
+                    });
+                });
+                actualizarSumaPartes(textoSuma, partesDesigualesRecurrente, uids, monto);
+            }
+            renderPartesRecurrenteGrupo();
+
+            switchDesigual.addEventListener('sl-change', (evento) => {
+                divisionDesigualRecurrente = evento.target.checked;
+                renderPartesRecurrenteGrupo();
+            });
+
+            document.getElementById('form-recurrente-grupo').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const monto = parseFloat(montoInput.value);
+                const divididoEntre = Array.from(participantes);
+                const datos = {
+                    descripcion: document.getElementById('recurrente-grupo-descripcion').value.trim(),
+                    monto,
+                    moneda: document.getElementById('recurrente-grupo-moneda').value,
+                    categoria: document.getElementById('recurrente-grupo-categoria').value,
+                    diaDelMes: parseInt(document.getElementById('recurrente-grupo-dia').value, 10),
+                    divididoEntre,
+                    activo: true,
+                };
+                if (!datos.descripcion || !datos.monto || datos.monto <= 0 || !datos.diaDelMes) {
+                    avisar('Completá todos los campos con valores válidos.', 'error');
+                    return;
+                }
+                if (divididoEntre.length === 0) {
+                    avisar('Elegí entre quiénes se divide.', 'error');
+                    return;
+                }
+                const partes = validarPartesDesiguales(divisionDesigualRecurrente, partesDesigualesRecurrente, divididoEntre, monto);
+                if (partes === undefined) {
+                    avisar('Los montos por persona no suman el total — ajustalos antes de guardar.', 'error');
+                    return;
+                }
+                datos.partes = partes;
+                try {
+                    if (recurrente) {
+                        await actualizarRecurrenteGrupo(grupoId, recurrente.id, datos);
+                        avisar('Recurrente actualizado', 'exito');
+                    } else {
+                        await agregarRecurrenteGrupo(grupoId, datos);
+                        avisar('Recurrente del grupo agregado', 'exito');
+                    }
+                    cerrarModal();
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+        }
+
+        document.getElementById('boton-nuevo-recurrente-grupo').addEventListener('click', () => abrirModalRecurrenteGrupo());
+
+        // Precarga el formulario "Agregar gasto" con los datos del
+        // recurrente — a propósito NO lo carga solo (el monto pudo
+        // cambiar, ej. un aumento de alquiler), así quien lo esté
+        // pagando confirma antes de guardar. Quien paga cada mes puede
+        // variar (a veces uno, a veces otro), así que el pagador se deja
+        // en quien tiene la sesión abierta en vez de fijarlo en el
+        // recurrente.
+        function cargarRecurrenteGrupoEnFormulario(recurrente) {
+            abrirPanelGasto();
+            // Sugiere el día habitual del recurrente dentro del mes
+            // actual (acotado a los días que el mes realmente tiene, por
+            // si el recurrente es "día 31" y estamos en un mes más
+            // corto) en vez de siempre "hoy" — normalmente coinciden,
+            // pero si se está cargando tarde (ver comentario de más
+            // arriba sobre por qué esta fecha existe) es más útil partir
+            // del día que correspondía.
+            const hoy = new Date();
+            const diasEnEsteMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+            const diaSugerido = Math.min(recurrente.diaDelMes || 1, diasEnEsteMes);
+            expenseFecha.value = new Date(hoy.getFullYear(), hoy.getMonth(), diaSugerido).toISOString().slice(0, 10);
+            expenseDescripcion.value = recurrente.descripcion;
+            expenseAmount.value = recurrente.monto;
+            document.getElementById('expense-moneda').value = recurrente.moneda || 'ARS';
+            document.getElementById('expense-cotizacion').value = '';
+            expensePagador.value = usuarioActual.uid;
+            expenseCategoria.value = recurrente.categoria || 'otros';
+            actualizarCampoCotizacion('expense');
+
+            participantesSeleccionados = new Set(
+                (recurrente.divididoEntre && recurrente.divididoEntre.length) ? recurrente.divididoEntre : Object.keys(nombresPorUid)
+            );
+            renderChipsParticipantes();
+
+            divisionDesigual = !!recurrente.partes;
+            partesDesiguales = { ...(recurrente.partes || {}) };
+            expenseSwitchDesigual.checked = divisionDesigual;
+            renderPartesDesigualesExpense();
+
+            panelGasto.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function renderRecurrentesGrupo() {
+            const listaContenedor = document.getElementById('recurrentes-grupo-lista-contenido');
+            const pendientesContenedor = document.getElementById('recurrentes-grupo-pendientes-contenido');
+
+            if (recurrentesGrupoActuales.length === 0) {
+                listaContenedor.innerHTML = '<p class="texto-muted" style="font-size:.85rem;">Todavía no hay recurrentes cargados en este grupo.</p>';
+                pendientesContenedor.innerHTML = '';
+                return;
+            }
+
+            const pendientes = recurrentesGrupoPendientes(recurrentesGrupoActuales, gastos);
+            pendientesContenedor.innerHTML = pendientes.length
+                ? pendientes.map(r => `
+                    <div class="sugerencia-pago">
+                        <span>💡 Todavía nadie cargó "${esc(r.descripcion)}" este mes</span>
+                        <button type="button" class="secundario boton-cargar-recurrente-grupo" data-id="${r.id}">Cargar ahora</button>
+                    </div>
+                `).join('')
+                : '';
+            pendientesContenedor.querySelectorAll('.boton-cargar-recurrente-grupo').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    const r = recurrentesGrupoActuales.find(x => x.id === boton.dataset.id);
+                    if (r) cargarRecurrenteGrupoEnFormulario(r);
+                });
+            });
+
+            const filas = recurrentesGrupoActuales.map(r => {
+                const participantesDelRecurrente = (r.divididoEntre && r.divididoEntre.length) ? r.divididoEntre : Object.keys(nombresPorUid);
+                const participantesTexto = r.partes
+                    ? participantesDelRecurrente.map(uid => `${nombreDeEsc(uid)} (${simboloDeMoneda(r.moneda || 'ARS')}${(r.partes[uid] || 0).toFixed(2)})`).join(', ')
+                    : participantesDelRecurrente.map(nombreDeEsc).join(', ');
+                return `
+                    <tr>
+                        <td>${esc(r.descripcion)}</td>
+                        <td>${simboloDeMoneda(r.moneda || 'ARS')}${r.monto.toFixed(2)}</td>
+                        <td>día ${r.diaDelMes}</td>
+                        <td>${participantesTexto}</td>
+                        <td>
+                            <button class="icono" data-editar-id="${r.id}" title="Editar">✏️</button>
+                            <button class="icono" data-id="${r.id}" title="Eliminar">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            listaContenedor.innerHTML = `
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Descripción</th><th>Monto</th><th>Cuándo</th><th>Se divide entre</th><th></th></tr></thead>
+                        <tbody>${filas}</tbody>
+                    </table>
+                </div>
+            `;
+            listaContenedor.querySelectorAll('button[data-id]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    if (!confirmar('¿Eliminar este recurrente del grupo? (no borra los gastos ya cargados, solo el recordatorio)')) return;
+                    eliminarRecurrenteGrupo(grupoId, boton.dataset.id);
+                });
+            });
+            listaContenedor.querySelectorAll('button[data-editar-id]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    const r = recurrentesGrupoActuales.find(x => x.id === boton.dataset.editarId);
+                    if (r) abrirModalRecurrenteGrupo(r);
+                });
+            });
+        }
+
+        document.getElementById('filtro-integrante').addEventListener('change', renderGastos);
+        document.getElementById('filtro-categoria-grupo').addEventListener('change', renderGastos);
+
+        expensesForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+
+            const fecha = expenseFecha.value;
+            const descripcion = expenseDescripcion.value.trim();
+            const monto = parseFloat(expenseAmount.value);
+            const moneda = document.getElementById('expense-moneda').value;
+            const cotizacionManual = parseFloat(document.getElementById('expense-cotizacion').value) || null;
+            const pagadoPor = expensePagador.value;
+            const categoria = expenseCategoria.value;
+            const divididoEntre = Array.from(participantesSeleccionados);
+
+            if (!fecha || !descripcion || !monto || monto <= 0 || !pagadoPor) {
+                avisar('Completá todos los campos con valores válidos.', 'error');
+                return;
+            }
+            if (divididoEntre.length === 0) {
+                avisar('Elegí entre quiénes se divide el gasto.', 'error');
+                return;
+            }
+
+            const partes = validarPartesDesiguales(divisionDesigual, partesDesiguales, divididoEntre, monto);
+            if (partes === undefined) {
+                avisar('Los montos por persona no suman el total del gasto — ajustalos antes de guardar.', 'error');
+                return;
+            }
+
+            // No se bloquea (puede ser intencional: registrar un gasto
+            // "del grupo" que no se reparte, para no perderlo del
+            // registro sin que genere deuda) — pero si hay más gente en
+            // el grupo y quedó tildado uno solo, es fácil que haya sido
+            // sin querer, así que se confirma antes de guardar.
+            if (divididoEntre.length === 1 && Object.keys(nombresPorUid).length > 1) {
+                const soloUno = confirmar(`Este gasto se va a dividir solo entre ${nombreDe(divididoEntre[0])} — no le va a generar deuda a nadie más. ¿Seguro?`);
+                if (!soloUno) return;
+            }
+
+            agregarGasto(grupoId, { fecha, descripcion, monto, moneda, cotizacionManual, pagadoPor, categoria, divididoEntre, partes, creadoEn: serverTimestamp() });
+            avisar('Gasto agregado', 'exito');
+            expensesForm.reset();
+            // .reset() deja la fecha vacía (no tiene un value="" fijo en
+            // el HTML) — se vuelve a poner hoy, igual que al abrir el
+            // panel por primera vez.
+            expenseFecha.value = new Date().toISOString().slice(0, 10);
+            // Vuelve a tildar a todos los miembros por defecto para el
+            // próximo gasto (si no se resetea el Set acá, quedaban
+            // destildados los mismos que en el gasto anterior). También
+            // se apaga el modo de montos distintos — si no, quedaría
+            // tildado con los montos del gasto anterior.
+            participantesSeleccionados = new Set(Object.keys(nombresPorUid));
+            renderChipsParticipantes();
+            divisionDesigual = false;
+            partesDesiguales = {};
+            expenseSwitchDesigual.checked = false;
+            renderPartesDesigualesExpense();
+            actualizarCampoCotizacion('expense');
+        });
+
+        // --- Pagos de deuda ---
+
+        function renderPagos() {
+            const contenedor = document.getElementById('payments-contenido');
+
+            if (pagos.length === 0) {
+                contenedor.innerHTML = `
+                    <div class="estado-vacio">
+                        <span class="icono-grande">💸</span>
+                        Todavía no se registró ningún pago.
+                    </div>
+                `;
+                return;
+            }
+
+            const filas = pagos.map(pago => {
+                const esOtraMoneda = (pago.moneda || 'ARS') !== 'ARS';
+                const equivalente = esOtraMoneda
+                    ? `<br><small class="texto-muted">≈ $${montoEnARS(pago.monto, pago.moneda, pago.cotizacionManual).toFixed(2)}</small>` : '';
+                return `
+                <tr>
+                    <td>${avatarDe(pago.pagadoPor)} ${nombreDeEsc(pago.pagadoPor)}</td>
+                    <td>${avatarDe(pago.recibidoPor)} ${nombreDeEsc(pago.recibidoPor)}</td>
+                    <td class="monto">${simboloDeMoneda(pago.moneda || 'ARS')}${pago.monto.toFixed(2)}${equivalente}</td>
+                    <td><button class="icono" data-id="${pago.id}" title="Eliminar">🗑️</button></td>
+                </tr>
+            `;
+            }).join('');
+
+            contenedor.innerHTML = `
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Pagó</th><th>Recibió</th><th>Monto</th><th></th></tr></thead>
+                        <tbody>${filas}</tbody>
+                    </table>
+                </div>
+            `;
+
+            contenedor.querySelectorAll('button[data-id]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    // renderBalances() se dispara solo cuando Firestore
+                    // confirma el borrado, vía el listener de más abajo.
+                    if (!confirmar('¿Eliminar este pago?')) return;
+                    eliminarPagoDeuda(grupoId, boton.dataset.id);
+                });
+            });
+        }
+
+        paymentForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const pagadoPor = payerSelect.value;
+            const recibidoPor = payeeSelect.value;
+            const monto = parseFloat(paymentAmount.value);
+            const moneda = paymentMoneda.value;
+            const cotizacionManual = parseFloat(document.getElementById('payment-cotizacion-manual').value) || null;
+
+            if (!pagadoPor || !recibidoPor || !monto || monto <= 0) {
+                avisar('Completá todos los campos con valores válidos.', 'error');
+                return;
+            }
+            if (pagadoPor === recibidoPor) {
+                avisar('El pagador y el receptor no pueden ser la misma persona.', 'error');
+                return;
+            }
+
+            await agregarPagoDeuda(grupoId, { pagadoPor, recibidoPor, monto, moneda, cotizacionManual, creadoEn: serverTimestamp() });
+            avisar(`${nombreDe(pagadoPor)} le pagó a ${nombreDe(recibidoPor)} ${simboloDeMoneda(moneda)}${monto.toFixed(2)}`, 'exito');
+            // Solo tiene sentido avisarle a recibidoPor si no es quien está
+            // cargando el pago (alguien puede registrar a mano un pago entre
+            // OTRAS dos personas del grupo, no siempre es "yo le pagué a...").
+            if (recibidoPor !== usuarioActual.uid) {
+                await avisarDeudaSaldada(recibidoPor, pagadoPor, monto, moneda);
+            }
+            paymentForm.reset();
+            delete paymentForm.dataset.objetivoArs;
+            actualizarCampoCotizacion('payment');
+        });
+
+        // --- Chat ---
+
+        // "Último leído" se guarda por grupo en localStorage (no en
+        // Firestore — es solo para este dispositivo, no hace falta
+        // sincronizarlo entre todos). Si nunca lo abrió, todo lo que no
+        // sea propio cuenta como no leído.
+        function contarNoLeidos() {
+            if (!usuarioActual) return 0;
+            const ultimoLeido = localStorage.getItem(`chat-ultimo-leido-${grupoId}`) || '';
+            return mensajes.filter(m => {
+                if (m.autorUid === usuarioActual.uid) return false;
+                const fecha = (m.creadoEn && m.creadoEn.toDate) ? m.creadoEn.toDate().toISOString() : new Date().toISOString();
+                return fecha > ultimoLeido;
+            }).length;
+        }
+
+        function marcarChatLeido() {
+            localStorage.setItem(`chat-ultimo-leido-${grupoId}`, new Date().toISOString());
+        }
+
+        function renderBadgeChat() {
+            const badge = document.getElementById('badge-chat-no-leidos');
+            const abierto = panelChat.style.display !== 'none';
+            const noLeidos = abierto ? 0 : contarNoLeidos();
+            badge.style.display = noLeidos > 0 ? 'flex' : 'none';
+            badge.textContent = noLeidos > 9 ? '9+' : noLeidos;
+        }
+
+        function renderMensajes() {
+            if (mensajes.length === 0) {
+                chatMensajesEl.innerHTML = '<p class="texto-muted" style="text-align:center; font-size:.85rem; margin:0;">Todavía no hay mensajes en este grupo. ¡Escribí el primero!</p>';
+                return;
+            }
+
+            // Se mide ANTES de reemplazar el contenido de abajo — si se
+            // mide después, scrollHeight ya reflejaría el tamaño nuevo
+            // (con el mensaje recién agregado incluido) y la comparación
+            // daría siempre "no estaba abajo", aunque sí lo estuviera.
+            const yaEstabaAbajo = chatMensajesEl.scrollHeight - chatMensajesEl.scrollTop - chatMensajesEl.clientHeight < 80;
+
+            chatMensajesEl.innerHTML = mensajes.map(m => {
+                const propio = usuarioActual && m.autorUid === usuarioActual.uid;
+                const hora = (m.creadoEn && m.creadoEn.toDate)
+                    ? m.creadoEn.toDate().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+                    : 'enviando...';
+                const borrar = propio ? `<button type="button" class="chat-borrar" data-id="${m.id}" title="Borrar">🗑️</button>` : '';
+                return `
+                    <div class="chat-burbuja ${propio ? 'propia' : ''}">
+                        ${!propio ? `<div class="chat-burbuja-autor">${avatarDe(m.autorUid)} ${nombreDeEsc(m.autorUid)}</div>` : ''}
+                        <div class="chat-burbuja-texto">${esc(m.texto)}</div>
+                        <div class="chat-burbuja-hora">${hora}${borrar}</div>
+                    </div>
+                `;
+            }).join('');
+
+            // Solo baja el scroll solo si ya estaba cerca del final — si
+            // alguien subió a leer mensajes viejos, un mensaje nuevo no le
+            // debería mover la pantalla de golpe.
+            if (yaEstabaAbajo || panelChat.style.display === 'none') {
+                chatMensajesEl.scrollTop = chatMensajesEl.scrollHeight;
+            }
+
+            chatMensajesEl.querySelectorAll('.chat-borrar').forEach(boton => {
+                boton.addEventListener('click', () => eliminarMensaje(grupoId, boton.dataset.id));
+            });
+        }
+
+        document.getElementById('chat-form').addEventListener('submit', (evento) => {
+            evento.preventDefault();
+            const input = document.getElementById('chat-texto');
+            const texto = input.value.trim();
+            if (!texto) return;
+            enviarMensaje(grupoId, usuarioActual.uid, texto);
+            input.value = '';
+        });
+
+        // --- Selector de grupo: elegir cuál ver sin volver a Inicio ---
+
+        const selectorGrupo = document.getElementById('selector-grupo');
+        const estadoSinGrupo = document.getElementById('estado-sin-grupo');
+        const contenidoGrupo = document.getElementById('contenido-grupo');
+        const formCuentaRapida = document.getElementById('form-cuenta-rapida');
+        const formCrearGrupo = document.getElementById('form-crear-grupo');
+        const formUnirseGrupo = document.getElementById('form-unirse-grupo');
+
+        // --- Card "Tu grupo": con un grupo ya activo, se colapsa a un
+        // resumen de una línea en vez de mostrar siempre el selector +
+        // "Crear/Unirme/Cuenta rápida" desplegados — eso solo hace falta
+        // la primera vez o cuando de verdad querés cambiar de grupo.
+        const resumenGrupoActivo = document.getElementById('resumen-grupo-activo');
+        const cuerpoSelectorGrupo = document.getElementById('cuerpo-selector-grupo');
+        const nombreGrupoActivoResumen = document.getElementById('nombre-grupo-activo-resumen');
+
+        function mostrarResumenGrupo(nombre) {
+            nombreGrupoActivoResumen.textContent = nombre;
+            resumenGrupoActivo.style.display = 'flex';
+            cuerpoSelectorGrupo.style.display = 'none';
+        }
+        function mostrarSelectorCompleto() {
+            resumenGrupoActivo.style.display = 'none';
+            cuerpoSelectorGrupo.style.display = 'block';
+        }
+        document.getElementById('boton-cambiar-grupo').addEventListener('click', mostrarSelectorCompleto);
+
+        let usuarioActual = null;
+        let misGrupos = [];
+        // Cada vez que se cambia de grupo hay que dejar de escuchar los
+        // listeners del anterior — si no, quedarían sumando datos de dos
+        // grupos distintos a las mismas variables locales.
+        let dejarDeEscuchar = [];
+
+        async function poblarSelectorDeGrupos(grupoActivoId) {
+            misGrupos = await obtenerMisGrupos(usuarioActual.uid);
+
+            if (misGrupos.length === 0) {
+                selectorGrupo.innerHTML = '<option value="">No tenés grupos guardados</option>';
+                return;
+            }
+
+            selectorGrupo.innerHTML = misGrupos
+                .map(g => `<option value="${g.id}" ${g.id === grupoActivoId ? 'selected' : ''}>${esc(g.nombre)}</option>`)
+                .join('');
+        }
+
+        function cargarGrupo(id, nombre, opciones = {}) {
+            dejarDeEscuchar.forEach(fn => fn());
+            dejarDeEscuchar = [];
+
+            grupoId = id;
+            nombresPorUid = {};
+            fotosPorUid = {};
+            aliasesPorUid = {};
+            gastos = [];
+            pagos = [];
+            mensajes = [];
+            recurrentesGrupoActuales = [];
+            guardarGrupoActivo(id, nombre, opciones);
+
+            // Si el chat de un grupo anterior había quedado abierto, se
+            // cierra al cambiar de grupo — si no, se vería vacío por un
+            // instante mostrando "abierto" pero sin sus mensajes todavía.
+            panelChat.style.display = 'none';
+            tarjetaChat.classList.remove('activa');
+
+            estadoSinGrupo.style.display = 'none';
+            contenidoGrupo.style.display = 'block';
+            mostrarResumenGrupo(nombre);
+
+            dejarDeEscuchar.push(escucharGrupo(grupoId, (datosGrupo) => {
+                if (!datosGrupo) {
+                    // El grupo ya no existe (se borró, o el id que este
+                    // dispositivo tenía guardado como "activo" quedó
+                    // viejo) — no tiene sentido seguir mostrando sus
+                    // botones y tarjetas vacíos, así que se cae al mismo
+                    // estado que "todavía no elegiste ningún grupo". De
+                    // paso, se limpia de "Tus grupos" si estaba ahí (algo
+                    // que solo se puede hacer para uno mismo).
+                    dejarDeEscuchar.forEach(fn => fn());
+                    dejarDeEscuchar = [];
+                    limpiarGrupoActivo();
+                    quitarGrupoDeMisGrupos(usuarioActual.uid, id).catch(() => {});
+                    contenidoGrupo.style.display = 'none';
+                    estadoSinGrupo.style.display = 'block';
+                    mostrarSelectorCompleto();
+                    avisar('Ese grupo ya no existe.', 'info');
+                    return;
+                }
+                nombresPorUid = datosGrupo.nombresPorUid || {};
+                fotosPorUid = datosGrupo.fotosPorUid || {};
+                aliasesPorUid = datosGrupo.aliasesPorUid || {};
+                preferenciasPorUid = datosGrupo.preferenciasPorUid || {};
+
+                // Grupos creados antes de que existiera nombresPorUid no
+                // tienen guardado el nombre de sus miembros — si al mío le
+                // falta, se completa solo. El propio updateDoc dispara este
+                // mismo listener de nuevo con el dato ya corregido.
+                if (!nombresPorUid[usuarioActual.uid]) {
+                    asegurarNombrePropioEnGrupo(grupoId, usuarioActual);
+                }
+
+                renderInfoGrupo(datosGrupo);
+                renderSelectoresDeMiembros();
+                renderGastos();
+                renderPagos();
+            }));
+            dejarDeEscuchar.push(escucharGastos(grupoId, (data) => {
+                gastos = data;
+                renderGastos();
+                // Cargar un gasto nuevo puede sacar a un recurrente de la
+                // lista de "pendientes" (si coincide con lo que se acaba
+                // de cargar), así que también hay que re-renderizarlos.
+                renderRecurrentesGrupo();
+            }));
+            dejarDeEscuchar.push(escucharPagosDeuda(grupoId, (data) => {
+                pagos = data;
+                renderBalances();
+                renderPagos();
+            }));
+            dejarDeEscuchar.push(escucharMensajes(grupoId, (data) => {
+                mensajes = data;
+                renderMensajes();
+                renderBadgeChat();
+            }));
+            dejarDeEscuchar.push(escucharRecurrentesGrupo(grupoId, (data) => {
+                recurrentesGrupoActuales = data;
+                renderRecurrentesGrupo();
+            }));
+        }
+
+        selectorGrupo.addEventListener('change', () => {
+            const grupo = misGrupos.find(g => g.id === selectorGrupo.value);
+            if (!grupo) return;
+            cargarGrupo(grupo.id, grupo.nombre);
+        });
+
+        formCrearGrupo.addEventListener('submit', async (evento) => {
+            evento.preventDefault();
+            const nombreInput = document.getElementById('nombre-grupo-nuevo');
+            const nombre = nombreInput.value.trim();
+            if (!nombre) return;
+            try {
+                const grupo = await crearGrupo(usuarioActual, nombre);
+                avisar(`Grupo "${grupo.nombre}" creado`, 'exito');
+                nombreInput.value = '';
+                await poblarSelectorDeGrupos(grupo.id);
+                cargarGrupo(grupo.id, grupo.nombre);
+            } catch (error) {
+                avisar('No se pudo crear el grupo: ' + error.message, 'error');
+            }
+        });
+
+        formUnirseGrupo.addEventListener('submit', async (evento) => {
+            evento.preventDefault();
+            const codigoInput = document.getElementById('codigo-invitacion');
+            const codigo = codigoInput.value.trim();
+            if (!codigo) return;
+            try {
+                const grupo = await unirseAGrupo(usuarioActual, codigo);
+                avisar(`Te uniste a "${grupo.nombre}"`, 'exito');
+                codigoInput.value = '';
+                await poblarSelectorDeGrupos(grupo.id);
+                cargarGrupo(grupo.id, grupo.nombre);
+            } catch (error) {
+                avisar('No se pudo unir al grupo: ' + error.message, 'error');
+            }
+        });
+
+        formCuentaRapida.addEventListener('submit', async (evento) => {
+            evento.preventDefault();
+            const nombreInput = document.getElementById('nombre-cuenta-rapida');
+            const nombre = nombreInput.value.trim() || `Cuenta rápida ${new Date().toLocaleDateString('es-AR')}`;
+            try {
+                const grupo = await crearCuentaRapida(usuarioActual, nombre);
+                avisar(`"${grupo.nombre}" lista — código: ${grupo.codigoInvitacion}`, 'exito');
+                nombreInput.value = '';
+                cargarGrupo(grupo.id, grupo.nombre, { esCuentaRapida: true });
+
+                // No se agrega a misGrupos a propósito: es justamente lo que
+                // la distingue de un grupo guardado. Y como "grupo activo"
+                // se guarda en sessionStorage (no localStorage, ver
+                // guardarGrupoActivo), tampoco se recuerda más allá de esta
+                // pestaña — cerrarla es "terminar" con la cuenta rápida.
+                // Mientras tanto, se refleja como opción temporal en el
+                // selector, para que no quede mostrando otro grupo mientras
+                // en realidad estás viendo esta cuenta rápida.
+                const opcionTemporal = document.createElement('option');
+                opcionTemporal.value = grupo.id;
+                opcionTemporal.textContent = `⚡ ${grupo.nombre}`;
+                selectorGrupo.appendChild(opcionTemporal);
+                selectorGrupo.value = grupo.id;
+            } catch (error) {
+                avisar('No se pudo crear la cuenta rápida: ' + error.message, 'error');
+            }
+        });
+
+        // --- Arranque: hace falta sesión para todo lo demás. Si ya había
+        // un grupo activo (de una visita anterior) se carga directo; si no,
+        // se muestra el selector para elegir uno o armar una cuenta rápida. ---
+        requerirSesion((user) => {
+            usuarioActual = user;
+            const grupoActivo = obtenerGrupoActivo();
+
+            poblarSelectorDeGrupos(grupoActivo ? grupoActivo.id : null);
+
+            if (grupoActivo) {
+                cargarGrupo(grupoActivo.id, grupoActivo.nombre);
+            } else {
+                estadoSinGrupo.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

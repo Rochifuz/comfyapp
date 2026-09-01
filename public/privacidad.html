@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de privacidad · FusiónApp</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <meta name="theme-color" content="#0f0e0c">
+    <script>
+        var tema = localStorage.getItem('tema') || 'oscuro';
+        document.documentElement.setAttribute('data-tema', tema);
+    </script>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <header class="navbar">
+        <a href="sistema.html" class="navbar-brand">🧩 FusiónApp</a>
+    </header>
+
+    <main class="page" style="max-width: 720px; margin: 0 auto;">
+        <div class="card">
+            <h1 style="margin-top:0;">Política de privacidad</h1>
+            <p class="texto-muted" style="font-size:.85rem;">Última actualización: 27 de agosto de 2026.</p>
+
+            <p>FusiónApp es un sistema personal (no comercial) de 5 apps — <strong>GastosApp</strong>, <strong>ComfyApp</strong>, <strong>GamingApp</strong>, <strong>AgendaApp</strong> y <strong>TareasApp</strong> — que uso yo (Roy) junto a un grupo cerrado de familia y amigos. No está abierto a que cualquiera se registre libremente. Esta página explica qué datos se guardan, para qué se usan y con quién se comparten.</p>
+
+            <h2>Qué datos se guardan</h2>
+            <ul>
+                <li><strong>Cuenta de Google</strong>: al iniciar sesión (Firebase Authentication) se guarda tu email, nombre y foto de perfil, para identificarte dentro del sistema.</li>
+                <li><strong>Datos de GastosApp</strong>: gastos, pagos y grupos que vos cargás o que compartís con otras personas del sistema.</li>
+                <li><strong>Datos de GamingApp</strong>: si conectás tu cuenta de Riot Games (Riot ID), se guarda tu rango de League of Legends/TFT y se consulta tu historial de partidas reciente para mostrártelo — solo se pide esto DESPUÉS de que vos mismo la conectás, nunca antes. También los torneos que creás o en los que participás (con resultados que cargan a mano los propios participantes) y, si usás Steam, tu biblioteca de juegos pública.</li>
+                <li><strong>Datos de AgendaApp</strong>: si conectás tu Google Calendar, se muestran tus eventos dentro de la app (no se modifican ni se crean eventos sin que vos lo pidas).</li>
+                <li><strong>Datos de TareasApp</strong>: tareas personales o de grupo que cargás.</li>
+                <li><strong>Notificaciones</strong>: si las activás, un token de tu dispositivo para poder enviarte avisos (ej. que se venció una tarea, que alguien te invitó a un torneo).</li>
+            </ul>
+
+            <h2>Con quién se comparten</h2>
+            <p>Tus datos NUNCA se venden ni se comparten con terceros con fines comerciales o publicitarios. Se comparten únicamente:</p>
+            <ul>
+                <li>Con las personas de tus propios grupos/torneos dentro del sistema (ej. quienes ven un gasto grupal que cargaste, o los demás participantes de un torneo).</li>
+                <li>Con los servicios técnicos que hacen funcionar la app, y solo lo estrictamente necesario para esa consulta puntual:
+                    <ul>
+                        <li><strong>Firebase (Google)</strong>: guarda toda la base de datos (Firestore) y maneja el login.</li>
+                        <li><strong>Riot Games API</strong>: se le consulta tu Riot ID (si lo conectaste) para traer tu rango e historial de partidas — no le mandamos ningún otro dato tuyo.</li>
+                        <li><strong>Google Calendar API</strong>: si conectás AgendaApp, se le pide la lista de tus eventos.</li>
+                        <li><strong>Open-Meteo / GNews</strong>: para mostrar clima y noticias generales — no reciben ningún dato personal tuyo, solo una ubicación o un tema de búsqueda si vos los pedís.</li>
+                    </ul>
+                </li>
+            </ul>
+
+            <h2>Cómo eliminar tus datos</h2>
+            <p>Desde <strong>Opciones → Seguridad → Eliminar cuenta</strong> (disponible en cualquiera de las 5 apps) podés borrar tu cuenta y todos tus datos del sistema de forma permanente. Esta acción es irreversible.</p>
+
+            <h2>Contacto</h2>
+            <p>Cualquier consulta sobre esta política o tus datos: <a href="mailto:tu-email@ejemplo.com">tu-email@ejemplo.com</a>.</p>
+
+            <p class="texto-muted" style="font-size:.85rem; margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--color-border);">Ver también los <a href="terminos.html">términos de uso</a>.</p>
+        </div>
+    </main>
+</body>
+</html>

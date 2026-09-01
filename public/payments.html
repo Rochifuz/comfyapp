@@ -1,0 +1,2225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gastos personales · GastosApp</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <meta name="theme-color" content="#0f0e0c">
+    <script>
+        var tema = localStorage.getItem('tema') || 'oscuro';
+        document.documentElement.setAttribute('data-tema', tema);
+        if (tema === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@twemoji/api@17.0.3/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div id="pantalla-carga" class="pantalla-carga"><div class="spinner"></div></div>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page">
+        <div class="card">
+            <div class="card-header">
+                <h2>Gastos personales</h2>
+            </div>
+            <p style="margin-top: -8px;">Registro privado, agrupado por mes. Solo vos ves estos datos.</p>
+        </div>
+
+        <div class="grid-acciones tres-columnas">
+            <div class="card-accion" id="tarjeta-agregar-gasto" tabindex="0" role="button">
+                <span class="icono-accion">🧾</span>
+                <h3>Agregar gasto</h3>
+                <p>Fecha, monto, categoría y método de pago</p>
+            </div>
+            <div class="card-accion" id="tarjeta-pagar-tarjeta" tabindex="0" role="button">
+                <span class="icono-accion">💳</span>
+                <h3>Pagar tarjeta</h3>
+                <p>Registrá un pago hecho a tu resumen</p>
+            </div>
+            <div class="card-accion" id="tarjeta-registrar-sueldo" tabindex="0" role="button">
+                <span class="icono-accion">💰</span>
+                <h3>Registrar ingreso</h3>
+                <p>Sumalo para ver tu balance del mes</p>
+            </div>
+
+            <div class="card panel-expandible" id="panel-agregar-gasto" style="display:none;">
+                <div class="card-header"><h3 style="margin:0;">Agregar gasto</h3></div>
+                <form id="payments-form" class="form">
+                    <div>
+                        <label for="payment-date">Fecha</label>
+                        <input type="date" id="payment-date" name="payment-date" required>
+                    </div>
+                    <div id="campo-monto">
+                        <label for="payment-amount">Monto</label>
+                        <input type="number" id="payment-amount" name="payment-amount" min="0.01" step="0.01" required>
+                    </div>
+                    <div>
+                        <label for="payment-moneda">Moneda</label>
+                        <select id="payment-moneda"></select>
+                    </div>
+                    <div class="campo-ancho" id="campo-cotizacion-manual" style="display:none;">
+                        <label for="payment-cotizacion">Valor del cambio (opcional)</label>
+                        <input type="number" id="payment-cotizacion" min="0.01" step="0.01" placeholder="Dejalo vacío para usar el automático">
+                        <p class="texto-muted" style="font-size:.78rem; margin:4px 0 0;" id="texto-cotizacion-auto"></p>
+                    </div>
+                    <div class="campo-ancho">
+                        <label for="payment-description">Descripción</label>
+                        <input type="text" id="payment-description" name="payment-description" placeholder="Ej: Alquiler, supermercado..." maxlength="200" required>
+                    </div>
+
+                    <div>
+                        <label for="payment-categoria">Categoría</label>
+                        <select id="payment-categoria"></select>
+                    </div>
+                    <p class="campo-ancho texto-muted" id="aviso-configurar-alquiler" style="display:none; font-size:.82rem; margin: -4px 0 0;">
+                        🔑 ¿Es tu alquiler? <a href="cuenta.html">Configuralo en Cuenta</a> para que te avise cuándo toca ajustarlo y te sugiera el nuevo monto.
+                    </p>
+                    <div>
+                        <label for="payment-metodo">Método de pago</label>
+                        <select id="payment-metodo">
+                            <option value="efectivo">💵 Efectivo</option>
+                            <option value="debito">💳 Débito</option>
+                            <option value="credito">💳 Crédito</option>
+                            <option value="transferencia">🏦 Transferencia</option>
+                        </select>
+                    </div>
+
+                    <div class="campo-ancho" id="campo-dia-cierre" style="display:none;">
+                        <label for="dia-cierre-tarjeta">¿Qué día del mes cierra tu tarjeta? (una sola vez, se guarda para la próxima)</label>
+                        <input type="number" id="dia-cierre-tarjeta" min="1" max="31" placeholder="Ej: 10">
+                    </div>
+
+                    <div class="campo-ancho" id="campo-cuotas-toggle" style="display:none;">
+                        <label style="display:flex; align-items:center; gap:8px; font-weight:normal; cursor:pointer;">
+                            <input type="checkbox" id="es-en-cuotas" style="width:auto;">
+                            🔢 Fue en cuotas
+                        </label>
+                    </div>
+
+                    <div class="subgrupo-campos" id="campo-cuotas-detalle" style="display:none;">
+                        <div>
+                            <label for="cantidad-cuotas">Cantidad de cuotas</label>
+                            <input type="number" id="cantidad-cuotas" min="2" max="60" step="1" placeholder="Ej: 6">
+                        </div>
+                        <div>
+                            <label for="precio-cuota">Precio de cada cuota</label>
+                            <input type="number" id="precio-cuota" min="0.01" step="0.01" placeholder="Ej: 1500">
+                        </div>
+                        <div class="campo-ancho">
+                            <label style="display:flex; align-items:center; gap:8px; font-weight:normal; cursor:pointer;">
+                                <input type="checkbox" id="cuota-empezo-antes" style="width:auto;">
+                                📅 La primera cuota fue en otra fecha (ya empezada)
+                            </label>
+                        </div>
+                        <div class="campo-ancho" id="campo-fecha-cuota-inicial" style="display:none;">
+                            <label for="fecha-cuota-inicial">Fecha de la primera cuota</label>
+                            <input type="date" id="fecha-cuota-inicial">
+                        </div>
+                        <p class="campo-ancho texto-muted" id="texto-total-cuotas" style="font-size:.85rem; margin:0;"></p>
+                    </div>
+
+                    <button type="submit" class="campo-ancho">➕ Agregar gasto</button>
+                </form>
+            </div>
+
+            <div class="card panel-expandible" id="panel-pagar-tarjeta" style="display:none;">
+                <div class="card-header"><h3 style="margin:0;">Pagar tarjeta</h3></div>
+                <p style="margin-top:-8px;" class="texto-muted">Reduce tu saldo de tarjeta (lo que debés en total), no lo que sale en el próximo resumen.</p>
+                <form id="form-pagar-tarjeta" class="form">
+                    <div>
+                        <label for="tarjeta-pago-fecha">Fecha</label>
+                        <input type="date" id="tarjeta-pago-fecha" required>
+                    </div>
+                    <div>
+                        <label for="tarjeta-pago-monto">Monto</label>
+                        <input type="number" id="tarjeta-pago-monto" min="0.01" step="0.01" required>
+                    </div>
+                    <div>
+                        <label for="tarjeta-pago-moneda">Moneda</label>
+                        <select id="tarjeta-pago-moneda"></select>
+                    </div>
+                    <div class="campo-ancho">
+                        <label for="tarjeta-pago-descripcion">Descripción (opcional)</label>
+                        <input type="text" id="tarjeta-pago-descripcion" placeholder="Ej: Pago resumen agosto" maxlength="200">
+                    </div>
+                    <button type="submit" class="campo-ancho secundario">Registrar pago</button>
+                </form>
+            </div>
+
+            <div class="card panel-expandible" id="panel-registrar-sueldo" style="display:none;">
+                <div class="card-header"><h3 style="margin:0;">Registrar ingreso</h3></div>
+                <form id="form-sueldo" class="form">
+                    <div>
+                        <label for="sueldo-fecha">Fecha</label>
+                        <input type="date" id="sueldo-fecha" required>
+                    </div>
+                    <div>
+                        <label for="sueldo-monto">Monto</label>
+                        <input type="number" id="sueldo-monto" min="0.01" step="0.01" required>
+                    </div>
+                    <div class="campo-ancho">
+                        <label for="sueldo-descripcion">Descripción (opcional)</label>
+                        <input type="text" id="sueldo-descripcion" placeholder="Ej: Sueldo, freelance, venta..." maxlength="200">
+                    </div>
+                    <button type="submit" class="campo-ancho secundario">Registrar ingreso</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom: var(--space-3);">🗓️ Período</h3>
+            <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Controla todo lo de acá abajo: totales, presupuesto, balance, historial y lo que se exporta con los botones de CSV/mail.</p>
+            <div class="tabs" id="selector-periodo">
+                <button type="button" class="tab activa" data-modo="mensual">Mensual</button>
+                <button type="button" class="tab" data-modo="anual">Anual</button>
+                <button type="button" class="tab" data-modo="rango">Rango</button>
+            </div>
+            <div id="periodo-mensual-campo" style="max-width:320px;">
+                <label for="periodo-mes">Mes</label>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <button type="button" class="secundario" id="periodo-mes-anterior" style="width:auto; padding:8px 12px;" title="Mes anterior">◀</button>
+                    <input type="month" id="periodo-mes" style="flex:1;">
+                    <button type="button" class="secundario" id="periodo-mes-siguiente" style="width:auto; padding:8px 12px;" title="Mes siguiente">▶</button>
+                </div>
+            </div>
+            <div id="periodo-anual-campo" style="display:none; max-width:220px;">
+                <label for="periodo-anio">Año</label>
+                <input type="number" id="periodo-anio" min="2000" max="2100" step="1">
+            </div>
+            <div id="periodo-rango-campo" class="subgrupo-campos" style="display:none;">
+                <div>
+                    <label for="periodo-desde">Desde</label>
+                    <input type="date" id="periodo-desde">
+                </div>
+                <div>
+                    <label for="periodo-hasta">Hasta</label>
+                    <input type="date" id="periodo-hasta">
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-row" id="stats-row" style="display:none;">
+            <div class="stat-tile stat-tile-tarjeta" id="stat-periodo-tile" style="display:none;">
+                <!-- Una slide por cada moneda con gastos en el período
+                     elegido — se arma por JS (ver renderStatsPersonales),
+                     nunca mezcla pesos y dólares en un solo número. -->
+                <div class="mini-carrusel" id="mini-carrusel-periodo">
+                    <button type="button" class="mini-carrusel-anterior" aria-label="Anterior">‹</button>
+                    <button type="button" class="mini-carrusel-siguiente" aria-label="Siguiente">›</button>
+                    <div class="mini-carrusel-pista"></div>
+                    <div class="mini-carrusel-puntos"></div>
+                </div>
+            </div>
+            <div class="stat-tile stat-tile-tarjeta" id="stat-tarjeta-tile" style="display:none;">
+                <div class="mini-carrusel" id="mini-carrusel-tarjeta">
+                    <button type="button" class="mini-carrusel-anterior" aria-label="Anterior">‹</button>
+                    <button type="button" class="mini-carrusel-siguiente" aria-label="Siguiente">›</button>
+                    <div class="mini-carrusel-pista">
+                        <div class="mini-carrusel-slide">
+                            <div class="stat-valor" id="stat-saldo-ars">$0.00</div>
+                            <div class="stat-etiqueta">💳 Saldo en pesos</div>
+                        </div>
+                        <div class="mini-carrusel-slide">
+                            <div class="stat-valor" id="stat-saldo-usd">US$0.00</div>
+                            <div class="stat-etiqueta">💳 Saldo en dólares</div>
+                        </div>
+                    </div>
+                    <div class="mini-carrusel-puntos"></div>
+                </div>
+                <div class="texto-muted" id="stat-tarjeta-cierre" style="font-size:.8rem;"></div>
+                <button type="button" class="stat-tile-editar" id="boton-editar-tarjeta" title="Cambiar el día de cierre de tu tarjeta">✏️ Editar cierre</button>
+            </div>
+        </div>
+
+        <div class="card" id="presupuesto-card" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;" id="presupuesto-titulo">🎯 Presupuesto del mes</h3></div>
+            <div class="barra-progreso-fondo"><div class="barra-progreso" id="barra-presupuesto"></div></div>
+            <p id="texto-presupuesto" style="margin:0;"></p>
+            <p id="texto-diario" style="margin: var(--space-2) 0 0; font-weight:600;"></p>
+            <div id="presupuestos-categoria-contenido" style="margin-top:var(--space-3);"></div>
+        </div>
+
+        <div class="card" id="cuotas-pendientes-card" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">📅 Cuotas pendientes</h3></div>
+            <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Compras en cuotas con pagos todavía por venir — agrupadas por descripción, para no tener que sumarlas a mano.</p>
+            <div id="cuotas-pendientes-contenido"></div>
+        </div>
+
+        <div class="card" id="duplicados-card" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">⚠️ Posibles gastos duplicados</h3></div>
+            <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Mismo monto, misma descripción y fecha igual o casi igual — puede ser que lo hayas cargado dos veces por error (o puede ser una coincidencia real).</p>
+            <div id="duplicados-contenido"></div>
+        </div>
+
+        <div class="card" id="recurrentes-card">
+            <div class="card-header">
+                <h3 style="margin:0;">🔁 Recurrentes</h3>
+                <button type="button" class="secundario" id="boton-nuevo-recurrente" style="width:auto;">+ Nuevo</button>
+            </div>
+            <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Gastos fijos (alquiler, suscripciones...) o ingresos fijos (sueldo u otro) — guardalos acá una vez y te avisamos si te olvidás de cargarlos.</p>
+            <div id="recurrentes-pendientes-contenido"></div>
+            <div id="recurrentes-lista-contenido"></div>
+        </div>
+
+        <div class="card" id="balance-card" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;" id="balance-titulo">💰 Balance del período</h3></div>
+            <div class="balance-item"><span>Ingresos</span><span class="monto positivo" id="balance-ingresos">$0.00</span></div>
+            <div class="balance-item"><span>Gastos</span><span class="monto negativo" id="balance-gastos">$0.00</span></div>
+            <div class="balance-item"><span>Balance</span><span class="monto" id="balance-neto">$0.00</span></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h3 style="margin:0;" id="historial-titulo">Historial</h3></div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:var(--space-4); align-items:flex-end; justify-content:space-between;">
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <div>
+                        <label for="filtro-texto">Buscar</label>
+                        <input type="search" id="filtro-texto" placeholder="Por descripción..." style="min-width:180px;">
+                    </div>
+                    <div>
+                        <label for="filtro-origen">Mostrar</label>
+                        <select id="filtro-origen">
+                            <option value="todos">Todos</option>
+                            <option value="personal">Solo personales</option>
+                            <option value="grupos">Solo grupos</option>
+                        </select>
+                    </div>
+                    <div id="contenedor-filtro-grupo" style="display:flex; flex-direction:column;">
+                        <label for="filtro-grupo">Grupo</label>
+                        <select id="filtro-grupo"><option value="">Todos los grupos</option></select>
+                    </div>
+                    <div>
+                        <label for="filtro-moneda">Moneda</label>
+                        <select id="filtro-moneda"><option value="todas">Todas</option></select>
+                    </div>
+                    <div>
+                        <label for="filtro-categoria">Categoría</label>
+                        <select id="filtro-categoria"><option value="todas">Todas</option></select>
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" id="boton-exportar-csv" class="secundario" style="width:auto;" title="Descarga lo que se ve abajo, con el período y el filtro elegidos">⬇️ CSV</button>
+                    <button type="button" id="boton-exportar-mail" class="secundario" style="width:auto;" title="Abre tu cliente de mail con un resumen ya escrito">📧 Enviar por mail</button>
+                </div>
+            </div>
+
+            <details id="detalles-filtro-avanzado" style="margin-bottom: var(--space-4);">
+                <summary style="cursor:pointer; color: var(--color-text-muted); font-size:.85rem;">🔧 Filtro avanzado (varias condiciones con Y/O)</summary>
+                <div style="margin-top: var(--space-3);">
+                    <div class="drawer-item" style="padding:0 0 var(--space-2);">
+                        <span style="font-size:.85rem;">Coincidir con</span>
+                        <select id="filtro-avanzado-modo" style="width:auto;">
+                            <option value="AND">Todas las condiciones (Y)</option>
+                            <option value="OR">Cualquier condición (O)</option>
+                        </select>
+                    </div>
+                    <div id="filtro-avanzado-condiciones"></div>
+                    <button type="button" id="boton-agregar-condicion" class="secundario" style="width:auto; font-size:.82rem;">+ Agregar condición</button>
+                </div>
+            </details>
+
+            <div id="payments-contenido"></div>
+        </div>
+
+        <div class="card" id="evolucion-saldo-tarjeta-card" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">📈 Evolución del saldo de tarjeta</h3></div>
+            <p class="texto-muted" style="font-size:.8rem; margin-top:-8px;">Últimos 6 meses, en pesos — lo cargado a crédito menos lo ya pagado, acumulado hasta el fin de cada mes.</p>
+            <div class="grafico-contenedor" id="grafico-evolucion-tarjeta"></div>
+        </div>
+
+        <div class="card" id="tarjeta-historial-card" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">Pagos de tarjeta</h3></div>
+            <div id="pagos-tarjeta-contenido"></div>
+        </div>
+
+        <div class="card" id="ingresos-historial-card" style="display:none;">
+            <div class="card-header"><h3 style="margin:0;">Ingresos</h3></div>
+            <div id="ingresos-contenido"></div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 GastosApp</p>
+    </footer>
+
+    <script type="module">
+        import { agregarPago, actualizarPago, eliminarPago, escucharPagos } from './storage.js';
+        import { iniciarMiniCarrusel } from './miniCarrusel.js';
+        import { graficoBarrasVertical } from './graficos.js';
+        import {
+            agregarPagoTarjeta, actualizarPagoTarjeta, eliminarPagoTarjeta, escucharPagosTarjeta,
+            agregarIngreso, actualizarIngreso, eliminarIngreso, escucharIngresos,
+        } from './finanzas.js';
+        import { escucharGastos, escucharPagosDeuda } from './expenses.js';
+        import { obtenerMisGrupos, escucharGrupo, guardarGrupoActivo } from './grupos.js';
+        import { construirMovimientosUnificados } from './movimientos.js';
+        import { generarCSV, descargarCSV, abrirMailConResumen } from './exportar.js';
+        import { avisarSiCierreProximo, avisarSiPresupuestoAlLimite, avisarSiRecurrentesPendientes } from './notificaciones.js';
+        import { registrarGastoPersonalCargado } from './analitica.js';
+        import { iniciarNavbar } from './nav.js';
+        import { iniciarWidgetDeSesion, requerirSesion } from './auth.js';
+        import { avisar, confirmar, abrirModal, cerrarModal, esc } from './ui.js';
+        import { opcionesDeCategorias, etiquetaDeCategoria, CATEGORIAS } from './categorias.js';
+        import { iniciarFiltroAvanzado, cumpleFiltroAvanzado } from './filtroAvanzado.js';
+        import { obtenerAlquiler, obtenerSerieInflacion, inflacionAcumuladaDeSerie } from './alquiler.js';
+        import {
+            obtenerDiaCierreTarjeta, guardarDiaCierreTarjeta, calcularCicloDeTarjeta, obtenerPresupuesto,
+            obtenerPresupuestosPorCategoria, obtenerPreferenciasNotif,
+        } from './perfil.js';
+        import {
+            MONEDAS, opcionesDeMonedas, simboloDeMoneda, obtenerCotizaciones, cotizacionActual,
+            montoEnARS as convertirItemAARS,
+        } from './monedas.js';
+        import {
+            escucharRecurrentes, agregarRecurrente, actualizarRecurrente, eliminarRecurrente, recurrentesPendientes,
+            registrarAumento,
+        } from './recurrentes.js';
+
+        iniciarNavbar('payments.html');
+        iniciarWidgetDeSesion('payments.html');
+
+        // El de "tarjeta" tiene slides fijas (ARS/USD) — se inicia una
+        // sola vez. El de "período" arma sus slides por JS según la
+        // moneda (ver renderStatsPersonales), así que se guarda la
+        // referencia para poder llamar a su `actualizar()` cada vez
+        // que cambia la cantidad de slides.
+        iniciarMiniCarrusel(document.getElementById('mini-carrusel-tarjeta'));
+        const miniCarruselPeriodo = iniciarMiniCarrusel(document.getElementById('mini-carrusel-periodo'));
+
+        document.getElementById('payment-categoria').innerHTML = opcionesDeCategorias();
+        document.getElementById('payment-moneda').innerHTML = opcionesDeMonedas();
+        document.getElementById('tarjeta-pago-moneda').innerHTML = opcionesDeMonedas();
+        document.getElementById('filtro-moneda').innerHTML += MONEDAS.map(m => `<option value="${m.valor}">${m.simbolo} ${m.texto}</option>`).join('');
+        document.getElementById('filtro-categoria').innerHTML += CATEGORIAS.map(c => `<option value="${c.valor}">${c.icono} ${c.texto}</option>`).join('');
+
+        // --- Filtro avanzado (varias condiciones combinadas con Y/O) ---
+        const METODOS_DE_PAGO = [
+            { valor: 'efectivo', texto: '💵 Efectivo' },
+            { valor: 'debito', texto: '💳 Débito' },
+            { valor: 'credito', texto: '💳 Crédito' },
+            { valor: 'transferencia', texto: '🏦 Transferencia' },
+        ];
+        // Los `valor` de cada campo tienen que coincidir con el nombre
+        // real de esa propiedad en los movimientos unificados (ver
+        // movimientos.js) — `amountARS` porque los montos se comparan
+        // siempre en pesos, igual que en el resto de la app.
+        const CAMPOS_FILTRO_HISTORIAL = [
+            { valor: 'categoria', texto: 'Categoría', tipo: 'texto-igual', opciones: CATEGORIAS.map(c => ({ valor: c.valor, texto: `${c.icono} ${c.texto}` })) },
+            { valor: 'amountARS', texto: 'Monto', tipo: 'numero' },
+            { valor: 'metodoPago', texto: 'Método de pago', tipo: 'texto-igual', opciones: METODOS_DE_PAGO },
+        ];
+        let condicionesAvanzadas = [];
+        let modoAvanzado = 'AND';
+        iniciarFiltroAvanzado({
+            contenedorCondiciones: document.getElementById('filtro-avanzado-condiciones'),
+            selectModo: document.getElementById('filtro-avanzado-modo'),
+            botonAgregar: document.getElementById('boton-agregar-condicion'),
+            campos: CAMPOS_FILTRO_HISTORIAL,
+            onCambio: (condiciones, modo) => {
+                condicionesAvanzadas = condiciones;
+                modoAvanzado = modo;
+                renderTablaHistorial();
+            },
+        });
+
+        // Muestra/oculta el campo opcional "Valor del cambio" según la
+        // moneda elegida, y completa el texto de referencia con la
+        // cotización automática — así quien quiera pactar un valor propio
+        // (ej. dólar blue acordado con el grupo) sabe contra qué lo está
+        // comparando.
+        function actualizarCampoCotizacion() {
+            const moneda = document.getElementById('payment-moneda').value;
+            const campo = document.getElementById('campo-cotizacion-manual');
+            if (moneda === 'ARS') { campo.style.display = 'none'; return; }
+            campo.style.display = 'block';
+            const auto = cotizacionActual(moneda, cotizaciones);
+            document.getElementById('texto-cotizacion-auto').textContent = auto
+                ? `Automático ahora: 1 ${moneda} ≈ $${auto.toFixed(2)}` : 'Todavía no se cargó el valor automático.';
+        }
+        document.getElementById('payment-moneda').addEventListener('change', actualizarCampoCotizacion);
+
+        // --- Botonera: solo un panel abierto a la vez ---
+        const tarjetas = {
+            gasto: { boton: document.getElementById('tarjeta-agregar-gasto'), panel: document.getElementById('panel-agregar-gasto') },
+            tarjeta: { boton: document.getElementById('tarjeta-pagar-tarjeta'), panel: document.getElementById('panel-pagar-tarjeta') },
+            sueldo: { boton: document.getElementById('tarjeta-registrar-sueldo'), panel: document.getElementById('panel-registrar-sueldo') },
+        };
+
+        function alternarPanel(clave) {
+            const abrir = tarjetas[clave].panel.style.display === 'none';
+            Object.values(tarjetas).forEach(({ boton, panel }) => {
+                panel.style.display = 'none';
+                boton.classList.remove('activa');
+            });
+            if (abrir) {
+                tarjetas[clave].panel.style.display = 'block';
+                tarjetas[clave].boton.classList.add('activa');
+                tarjetas[clave].panel.querySelector('input, select')?.focus();
+            }
+        }
+
+        Object.keys(tarjetas).forEach(clave => {
+            tarjetas[clave].boton.addEventListener('click', () => alternarPanel(clave));
+        });
+
+        // Sugiere hoy (o, si hay día de sueldo configurado, ese día de este
+        // mes) al abrir el panel de sueldo — ver requerirSesion más abajo,
+        // donde se lee diaSueldo.
+        let diaSueldo = null;
+        tarjetas.sueldo.boton.addEventListener('click', () => {
+            const fechaInput = document.getElementById('sueldo-fecha');
+            if (fechaInput.value) return;
+            const hoy = new Date();
+            const dia = diaSueldo || hoy.getDate();
+            fechaInput.value = new Date(hoy.getFullYear(), hoy.getMonth(), dia).toISOString().slice(0, 10);
+        });
+
+        const contenido = document.getElementById('payments-contenido');
+        const statsRow = document.getElementById('stats-row');
+        const categoriaSelect = document.getElementById('payment-categoria');
+        const metodoSelect = document.getElementById('payment-metodo');
+        const campoDiaCierre = document.getElementById('campo-dia-cierre');
+        const diaCierreInput = document.getElementById('dia-cierre-tarjeta');
+
+        // Si eligen "Alquiler" y todavía no tienen el contrato configurado
+        // en Cuenta, se les avisa — no bloquea cargar el gasto igual, solo
+        // invita a configurarlo para tener el seguimiento automático.
+        let alquilerConfigurado = true; // arranca en true para no mostrar el aviso antes de tiempo, mientras se consulta
+        categoriaSelect.addEventListener('change', () => {
+            document.getElementById('aviso-configurar-alquiler').style.display =
+                (categoriaSelect.value === 'alquiler' && !alquilerConfigurado) ? 'block' : 'none';
+        });
+
+        let uid = null;
+        let diaCierreTarjeta = null;
+        let presupuestoMensual = null;
+        let presupuestosPorCategoria = {};
+        let preferenciasNotif = {}; // qué avisos automáticos tiene prendidos — ver cuenta.html y perfil.js
+        // Espejos locales de las 3 colecciones — cada listener de más abajo
+        // actualiza el suyo y dispara actualizarTodo(), porque varias de
+        // las métricas (balance, presupuesto) combinan datos de más de una.
+        let gastosActuales = [];
+        let pagosTarjetaActuales = [];
+        let ingresosActuales = [];
+        let recurrentesActuales = [];
+        // "¿ya llegó el primer snapshot de verdad, o esto sigue siendo el
+        // arranque en []?" — hace falta para recurrentesPendientes() (ver
+        // renderRecurrentes), que si no puede confundir "todavía no cargó
+        // nada" con "de verdad no hay nada cargado este mes". Los otros
+        // dos espejos (pagosTarjetaActuales/recurrentesActuales) no lo
+        // necesitan: nada calcula "pendiente" a partir de ellos antes de
+        // tiempo.
+        let gastosPersonalesListos = false;
+        let ingresosListos = false;
+
+        // Cotizaciones USD→ARS/EUR (ver monedas.js) — se piden una vez al
+        // arrancar y quedan en memoria; todos los cálculos que suman plata
+        // de distinta moneda (totales, presupuesto, balance) usan
+        // montoEnARS() de acá abajo en vez del monto crudo. Si el gasto
+        // tiene una cotización manual guardada, esa gana sobre la
+        // automática — ver monedas.js.
+        let cotizaciones = null;
+        function montoEnARS(item) {
+            return convertirItemAARS(parseFloat(item.amount), item.moneda || 'ARS', item.cotizacionManual, cotizaciones);
+        }
+
+        // --- Movimientos de los grupos a los que pertenezco, para el
+        // historial unificado (ver construirMovimientosUnificados). Cada
+        // grupo tiene sus propios listeners de gastos y pagos de deuda —
+        // dejarDeEscucharGrupos guarda todas las funciones de desuscripción
+        // para poder limpiarlas si hiciera falta (ej. si más adelante se
+        // agrega logout sin recargar la página).
+        let misGrupos = [];
+        let datosGrupos = {}; // grupoId -> { nombre, nombresPorUid }
+        let gastosGrupales = {}; // grupoId -> gastos del grupo (Firestore)
+        let pagosGrupales = {}; // grupoId -> pagosDeuda del grupo (Firestore)
+        const dejarDeEscucharGrupos = [];
+
+        // --- Cuotas de crédito ---
+        const campoMonto = document.getElementById('campo-monto');
+        const campoCuotasToggle = document.getElementById('campo-cuotas-toggle');
+        const esEnCuotas = document.getElementById('es-en-cuotas');
+        const campoCuotasDetalle = document.getElementById('campo-cuotas-detalle');
+        const cantidadCuotasInput = document.getElementById('cantidad-cuotas');
+        const precioCuotaInput = document.getElementById('precio-cuota');
+        const cuotaEmpezoAntes = document.getElementById('cuota-empezo-antes');
+        const campoFechaCuotaInicial = document.getElementById('campo-fecha-cuota-inicial');
+        const fechaCuotaInicialInput = document.getElementById('fecha-cuota-inicial');
+        const textoTotalCuotas = document.getElementById('texto-total-cuotas');
+
+        metodoSelect.addEventListener('change', () => {
+            const esCredito = metodoSelect.value === 'credito';
+            campoDiaCierre.style.display = (esCredito && !diaCierreTarjeta) ? 'block' : 'none';
+            campoCuotasToggle.style.display = esCredito ? 'block' : 'none';
+            if (!esCredito) {
+                esEnCuotas.checked = false;
+                esEnCuotas.dispatchEvent(new Event('change'));
+            }
+        });
+
+        esEnCuotas.addEventListener('change', () => {
+            campoCuotasDetalle.style.display = esEnCuotas.checked ? 'grid' : 'none';
+            campoMonto.style.display = esEnCuotas.checked ? 'none' : 'block';
+            document.getElementById('payment-amount').required = !esEnCuotas.checked;
+        });
+
+        cuotaEmpezoAntes.addEventListener('change', () => {
+            campoFechaCuotaInicial.style.display = cuotaEmpezoAntes.checked ? 'block' : 'none';
+        });
+
+        function actualizarTotalCuotas() {
+            const cantidad = parseInt(cantidadCuotasInput.value, 10);
+            const precio = parseFloat(precioCuotaInput.value);
+            textoTotalCuotas.textContent = (cantidad > 0 && precio > 0)
+                ? `Total: $${(cantidad * precio).toFixed(2)} en ${cantidad} cuotas de $${precio.toFixed(2)}`
+                : '';
+        }
+        cantidadCuotasInput.addEventListener('input', actualizarTotalCuotas);
+        precioCuotaInput.addEventListener('input', actualizarTotalCuotas);
+
+        // Suma `n` meses a una fecha (YYYY-MM-DD) sin desbordarse cuando el
+        // mes destino tiene menos días — ej. 31 de enero + 1 mes cae el 28
+        // (o 29) de febrero, no el 2/3 de marzo como haría sumar días fijo.
+        function sumarMeses(fechaTexto, n) {
+            const [anio, mes, dia] = fechaTexto.split('-').map(Number);
+            const primerDiaDelMesDestino = new Date(anio, mes - 1 + n, 1);
+            const ultimoDiaDelMesDestino = new Date(primerDiaDelMesDestino.getFullYear(), primerDiaDelMesDestino.getMonth() + 1, 0).getDate();
+            primerDiaDelMesDestino.setDate(Math.min(dia, ultimoDiaDelMesDestino));
+            return primerDiaDelMesDestino.toISOString().slice(0, 10);
+        }
+
+        function formatearMes(clave) {
+            const [anio, mes] = clave.split('-');
+            const fecha = new Date(anio, mes - 1, 1);
+            const nombre = fecha.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+            return nombre.charAt(0).toUpperCase() + nombre.slice(1);
+        }
+
+        function formatearFechaCorta(fecha) {
+            return fecha.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+        }
+
+        function etiquetaDeMetodo(metodo) {
+            return (METODOS_DE_PAGO.find(m => m.valor === metodo) || METODOS_DE_PAGO[0]).texto;
+        }
+
+        // --- Edición (modal) de un gasto personal ---
+        function abrirModalEditarGasto(gasto) {
+            abrirModal(`
+                <h3 style="margin-top:0;">Editar gasto</h3>
+                <form id="form-editar-gasto" class="form">
+                    <div>
+                        <label for="editar-gasto-fecha">Fecha</label>
+                        <input type="date" id="editar-gasto-fecha" value="${gasto.date}" required>
+                    </div>
+                    <div>
+                        <label for="editar-gasto-monto">Monto</label>
+                        <input type="number" id="editar-gasto-monto" min="0.01" step="0.01" value="${gasto.amount}" required>
+                    </div>
+                    <div>
+                        <label for="editar-gasto-moneda">Moneda</label>
+                        <select id="editar-gasto-moneda">${opcionesDeMonedas()}</select>
+                    </div>
+                    <div class="campo-ancho" id="campo-editar-gasto-cotizacion" style="display:none;">
+                        <label for="editar-gasto-cotizacion">Valor del cambio (opcional)</label>
+                        <input type="number" id="editar-gasto-cotizacion" min="0.01" step="0.01" placeholder="Dejalo vacío para usar el automático" value="${gasto.cotizacionManual || ''}">
+                        <p class="texto-muted" style="font-size:.78rem; margin:4px 0 0;" id="texto-editar-gasto-cotizacion-auto"></p>
+                    </div>
+                    <div class="campo-ancho">
+                        <label for="editar-gasto-descripcion">Descripción</label>
+                        <input type="text" id="editar-gasto-descripcion" value="${esc(gasto.description)}" maxlength="200" required>
+                    </div>
+                    <div>
+                        <label for="editar-gasto-categoria">Categoría</label>
+                        <select id="editar-gasto-categoria">${opcionesDeCategorias()}</select>
+                    </div>
+                    <div>
+                        <label for="editar-gasto-metodo">Método de pago</label>
+                        <select id="editar-gasto-metodo">
+                            <option value="efectivo">💵 Efectivo</option>
+                            <option value="debito">💳 Débito</option>
+                            <option value="credito">💳 Crédito</option>
+                            <option value="transferencia">🏦 Transferencia</option>
+                        </select>
+                    </div>
+                    ${gasto.metodoPago === 'credito' ? `
+                        <div class="campo-ancho drawer-item" style="padding:0;">
+                            <span>${gasto.pagado ? '✅ Ya la marcaste como pagada' : '¿Ya pagaste esta compra en el resumen?'}</span>
+                            <button type="button" class="secundario" id="boton-marcar-pagado" style="width:auto;">${gasto.pagado ? '↩️ Deshacer' : '✅ Marcar como pagada'}</button>
+                        </div>
+                        <p class="campo-ancho texto-muted" style="font-size:.78rem; margin:-4px 0 0;">${gasto.pagado ? 'Se registró un pago de tarjeta por este monto — deshacer lo borra.' : 'Registra un pago de tarjeta por el mismo monto, para descontarlo de tu saldo pendiente.'}</p>
+                    ` : ''}
+                    <button type="submit" class="campo-ancho">Guardar cambios</button>
+                </form>
+            `);
+            document.getElementById('editar-gasto-categoria').value = gasto.categoria || 'otros';
+            document.getElementById('editar-gasto-metodo').value = gasto.metodoPago || 'efectivo';
+            document.getElementById('editar-gasto-moneda').value = gasto.moneda || 'ARS';
+
+            document.getElementById('boton-marcar-pagado')?.addEventListener('click', async () => {
+                try {
+                    if (gasto.pagado) {
+                        await desmarcarComoPagado(gasto);
+                        avisar('Deshecho — vuelve a contar como pendiente.', 'exito');
+                    } else {
+                        await marcarComoPagado(gasto);
+                        avisar('Marcada como pagada — se descontó de tu saldo de tarjeta.', 'exito');
+                    }
+                    cerrarModal();
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+
+            function actualizarCampoCotizacionEditar() {
+                const moneda = document.getElementById('editar-gasto-moneda').value;
+                const campo = document.getElementById('campo-editar-gasto-cotizacion');
+                if (moneda === 'ARS') { campo.style.display = 'none'; return; }
+                campo.style.display = 'block';
+                const auto = cotizacionActual(moneda, cotizaciones);
+                document.getElementById('texto-editar-gasto-cotizacion-auto').textContent = auto
+                    ? `Automático ahora: 1 ${moneda} ≈ $${auto.toFixed(2)}` : 'Todavía no se cargó el valor automático.';
+            }
+            actualizarCampoCotizacionEditar();
+            document.getElementById('editar-gasto-moneda').addEventListener('change', actualizarCampoCotizacionEditar);
+
+            document.getElementById('form-editar-gasto').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const datos = {
+                    date: document.getElementById('editar-gasto-fecha').value,
+                    amount: parseFloat(document.getElementById('editar-gasto-monto').value),
+                    description: document.getElementById('editar-gasto-descripcion').value,
+                    categoria: document.getElementById('editar-gasto-categoria').value,
+                    metodoPago: document.getElementById('editar-gasto-metodo').value,
+                    moneda: document.getElementById('editar-gasto-moneda').value,
+                    cotizacionManual: parseFloat(document.getElementById('editar-gasto-cotizacion').value) || null,
+                };
+                if (!datos.date || !datos.amount || datos.amount <= 0 || !datos.description) {
+                    avisar('Completá todos los campos con valores válidos.', 'error');
+                    return;
+                }
+                try {
+                    await actualizarPago(uid, gasto.id, datos);
+                    avisar('Gasto actualizado', 'exito');
+                    cerrarModal();
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+        }
+
+        // "Marcar como pagada" en una compra con tarjeta: registra un
+        // pago de tarjeta por el mismo monto (así se descuenta del
+        // saldo pendiente, ver saldoDeTarjetaEnMoneda) y deja guardada
+        // la referencia en el propio gasto — así "Deshacer" puede
+        // borrar exactamente ese pago en vez de tener que adivinar
+        // cuál fue.
+        async function marcarComoPagado(gasto) {
+            const ref = await agregarPagoTarjeta(uid, {
+                date: new Date().toISOString().slice(0, 10),
+                amount: gasto.amount,
+                moneda: gasto.moneda || 'ARS',
+                description: `Pago automático: ${gasto.description}`,
+            });
+            await actualizarPago(uid, gasto.id, { pagado: true, pagoTarjetaId: ref.id });
+        }
+
+        async function desmarcarComoPagado(gasto) {
+            if (gasto.pagoTarjetaId) {
+                try { await eliminarPagoTarjeta(uid, gasto.pagoTarjetaId); } catch { /* ya no existía, no pasa nada */ }
+            }
+            await actualizarPago(uid, gasto.id, { pagado: false, pagoTarjetaId: null });
+        }
+
+        // --- Edición (modal) de un ingreso ---
+        function abrirModalEditarIngreso(ingreso) {
+            abrirModal(`
+                <h3 style="margin-top:0;">Editar ingreso</h3>
+                <form id="form-editar-ingreso" class="form">
+                    <div>
+                        <label for="editar-ingreso-fecha">Fecha</label>
+                        <input type="date" id="editar-ingreso-fecha" value="${ingreso.date}" required>
+                    </div>
+                    <div>
+                        <label for="editar-ingreso-monto">Monto</label>
+                        <input type="number" id="editar-ingreso-monto" min="0.01" step="0.01" value="${ingreso.amount}" required>
+                    </div>
+                    <div class="campo-ancho">
+                        <label for="editar-ingreso-descripcion">Descripción</label>
+                        <input type="text" id="editar-ingreso-descripcion" value="${esc(ingreso.description)}" maxlength="200">
+                    </div>
+                    <button type="submit" class="campo-ancho">Guardar cambios</button>
+                </form>
+            `);
+
+            document.getElementById('form-editar-ingreso').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const datos = {
+                    date: document.getElementById('editar-ingreso-fecha').value,
+                    amount: parseFloat(document.getElementById('editar-ingreso-monto').value),
+                    description: document.getElementById('editar-ingreso-descripcion').value || 'Ingreso',
+                };
+                if (!datos.date || !datos.amount || datos.amount <= 0) {
+                    avisar('Completá fecha y monto con valores válidos.', 'error');
+                    return;
+                }
+                try {
+                    await actualizarIngreso(uid, ingreso.id, datos);
+                    avisar('Ingreso actualizado', 'exito');
+                    cerrarModal();
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+        }
+
+        // --- Edición (modal) de un pago de tarjeta ---
+        function abrirModalEditarPagoTarjeta(pago) {
+            abrirModal(`
+                <h3 style="margin-top:0;">Editar pago de tarjeta</h3>
+                <form id="form-editar-pago-tarjeta" class="form">
+                    <div>
+                        <label for="editar-pago-tarjeta-fecha">Fecha</label>
+                        <input type="date" id="editar-pago-tarjeta-fecha" value="${pago.date}" required>
+                    </div>
+                    <div>
+                        <label for="editar-pago-tarjeta-monto">Monto</label>
+                        <input type="number" id="editar-pago-tarjeta-monto" min="0.01" step="0.01" value="${pago.amount}" required>
+                    </div>
+                    <div>
+                        <label for="editar-pago-tarjeta-moneda">Moneda</label>
+                        <select id="editar-pago-tarjeta-moneda">${opcionesDeMonedas()}</select>
+                    </div>
+                    <div class="campo-ancho">
+                        <label for="editar-pago-tarjeta-descripcion">Descripción (opcional)</label>
+                        <input type="text" id="editar-pago-tarjeta-descripcion" value="${esc(pago.description)}" maxlength="200">
+                    </div>
+                    <button type="submit" class="campo-ancho">Guardar cambios</button>
+                </form>
+            `);
+            document.getElementById('editar-pago-tarjeta-moneda').value = pago.moneda || 'ARS';
+
+            document.getElementById('form-editar-pago-tarjeta').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const datos = {
+                    date: document.getElementById('editar-pago-tarjeta-fecha').value,
+                    amount: parseFloat(document.getElementById('editar-pago-tarjeta-monto').value),
+                    moneda: document.getElementById('editar-pago-tarjeta-moneda').value,
+                    description: document.getElementById('editar-pago-tarjeta-descripcion').value,
+                };
+                if (!datos.date || !datos.amount || datos.amount <= 0) {
+                    avisar('Completá fecha y monto con valores válidos.', 'error');
+                    return;
+                }
+                try {
+                    await actualizarPagoTarjeta(uid, pago.id, datos);
+                    avisar('Pago actualizado', 'exito');
+                    cerrarModal();
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+        }
+
+        // --- Edición (modal) del día de cierre de la tarjeta — lo mismo
+        // que hay en Cuenta, pero a mano acá para no tener que navegar. ---
+        function abrirModalEditarTarjeta() {
+            abrirModal(`
+                <h3 style="margin-top:0;">💳 Día de cierre de la tarjeta</h3>
+                <form id="form-editar-tarjeta" class="form">
+                    <div class="campo-ancho">
+                        <label for="editar-dia-cierre">Día del mes en que cierra</label>
+                        <input type="number" id="editar-dia-cierre" min="1" max="31" value="${diaCierreTarjeta || ''}" required>
+                    </div>
+                    <button type="submit" class="campo-ancho">Guardar</button>
+                </form>
+            `);
+
+            document.getElementById('form-editar-tarjeta').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const dia = parseInt(document.getElementById('editar-dia-cierre').value, 10);
+                if (!dia || dia < 1 || dia > 31) {
+                    avisar('Ingresá un día válido (1 a 31).', 'error');
+                    return;
+                }
+                try {
+                    await guardarDiaCierreTarjeta(uid, dia);
+                    diaCierreTarjeta = dia;
+                    avisar('Día de cierre actualizado', 'exito');
+                    cerrarModal();
+                    renderTarjeta();
+                    // Si el panel "Agregar gasto" está abierto con Crédito
+                    // elegido, todavía podría estar mostrando el campo que
+                    // pregunta el día de cierre (porque antes no había uno
+                    // guardado) — sin este refresco, quedaba ahí pidiéndolo
+                    // de nuevo aunque ya se acababa de guardar acá.
+                    metodoSelect.dispatchEvent(new Event('change'));
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+        }
+
+        document.getElementById('boton-editar-tarjeta').addEventListener('click', abrirModalEditarTarjeta);
+
+        // --- Período activo: controla qué se muestra en el historial y en
+        // todas las tarjetas de abajo (menos "Próximo resumen"/"Saldo de
+        // tarjeta", que son del ciclo real de la tarjeta, no de un período
+        // histórico elegido). 3 modos: un mes puntual, un año entero, o un
+        // rango con fecha desde/hasta a elección.
+        const selectorPeriodo = document.getElementById('selector-periodo');
+        const periodoMesInput = document.getElementById('periodo-mes');
+        const periodoAnioInput = document.getElementById('periodo-anio');
+        const periodoDesdeInput = document.getElementById('periodo-desde');
+        const periodoHastaInput = document.getElementById('periodo-hasta');
+
+        periodoMesInput.value = new Date().toISOString().slice(0, 7);
+        periodoAnioInput.value = new Date().getFullYear();
+
+        function modoPeriodoActivo() {
+            return selectorPeriodo.querySelector('.tab.activa')?.dataset.modo || 'mensual';
+        }
+
+        // Devuelve [desde, hasta] (YYYY-MM-DD, ambos inclusive) según el
+        // modo activo. Si falta algún dato (ej. rango sin completar), ese
+        // extremo queda en null y no filtra de ese lado.
+        function rangoPeriodoActivo() {
+            const modo = modoPeriodoActivo();
+            if (modo === 'mensual') {
+                const valor = periodoMesInput.value;
+                if (!valor) return { desde: null, hasta: null };
+                const [anio, mes] = valor.split('-').map(Number);
+                const ultimoDia = new Date(anio, mes, 0).getDate();
+                return { desde: `${valor}-01`, hasta: `${valor}-${String(ultimoDia).padStart(2, '0')}` };
+            }
+            if (modo === 'anual') {
+                const anio = parseInt(periodoAnioInput.value, 10);
+                if (!anio) return { desde: null, hasta: null };
+                return { desde: `${anio}-01-01`, hasta: `${anio}-12-31` };
+            }
+            return { desde: periodoDesdeInput.value || null, hasta: periodoHastaInput.value || null };
+        }
+
+        function estaEnPeriodo(fechaTexto) {
+            const { desde, hasta } = rangoPeriodoActivo();
+            if (desde && fechaTexto < desde) return false;
+            if (hasta && fechaTexto > hasta) return false;
+            return true;
+        }
+
+        function etiquetaDelPeriodo() {
+            const modo = modoPeriodoActivo();
+            if (modo === 'mensual') return periodoMesInput.value ? formatearMes(periodoMesInput.value) : 'el mes elegido';
+            if (modo === 'anual') return periodoAnioInput.value ? `Año ${periodoAnioInput.value}` : 'el año elegido';
+            const { desde, hasta } = rangoPeriodoActivo();
+            if (!desde && !hasta) return 'el rango elegido';
+            return `${desde || '…'} al ${hasta || '…'}`;
+        }
+
+        // Días transcurridos del período, para el promedio diario — sin
+        // contar de más si el período llega hasta el futuro (ej. el mes
+        // actual todavía no terminó).
+        function diasTranscurridosDelPeriodo() {
+            const { desde, hasta } = rangoPeriodoActivo();
+            if (!desde) return 1;
+            const inicio = new Date(`${desde}T00:00:00`);
+            const finElegido = hasta ? new Date(`${hasta}T00:00:00`) : new Date();
+            const hoy = new Date();
+            const fin = finElegido > hoy ? hoy : finElegido;
+            return Math.max(Math.round((fin - inicio) / 86400000) + 1, 1);
+        }
+
+        selectorPeriodo.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                selectorPeriodo.querySelectorAll('.tab').forEach(t => t.classList.remove('activa'));
+                tab.classList.add('activa');
+                const modo = tab.dataset.modo;
+                document.getElementById('periodo-mensual-campo').style.display = modo === 'mensual' ? 'block' : 'none';
+                document.getElementById('periodo-anual-campo').style.display = modo === 'anual' ? 'block' : 'none';
+                document.getElementById('periodo-rango-campo').style.display = modo === 'rango' ? 'grid' : 'none';
+                actualizarTodo();
+            });
+        });
+        [periodoMesInput, periodoAnioInput, periodoDesdeInput, periodoHastaInput].forEach(input => {
+            input.addEventListener('change', actualizarTodo);
+        });
+
+        // Flechas para moverse de a un mes sin tener que abrir el selector
+        // nativo — cambian el <input type="month"> y disparan 'change' a
+        // mano (asignar .value por JS no lo dispara solo).
+        function moverMes(delta) {
+            const valorActual = periodoMesInput.value || new Date().toISOString().slice(0, 7);
+            const [anio, mes] = valorActual.split('-').map(Number);
+            const fecha = new Date(anio, mes - 1 + delta, 1);
+            periodoMesInput.value = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+            periodoMesInput.dispatchEvent(new Event('change'));
+        }
+        document.getElementById('periodo-mes-anterior').addEventListener('click', () => moverMes(-1));
+        document.getElementById('periodo-mes-siguiente').addEventListener('click', () => moverMes(1));
+
+        // Junta gastos personales + lo que pagué o cobré en mis grupos en
+        // una sola lista (ver movimientos.js — se comparte con Más datos e
+        // Inicio). Solo se incluye lo que a MÍ me pasó dentro del grupo (lo
+        // que pagué, o pagos que recibí) — no todos los gastos de todo el
+        // grupo, que ya se ven completos desde la sección Grupos.
+        function movimientosDeEstaPagina() {
+            return construirMovimientosUnificados({
+                uid, gastosPersonales: gastosActuales, misGrupos, gastosGrupales,
+                pagosGrupales, datosGrupos, incluirPagosDeuda: true, cotizaciones,
+            });
+        }
+
+        function aplicarFiltroHistorial(movimientos) {
+            const origen = document.getElementById('filtro-origen').value;
+            const grupoFiltro = document.getElementById('filtro-grupo').value;
+            const texto = document.getElementById('filtro-texto').value.trim().toLowerCase();
+            const moneda = document.getElementById('filtro-moneda').value;
+            const categoria = document.getElementById('filtro-categoria').value;
+
+            return movimientos.filter(m => {
+                if (texto && !(m.description || '').toLowerCase().includes(texto)) return false;
+                if (moneda !== 'todas' && (m.moneda || 'ARS') !== moneda) return false;
+                if (categoria !== 'todas' && (m.categoria || '') !== categoria) return false;
+                // El filtro avanzado (varias condiciones con Y/O) se
+                // aplica encima de todo lo de arriba, no en su
+                // reemplazo — así "Solo personales" + "Categoría:
+                // Alquiler" + una condición avanzada de monto se
+                // combinan todos entre sí.
+                if (!cumpleFiltroAvanzado(m, condicionesAvanzadas, modoAvanzado, CAMPOS_FILTRO_HISTORIAL)) return false;
+                if (origen === 'personal') return m.tipo === 'personal';
+                if (origen === 'grupos') {
+                    if (m.tipo === 'personal') return false;
+                    return !grupoFiltro || m.grupoId === grupoFiltro;
+                }
+                return true; // 'todos'
+            });
+        }
+
+        document.getElementById('filtro-origen').addEventListener('change', () => {
+            document.getElementById('contenedor-filtro-grupo').style.display =
+                document.getElementById('filtro-origen').value === 'personal' ? 'none' : 'flex';
+            renderTablaHistorial();
+        });
+        document.getElementById('filtro-grupo').addEventListener('change', renderTablaHistorial);
+        document.getElementById('filtro-moneda').addEventListener('change', renderTablaHistorial);
+        document.getElementById('filtro-categoria').addEventListener('change', renderTablaHistorial);
+        document.getElementById('filtro-texto').addEventListener('input', renderTablaHistorial);
+
+        // `editarFn`, si se pasa, recibe el item completo y abre su modal
+        // de edición (queda opcional por si en el futuro se reusa esta
+        // función para algo que no deba ser editable).
+        function renderHistorialSimple(contenedor, items, eliminarFn, vacioTexto, editarFn = null) {
+            if (items.length === 0) {
+                contenedor.innerHTML = `<div class="estado-vacio"><span class="icono-grande">🧾</span>${vacioTexto}</div>`;
+                return;
+            }
+            // `moneda` solo existe en pagos de tarjeta (Ingresos siempre
+            // es en pesos) — simboloDeMoneda ya devuelve "$" por defecto,
+            // así que esta función sirve para las dos tablas sin pisar
+            // nada.
+            const filas = items.map(item => `
+                <tr>
+                    <td>${item.date}</td>
+                    <td>${esc(item.description) || '—'}</td>
+                    <td class="monto">${simboloDeMoneda(item.moneda || 'ARS')}${parseFloat(item.amount).toFixed(2)}</td>
+                    <td>
+                        ${editarFn ? `<button class="icono" data-editar-id="${item.id}" title="Editar">✏️</button>` : ''}
+                        <button class="icono" data-id="${item.id}" title="Eliminar">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+            contenedor.innerHTML = `
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th></th></tr></thead>
+                        <tbody>${filas}</tbody>
+                    </table>
+                </div>
+            `;
+            contenedor.querySelectorAll('button[data-id]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    if (!confirmar('¿Eliminar este registro?')) return;
+                    eliminarFn(uid, boton.dataset.id);
+                });
+            });
+            if (editarFn) {
+                contenedor.querySelectorAll('button[data-editar-id]').forEach(boton => {
+                    boton.addEventListener('click', () => {
+                        const item = items.find(i => i.id === boton.dataset.editarId);
+                        if (item) editarFn(item);
+                    });
+                });
+            }
+        }
+
+        // El saldo de tarjeta (lo que debés en total, no solo lo de este
+        // ciclo) se muestra por separado en pesos y en dólares — nunca
+        // convertido de una moneda a la otra, porque el resumen real de
+        // una tarjeta argentina también los factura aparte. Cada saldo es
+        // "todo lo cargado como crédito en esa moneda, menos lo ya pagado
+        // en esa misma moneda" (por eso "Pagar tarjeta" también tiene
+        // selector de moneda: un pago en pesos no baja la deuda en
+        // dólares, y viceversa).
+        function saldoDeTarjetaEnMoneda(moneda) {
+            const credito = gastosActuales
+                .filter(p => p.metodoPago === 'credito' && (p.moneda || 'ARS') === moneda)
+                .reduce((suma, p) => suma + parseFloat(p.amount), 0);
+            const pagado = pagosTarjetaActuales
+                .filter(p => (p.moneda || 'ARS') === moneda)
+                .reduce((suma, p) => suma + parseFloat(p.amount), 0);
+            return credito - pagado;
+        }
+
+        function renderTarjeta() {
+            const tileResumen = document.getElementById('stat-tarjeta-tile');
+
+            if (!diaCierreTarjeta) {
+                tileResumen.style.display = 'none';
+                actualizarVisibilidadStatsRow();
+                return;
+            }
+
+            const { cierre } = calcularCicloDeTarjeta(diaCierreTarjeta);
+
+            document.getElementById('stat-saldo-ars').textContent = `$${saldoDeTarjetaEnMoneda('ARS').toFixed(2)}`;
+            document.getElementById('stat-saldo-usd').textContent = `US$${saldoDeTarjetaEnMoneda('USD').toFixed(2)}`;
+            document.getElementById('stat-tarjeta-cierre').textContent = `Cierra el ${formatearFechaCorta(cierre)}`;
+            tileResumen.style.display = 'block';
+            actualizarVisibilidadStatsRow();
+
+            if (preferenciasNotif.cierreTarjeta) {
+                avisarSiCierreProximo(cierre, preferenciasNotif.cierreTarjetaDiasAntes);
+            }
+        }
+
+        // --- Evolución del saldo de tarjeta ---
+        //
+        // Mismo cálculo que saldoDeTarjetaEnMoneda() de arriba (crédito
+        // cargado menos lo ya pagado), pero acumulado hasta el fin de
+        // cada uno de los últimos 6 meses en vez de solo "ahora" — para
+        // ver si la deuda viene creciendo o achicándose. En pesos nomás
+        // (el saldo en dólares queda solo en el número de arriba, no
+        // vale la pena otro gráfico para eso).
+        function renderEvolucionSaldoTarjeta() {
+            const card = document.getElementById('evolucion-saldo-tarjeta-card');
+            if (!diaCierreTarjeta) {
+                card.style.display = 'none';
+                return;
+            }
+            const hayCredito = gastosActuales.some(p => p.metodoPago === 'credito' && (p.moneda || 'ARS') === 'ARS');
+            if (!hayCredito) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+
+            const hoy = new Date();
+            const datos = [];
+            for (let i = 5; i >= 0; i--) {
+                const finDeMes = new Date(hoy.getFullYear(), hoy.getMonth() - i + 1, 0).toISOString().slice(0, 10);
+                const etiquetaMes = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1)
+                    .toLocaleDateString('es-AR', { month: 'short' }).replace('.', '');
+
+                const credito = gastosActuales
+                    .filter(p => p.metodoPago === 'credito' && (p.moneda || 'ARS') === 'ARS' && p.date <= finDeMes)
+                    .reduce((s, p) => s + parseFloat(p.amount), 0);
+                const pagado = pagosTarjetaActuales
+                    .filter(p => (p.moneda || 'ARS') === 'ARS' && p.date <= finDeMes)
+                    .reduce((s, p) => s + parseFloat(p.amount), 0);
+
+                datos.push({ etiqueta: etiquetaMes.charAt(0).toUpperCase() + etiquetaMes.slice(1), valor: credito - pagado });
+            }
+
+            graficoBarrasVertical('grafico-evolucion-tarjeta', datos, (v) => `$${v.toFixed(2)}`);
+        }
+
+        // ¿Cuándo cae el próximo sueldo, contando desde `desde`? Si el día
+        // configurado ya pasó este mes, es el mes que viene — mismo
+        // criterio de "día X del mes, corrido al último día real si el mes
+        // no llega" que ya se usa en otros lados (cierre de tarjeta,
+        // alquiler).
+        function proximaFechaDeSueldo(dia, desde = new Date()) {
+            const diasEsteMes = new Date(desde.getFullYear(), desde.getMonth() + 1, 0).getDate();
+            let candidato = new Date(desde.getFullYear(), desde.getMonth(), Math.min(dia, diasEsteMes));
+            if (candidato <= desde) {
+                const diasProximoMes = new Date(desde.getFullYear(), desde.getMonth() + 2, 0).getDate();
+                candidato = new Date(desde.getFullYear(), desde.getMonth() + 1, Math.min(dia, diasProximoMes));
+            }
+            return candidato;
+        }
+
+        // "¿Cuánto puedo gastar por día hasta que cobre?" — la cuenta que
+        // se termina haciendo a mano con la calculadora del teléfono. Solo
+        // tiene sentido si hay presupuesto Y día de sueldo configurados;
+        // sin el día de sueldo no hay "hasta cuándo" para repartir lo que
+        // queda.
+        function renderGastoDiarioDisponible(gastadoEsteMes) {
+            const textoDiario = document.getElementById('texto-diario');
+            if (!diaSueldo) {
+                textoDiario.textContent = '';
+                return;
+            }
+            const hoy = new Date();
+            const proximoSueldo = proximaFechaDeSueldo(diaSueldo, hoy);
+            const diasRestantes = Math.max(1, Math.ceil((proximoSueldo - hoy) / 86400000));
+            const disponible = presupuestoMensual - gastadoEsteMes;
+
+            if (disponible <= 0) {
+                textoDiario.innerHTML = `<span class="monto negativo">Ya te pasaste del presupuesto por $${Math.abs(disponible).toFixed(2)}</span>`;
+                return;
+            }
+            const porDia = disponible / diasRestantes;
+            textoDiario.textContent = `📅 Podés gastar $${porDia.toFixed(2)} por día hasta cobrar (${diasRestantes} día${diasRestantes === 1 ? '' : 's'})`;
+        }
+
+        // El presupuesto es un concepto mensual (se define como "por mes"),
+        // así que solo tiene sentido mostrarlo cuando el período elegido es
+        // un mes puntual — en modo Anual o Rango se oculta, en vez de
+        // comparar peras con manzanas contra un total de varios meses.
+        // La tarjeta entera se oculta solo si NO hay presupuesto general NI
+        // por categoría — puede haber alguien que solo use uno de los dos.
+        function renderPresupuesto() {
+            const card = document.getElementById('presupuesto-card');
+            const hayPresupuestoCategoria = Object.values(presupuestosPorCategoria).some(v => v > 0);
+            if ((!presupuestoMensual && !hayPresupuestoCategoria) || modoPeriodoActivo() !== 'mensual') {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+
+            const contenedorGeneral = document.getElementById('barra-presupuesto').closest('.barra-progreso-fondo');
+            const textoGeneral = document.getElementById('texto-presupuesto');
+
+            if (!presupuestoMensual) {
+                contenedorGeneral.style.display = 'none';
+                textoGeneral.style.display = 'none';
+                // Sin presupuesto general no hay "disponible" que
+                // repartir por día — si no se limpia acá, quedaba
+                // pegado el texto de la última vez que sí hubo uno
+                // (ej. si lo borraron y se quedaron solo con topes por
+                // categoría).
+                document.getElementById('texto-diario').textContent = '';
+                document.getElementById('presupuesto-titulo').textContent = `🎯 Presupuesto por categoría — ${etiquetaDelPeriodo()}`;
+                renderPresupuestosPorCategoria();
+                return;
+            }
+            contenedorGeneral.style.display = 'block';
+            textoGeneral.style.display = 'block';
+
+            const gastadoEsteMes = gastosActuales
+                .filter(p => estaEnPeriodo(p.date))
+                .reduce((suma, p) => suma + montoEnARS(p), 0);
+
+            const porcentaje = Math.min((gastadoEsteMes / presupuestoMensual) * 100, 100);
+            const clase = gastadoEsteMes > presupuestoMensual ? 'excedido' : (porcentaje >= 80 ? 'alerta' : 'ok');
+
+            document.getElementById('presupuesto-titulo').textContent = `🎯 Presupuesto — ${etiquetaDelPeriodo()}`;
+            document.getElementById('barra-presupuesto').style.width = `${porcentaje}%`;
+            document.getElementById('barra-presupuesto').className = `barra-progreso ${clase}`;
+            document.getElementById('texto-presupuesto').textContent =
+                `Gastaste $${gastadoEsteMes.toFixed(2)} de $${presupuestoMensual.toFixed(2)} (${Math.round((gastadoEsteMes / presupuestoMensual) * 100)}%)`;
+            renderPresupuestosPorCategoria();
+
+            // El aviso usa el mes calendario REAL (no el período que se
+            // esté navegando arriba, que en este punto ya sabemos que es
+            // "mensual" pero podría ser un mes pasado o futuro elegido a
+            // mano) — sin este chequeo aparte, mirar un mes viejo con
+            // presupuesto superado dispararía el aviso igual.
+            const mesActualTexto = new Date().toISOString().slice(0, 7);
+            const textoDiario = document.getElementById('texto-diario');
+            if (periodoMesInput.value === mesActualTexto) {
+                if (preferenciasNotif.presupuesto) avisarSiPresupuestoAlLimite(gastadoEsteMes, presupuestoMensual);
+                renderGastoDiarioDisponible(gastadoEsteMes);
+            } else {
+                textoDiario.textContent = '';
+            }
+        }
+
+        // Una barrita por cada categoría que tenga un tope configurado (ver
+        // cuenta.html) — mismo criterio de colores que la barra general.
+        // Se llama siempre desde renderPresupuesto(), nunca sola, así los
+        // dos quedan sincronizados con el mismo período.
+        function renderPresupuestosPorCategoria() {
+            const contenedor = document.getElementById('presupuestos-categoria-contenido');
+            const categoriasConTope = Object.entries(presupuestosPorCategoria).filter(([, tope]) => tope > 0);
+            if (categoriasConTope.length === 0) {
+                contenedor.innerHTML = '';
+                return;
+            }
+
+            const gastosDelMes = gastosActuales.filter(p => estaEnPeriodo(p.date));
+
+            contenedor.innerHTML = categoriasConTope.map(([categoria, tope]) => {
+                const gastado = gastosDelMes
+                    .filter(p => (p.categoria || 'otros') === categoria)
+                    .reduce((suma, p) => suma + montoEnARS(p), 0);
+                const porcentaje = Math.min((gastado / tope) * 100, 100);
+                const clase = gastado > tope ? 'excedido' : (porcentaje >= 80 ? 'alerta' : 'ok');
+                return `
+                    <div style="margin-top:var(--space-3);">
+                        <p style="margin:0 0 4px; font-size:.85rem;">${etiquetaDeCategoria(categoria)} — $${gastado.toFixed(2)} de $${tope.toFixed(2)}</p>
+                        <div class="barra-progreso-fondo"><div class="barra-progreso ${clase}" style="width:${porcentaje}%;"></div></div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderBalance() {
+            const card = document.getElementById('balance-card');
+            if (ingresosActuales.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+
+            // "Gastos" acá incluye lo personal Y lo que pagué en mis grupos
+            // (construirMovimientosUnificados) — un gasto de grupo que
+            // pagué yo es plata real que salió de mi bolsillo, así que
+            // tiene que contar en el balance igual que en el historial
+            // (antes solo se sumaba lo personal y quedaba inconsistente).
+            const gastosDelPeriodo = movimientosDeEstaPagina()
+                .filter(m => (m.tipo === 'personal' || m.tipo === 'grupo-gasto') && estaEnPeriodo(m.date))
+                .reduce((s, m) => s + m.amountARS, 0);
+
+            const ingresosDelPeriodo = ingresosActuales.filter(i => estaEnPeriodo(i.date)).reduce((s, i) => s + montoEnARS(i), 0);
+            const neto = ingresosDelPeriodo - gastosDelPeriodo;
+
+            document.getElementById('balance-titulo').textContent = `💰 Balance — ${etiquetaDelPeriodo()}`;
+            document.getElementById('balance-ingresos').textContent = `$${ingresosDelPeriodo.toFixed(2)}`;
+            document.getElementById('balance-gastos').textContent = `$${gastosDelPeriodo.toFixed(2)}`;
+            const balanceNeto = document.getElementById('balance-neto');
+            balanceNeto.textContent = `$${neto.toFixed(2)}`;
+            balanceNeto.className = 'monto ' + (neto >= 0 ? 'positivo' : 'negativo');
+            card.style.display = 'block';
+        }
+
+        // "stats-row" contiene 2 tiles independientes (período y tarjeta)
+        // que se muestran u ocultan cada una por su cuenta — la fila
+        // entera solo se oculta si las dos están vacías a la vez.
+        function actualizarVisibilidadStatsRow() {
+            const hayPeriodo = document.getElementById('stat-periodo-tile').style.display !== 'none';
+            const hayTarjeta = document.getElementById('stat-tarjeta-tile').style.display !== 'none';
+            statsRow.style.display = (hayPeriodo || hayTarjeta) ? 'flex' : 'none';
+        }
+
+        // Total del período / Promedio diario — solo de tu plata personal
+        // (a propósito no suma lo de los grupos, que es plata compartida
+        // con otras reglas de balances/deudas; eso se ve identificado en
+        // la tabla de abajo). Dos slides por cada moneda que tenga algo
+        // cargado en el período (total y promedio, cada una su propia
+        // card del carrusel) — nunca se convierte una moneda a otra para
+        // sumarlas en un solo número, porque eso es justo lo que hacía
+        // confuso saber cuánto pagar de cada una.
+        function renderStatsPersonales() {
+            const tile = document.getElementById('stat-periodo-tile');
+            const gastosDelPeriodo = gastosActuales.filter(p => estaEnPeriodo(p.date));
+
+            if (gastosDelPeriodo.length === 0) {
+                tile.style.display = 'none';
+                actualizarVisibilidadStatsRow();
+                return;
+            }
+
+            const dias = diasTranscurridosDelPeriodo();
+            const porMoneda = {};
+            gastosDelPeriodo.forEach(p => {
+                const moneda = p.moneda || 'ARS';
+                porMoneda[moneda] = (porMoneda[moneda] || 0) + parseFloat(p.amount);
+            });
+
+            // Pesos primero si están (es lo más común), el resto en el
+            // orden en que aparecieron.
+            const monedas = Object.keys(porMoneda).sort((a, b) => (a === 'ARS' ? -1 : b === 'ARS' ? 1 : 0));
+
+            document.querySelector('#mini-carrusel-periodo .mini-carrusel-pista').innerHTML = monedas.flatMap(moneda => {
+                const total = porMoneda[moneda];
+                const promedio = total / dias;
+                return [
+                    `<div class="mini-carrusel-slide">
+                        <div class="stat-valor">${simboloDeMoneda(moneda)}${total.toFixed(2)}</div>
+                        <div class="stat-etiqueta">${esc(etiquetaDelPeriodo())}</div>
+                    </div>`,
+                    `<div class="mini-carrusel-slide">
+                        <div class="stat-valor">${simboloDeMoneda(moneda)}${promedio.toFixed(2)}</div>
+                        <div class="stat-etiqueta">Promedio diario</div>
+                    </div>`,
+                ];
+            }).join('');
+            // La cantidad de slides puede cambiar de una vez a otra
+            // (según cuántas monedas tengan gastos en el período
+            // elegido) — hay que rearmar los puntitos cada vez.
+            miniCarruselPeriodo?.actualizar();
+
+            tile.style.display = 'block';
+            actualizarVisibilidadStatsRow();
+        }
+
+        function etiquetaDeOrigen(movimiento) {
+            return movimiento.tipo === 'personal' ? '🧍 Vos' : `👥 ${esc(movimiento.grupoNombre)}`;
+        }
+
+
+        // El historial mezcla gastos personales con lo que pagué o cobré en
+        // mis grupos (ver construirMovimientosUnificados) — acá solo se
+        // agrupa por mes y se arma la tabla; el cálculo de qué entra en
+        // cada movimiento vive en esa otra función.
+        function renderTablaHistorial() {
+            document.getElementById('historial-titulo').textContent = `Historial — ${etiquetaDelPeriodo()}`;
+            const movimientos = aplicarFiltroHistorial(movimientosDeEstaPagina().filter(m => estaEnPeriodo(m.date)));
+
+            if (movimientos.length === 0) {
+                contenido.innerHTML = `
+                    <div class="estado-vacio">
+                        <span class="icono-grande">🧾</span>
+                        No hay movimientos que coincidan con el filtro.
+                    </div>
+                `;
+                return;
+            }
+
+            const porMes = {};
+            movimientos.forEach(m => {
+                const mes = m.date.slice(0, 7);
+                (porMes[mes] = porMes[mes] || []).push(m);
+            });
+
+            const meses = Object.keys(porMes).sort().reverse();
+
+            // Con el filtro de moneda en una puntual, TODO lo que llega
+            // acá ya es esa misma moneda (aplicarFiltroHistorial se
+            // encargó) — el total del mes se suma nativo, sin convertir.
+            // Con "Todas" (mezclado) se sigue sumando en pesos como
+            // siempre, porque ahí sí hace falta un común denominador.
+            const monedaFiltro = document.getElementById('filtro-moneda').value;
+
+            contenido.innerHTML = meses.map(mes => {
+                const movimientosDelMes = porMes[mes].sort((a, b) => b.date.localeCompare(a.date));
+                const total = monedaFiltro === 'todas'
+                    ? movimientosDelMes.reduce((suma, m) => suma + m.amountARS, 0)
+                    : movimientosDelMes.reduce((suma, m) => suma + m.amount, 0);
+                const simboloTotal = monedaFiltro === 'todas' ? '$' : simboloDeMoneda(monedaFiltro);
+
+                const filas = movimientosDelMes.map(m => {
+                    const claseMonto = m.tipo === 'grupo-pago-recibido' ? 'monto positivo' : 'monto';
+                    // El botón de "marcar pagada" solo tiene sentido en
+                    // compras con tarjeta — para el resto de los
+                    // métodos ya está "pagado" en el momento de
+                    // cargarlo, no hay nada pendiente que saldar.
+                    const botonPagado = (m.tipo === 'personal' && m.metodoPago === 'credito')
+                        ? `<button class="icono" data-pagado-id="${m.id}" title="${m.pagado ? 'Deshacer' : 'Marcar como pagada'}">${m.pagado ? '↩️' : '✅'}</button>`
+                        : '';
+                    const accion = m.tipo === 'personal'
+                        ? `${botonPagado}<button class="icono" data-editar-id="${m.id}" title="Editar">✏️</button>
+                           <button class="icono" data-id="${m.id}" title="Eliminar">🗑️</button>`
+                        : `<button type="button" class="icono" data-grupo-id="${m.grupoId}" data-grupo-nombre="${esc(m.grupoNombre)}" title="Ver en el grupo">→</button>`;
+
+                    // Cada fila muestra el monto en SU moneda original — si
+                    // no es peso, se le suma un renglón chico con el
+                    // equivalente en pesos (lo que realmente entra en el
+                    // total de arriba), para que no parezca que no cierra.
+                    // Con un filtro de moneda puntual ya no hace falta esa
+                    // referencia: todo lo que se ve es la misma moneda.
+                    const esOtraMoneda = monedaFiltro === 'todas' && (m.moneda || 'ARS') !== 'ARS';
+                    const equivalente = esOtraMoneda
+                        ? `<br><small class="texto-muted">≈ $${m.amountARS.toFixed(2)}</small>` : '';
+
+                    return `
+                        <tr>
+                            <td>${m.date}</td>
+                            <td>${esc(m.description)}</td>
+                            <td class="${claseMonto}">${simboloDeMoneda(m.moneda || 'ARS')}${m.amount.toFixed(2)}${equivalente}</td>
+                            <td>${etiquetaDeOrigen(m)}</td>
+                            <td>${m.categoria ? etiquetaDeCategoria(m.categoria) : '—'}</td>
+                            <td>${m.metodoPago ? etiquetaDeMetodo(m.metodoPago) : '—'}</td>
+                            <td>${accion}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                return `
+                    <h3>${formatearMes(mes)} · ${simboloTotal}${total.toFixed(2)}</h3>
+                    <div class="tabla-wrap">
+                        <table>
+                            <thead><tr><th>Fecha</th><th>Descripción</th><th>Monto</th><th>Origen</th><th>Categoría</th><th>Método</th><th></th></tr></thead>
+                            <tbody>${filas}</tbody>
+                        </table>
+                    </div>
+                `;
+            }).join('');
+
+            contenido.querySelectorAll('button[data-id]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    if (!confirmar('¿Eliminar este gasto?')) return;
+                    eliminarPago(uid, boton.dataset.id);
+                });
+            });
+
+            contenido.querySelectorAll('button[data-editar-id]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    const gasto = gastosActuales.find(g => g.id === boton.dataset.editarId);
+                    if (gasto) abrirModalEditarGasto(gasto);
+                });
+            });
+
+            contenido.querySelectorAll('button[data-pagado-id]').forEach(boton => {
+                boton.addEventListener('click', async () => {
+                    const gasto = gastosActuales.find(g => g.id === boton.dataset.pagadoId);
+                    if (!gasto) return;
+                    try {
+                        if (gasto.pagado) {
+                            await desmarcarComoPagado(gasto);
+                            avisar('Deshecho — vuelve a contar como pendiente.', 'exito');
+                        } else {
+                            await marcarComoPagado(gasto);
+                            avisar('Marcada como pagada — se descontó de tu saldo de tarjeta.', 'exito');
+                        }
+                    } catch (error) {
+                        avisar(error.message, 'error');
+                    }
+                });
+            });
+
+            contenido.querySelectorAll('button[data-grupo-id]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    guardarGrupoActivo(boton.dataset.grupoId, boton.dataset.grupoNombre);
+                    window.location.href = 'division-de-gastos.html';
+                });
+            });
+        }
+
+        // --- Exportar / enviar por mail ---
+        // Usa lo mismo que se ve en el Historial de arriba: el período
+        // elegido (Mensual/Anual/Rango) Y el filtro de "Mostrar" — lo que
+        // se descarga o se manda es exactamente lo que está en pantalla.
+
+        function movimientosParaExportar() {
+            return aplicarFiltroHistorial(movimientosDeEstaPagina().filter(m => estaEnPeriodo(m.date)));
+        }
+
+        function formatearFechaParaArchivo(fechaTexto) {
+            if (!fechaTexto) return '...';
+            const [anio, mes, dia] = fechaTexto.split('-');
+            return `${dia}-${mes}-${anio}`;
+        }
+
+        // Mismo texto que etiquetaDelPeriodo() pero sin "/" (rompen el
+        // nombre de archivo) y sin tildar "el mes/año/rango elegido" — acá
+        // conviene algo corto y sin caracteres raros.
+        function etiquetaDelPeriodoParaArchivo() {
+            const modo = modoPeriodoActivo();
+            if (modo === 'mensual') return periodoMesInput.value ? formatearMes(periodoMesInput.value) : 'sin fecha';
+            if (modo === 'anual') return periodoAnioInput.value || 'sin fecha';
+            const { desde, hasta } = rangoPeriodoActivo();
+            return `${formatearFechaParaArchivo(desde)} a ${formatearFechaParaArchivo(hasta)}`;
+        }
+
+        function nombreDeArchivoExportacion() {
+            const etiqueta = etiquetaDelPeriodoParaArchivo().replace(/[\\/:*?"<>|]/g, '-');
+            return `Gastos ${etiqueta}.csv`;
+        }
+
+        document.getElementById('boton-exportar-csv').addEventListener('click', () => {
+            const movimientos = movimientosParaExportar();
+            if (movimientos.length === 0) {
+                avisar('No hay movimientos para exportar con este período y filtro.', 'info');
+                return;
+            }
+            descargarCSV(nombreDeArchivoExportacion(), generarCSV(movimientos));
+        });
+
+        document.getElementById('boton-exportar-mail').addEventListener('click', () => {
+            const movimientos = movimientosParaExportar();
+            if (movimientos.length === 0) {
+                avisar('No hay movimientos para enviar con este período y filtro.', 'info');
+                return;
+            }
+            abrirMailConResumen(movimientos, etiquetaDelPeriodo());
+        });
+
+        // --- Cuotas pendientes ---
+        //
+        // Cada cuota se guarda como un gasto suelto ("Compra (cuota
+        // i/N)", ver el submit de más abajo) — no hay ninguna entidad
+        // que las agrupe. Se detectan por ese patrón en la descripción
+        // y se agrupan por descripción base + cantidad total, para
+        // mostrar cuánto falta pagar de cada compra sin sumarlas a
+        // mano. Limitación conocida (mismo criterio que "Compras que
+        // se repiten" en Más datos, que también agrupa solo por
+        // descripción): si cargás DOS compras distintas con la misma
+        // descripción Y la misma cantidad de cuotas, se muestran
+        // mezcladas en un solo grupo — el monto total pendiente sigue
+        // siendo correcto, pero el "quedan X de Y" puede verse raro.
+        const PATRON_CUOTA = /^(.*) \(cuota (\d+)\/(\d+)\)$/;
+
+        function agruparCuotasPendientes() {
+            const hoyTexto = new Date().toISOString().slice(0, 10);
+            const grupos = {};
+
+            gastosActuales.forEach(p => {
+                const coincidencia = PATRON_CUOTA.exec(p.description || '');
+                if (!coincidencia) return;
+                const [, base, numero, total] = coincidencia;
+                const clave = `${base}|${total}|${p.moneda || 'ARS'}`;
+                if (!grupos[clave]) {
+                    grupos[clave] = { base, total: parseInt(total, 10), moneda: p.moneda || 'ARS', cuotas: [] };
+                }
+                grupos[clave].cuotas.push({ numero: parseInt(numero, 10), date: p.date, amount: parseFloat(p.amount) });
+            });
+
+            return Object.values(grupos)
+                .map(grupo => {
+                    grupo.cuotas.sort((a, b) => a.numero - b.numero);
+                    const pendientes = grupo.cuotas.filter(c => c.date >= hoyTexto);
+                    const ultima = grupo.cuotas[grupo.cuotas.length - 1];
+                    return {
+                        ...grupo,
+                        cantidadPendiente: pendientes.length,
+                        montoPendiente: pendientes.reduce((s, c) => s + c.amount, 0),
+                        montoCuota: ultima.amount,
+                        fechaInicio: grupo.cuotas[0].date,
+                        fechaFin: ultima.date,
+                    };
+                })
+                .filter(grupo => grupo.cantidadPendiente > 0);
+        }
+
+        function renderCuotasPendientes() {
+            const card = document.getElementById('cuotas-pendientes-card');
+            const contenedor = document.getElementById('cuotas-pendientes-contenido');
+            const grupos = agruparCuotasPendientes();
+
+            if (grupos.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+
+            // El botón de comparar contra contado solo se ofrece para
+            // compras en pesos: usa el IPC (inflación en pesos) para
+            // "deflactar" cada cuota — aplicárselo a una compra en
+            // dólares no tendría ningún sentido (el dólar no se
+            // devalúa así).
+
+            contenedor.innerHTML = grupos.map((g, indice) => `
+                <div class="balance-item">
+                    <span>
+                        ${esc(g.base)}<br>
+                        <small class="texto-muted">Quedan ${g.cantidadPendiente} de ${g.total} cuotas — termina ${g.fechaFin}</small>
+                    </span>
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <span class="monto">${simboloDeMoneda(g.moneda)}${g.montoPendiente.toFixed(2)}</span>
+                        ${g.moneda === 'ARS' ? `<button type="button" class="secundario boton-comparar-contado" data-indice="${indice}" style="width:auto; font-size:.78rem;" title="¿Convenía pagar de contado?">💹</button>` : ''}
+                    </span>
+                </div>
+            `).join('');
+
+            contenedor.querySelectorAll('.boton-comparar-contado').forEach(boton => {
+                boton.addEventListener('click', () => abrirModalCompararContado(grupos[parseInt(boton.dataset.indice, 10)]));
+            });
+        }
+
+        // Compara lo que en definitiva pagás en cuotas (a valores
+        // nominales, fijos) contra lo que hubiera costado de contado —
+        // pero en plata de HOY: cada cuota futura se "deflacta" con el
+        // IPC acumulado entre el inicio de la compra y la fecha de esa
+        // cuota, así se puede comparar contra un monto de contado que
+        // también está en plata de hoy. Con inflación alta, financiar
+        // suele terminar siendo más barato en términos reales — la
+        // cuota de dentro de 6 meses "vale" menos en plata de hoy que
+        // su número nominal.
+        function abrirModalCompararContado(grupo) {
+            abrirModal(`
+                <h3 style="margin-top:0;">💹 ¿Convenía pagar de contado?</h3>
+                <p class="texto-muted" style="font-size:.85rem;">${esc(grupo.base)} — ${grupo.total} cuotas de ${simboloDeMoneda(grupo.moneda)}${grupo.montoCuota.toFixed(2)}</p>
+                <form id="form-comparar-contado" class="form">
+                    <div class="campo-ancho">
+                        <label for="monto-contado">¿Cuánto costaba pagando de contado?</label>
+                        <input type="number" id="monto-contado" min="0.01" step="0.01" placeholder="Ej: ${(grupo.montoCuota * grupo.total).toFixed(2)}" required>
+                    </div>
+                    <button type="submit" class="campo-ancho">Comparar</button>
+                </form>
+                <div id="resultado-comparar-contado" style="margin-top: var(--space-3);"></div>
+            `);
+
+            document.getElementById('form-comparar-contado').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const montoContado = parseFloat(document.getElementById('monto-contado').value);
+                if (!montoContado || montoContado <= 0) return;
+
+                const resultado = document.getElementById('resultado-comparar-contado');
+                resultado.innerHTML = '<p class="texto-muted" style="font-size:.85rem;">Calculando...</p>';
+                try {
+                    const serie = await obtenerSerieInflacion();
+                    const inicio = new Date(`${grupo.fechaInicio}T00:00:00`);
+                    // Cada cuota, traída a "plata de hoy (inicio de la
+                    // compra)": si entre el inicio y la fecha de esa cuota
+                    // se acumuló, por ejemplo, 20% de inflación, esa cuota
+                    // "vale" su monto nominal dividido 1.20 en plata de
+                    // ese momento inicial.
+                    const totalReal = grupo.cuotas.reduce((suma, c) => {
+                        const fechaCuota = new Date(`${c.date}T00:00:00`);
+                        const inflacionAcumulada = inflacionAcumuladaDeSerie(serie, inicio, fechaCuota);
+                        return suma + c.amount / (1 + inflacionAcumulada / 100);
+                    }, 0);
+
+                    const diferencia = montoContado - totalReal;
+                    const simbolo = simboloDeMoneda(grupo.moneda);
+                    const veredicto = Math.abs(diferencia) < 0.01
+                        ? 'Salió prácticamente igual de cualquiera de las dos formas.'
+                        : diferencia > 0
+                            ? `Financiar en cuotas te convino — en plata de hoy, pagaste el equivalente a ${simbolo}${totalReal.toFixed(2)} (${simbolo}${diferencia.toFixed(2)} menos que de contado).`
+                            : `Pagar de contado te hubiera convenido — en cuotas terminaste pagando el equivalente a ${simbolo}${totalReal.toFixed(2)} en plata de hoy (${simbolo}${Math.abs(diferencia).toFixed(2)} más que de contado).`;
+
+                    resultado.innerHTML = `
+                        <p style="margin:0 0 4px;">De contado: <strong>${simbolo}${montoContado.toFixed(2)}</strong></p>
+                        <p style="margin:0 0 8px;">En cuotas, en plata de hoy: <strong>${simbolo}${totalReal.toFixed(2)}</strong></p>
+                        <p class="texto-muted" style="font-size:.85rem;">${veredicto}</p>
+                    `;
+                } catch (error) {
+                    resultado.innerHTML = `<p class="texto-muted" style="font-size:.85rem;">No se pudo consultar el índice de inflación ahora — probá de nuevo más tarde. (${esc(error.message)})</p>`;
+                }
+            });
+        }
+
+        // --- Posibles gastos duplicados ---
+        //
+        // Mismo monto + misma descripción (sin mayúsculas/espacios de
+        // más) + fecha igual o a un día de diferencia = probablemente
+        // se cargó dos veces por error (pasa fácil si se toca
+        // "Agregar" dos veces sin querer). Es un aviso, no un bloqueo
+        // — puede ser una coincidencia real.
+        function detectarPosiblesDuplicados() {
+            // Agrupar primero por (moneda, descripción, monto) — sin
+            // esto, había que comparar TODOS los gastos entre sí de a
+            // pares (O(n²)), y gastosActuales no tiene límite ni se
+            // acota por período (guarda el historial completo, ver
+            // escucharPagos en storage.js) — con años de cuotas
+            // cargadas eso son muchas filas. Agrupando primero, solo
+            // hace falta mirar la fecha DENTRO de cada grupo, que en la
+            // práctica casi siempre tiene 1 o 2 gastos.
+            const grupos = {};
+            gastosActuales.forEach(p => {
+                const descripcion = (p.description || '').trim().toLowerCase();
+                if (!descripcion) return;
+                const clave = `${p.moneda || 'ARS'}|${descripcion}|${parseFloat(p.amount).toFixed(2)}`;
+                (grupos[clave] = grupos[clave] || []).push(p);
+            });
+
+            const pares = [];
+            Object.values(grupos).forEach(grupo => {
+                if (grupo.length < 2) return;
+                for (let i = 0; i < grupo.length; i++) {
+                    for (let j = i + 1; j < grupo.length; j++) {
+                        const diffDias = Math.abs((new Date(`${grupo[i].date}T00:00:00`) - new Date(`${grupo[j].date}T00:00:00`)) / 86400000);
+                        if (diffDias <= 1) pares.push([grupo[i], grupo[j]]);
+                    }
+                }
+            });
+            return pares;
+        }
+
+        function renderPosiblesDuplicados() {
+            const card = document.getElementById('duplicados-card');
+            const contenedor = document.getElementById('duplicados-contenido');
+            const pares = detectarPosiblesDuplicados();
+
+            if (pares.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+
+            contenedor.innerHTML = pares.map(([a, b], indice) => `
+                <div class="balance-item">
+                    <span>${esc(a.description)} — ${a.date} y ${b.date} — ${simboloDeMoneda(a.moneda || 'ARS')}${parseFloat(a.amount).toFixed(2)} (x2)</span>
+                    <button type="button" class="secundario" data-eliminar-uno="${indice}" style="width:auto; font-size:.78rem;">🗑️ Eliminar uno</button>
+                </div>
+            `).join('');
+
+            contenedor.querySelectorAll('[data-eliminar-uno]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    const [, b] = pares[parseInt(boton.dataset.eliminarUno, 10)];
+                    if (!confirmar(`¿Eliminar "${b.description}" del ${b.date}?`)) return;
+                    eliminarPago(uid, b.id);
+                });
+            });
+        }
+
+        function actualizarTodo() {
+            renderStatsPersonales();
+            renderTablaHistorial();
+            renderTarjeta();
+            renderEvolucionSaldoTarjeta();
+            renderPresupuesto();
+            renderBalance();
+            renderCuotasPendientes();
+            renderPosiblesDuplicados();
+        }
+
+        document.getElementById('payments-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const date = document.getElementById('payment-date').value;
+            const description = document.getElementById('payment-description').value;
+            const categoria = categoriaSelect.value;
+            const metodoPago = metodoSelect.value;
+            const moneda = document.getElementById('payment-moneda').value;
+            const cotizacionManual = parseFloat(document.getElementById('payment-cotizacion').value) || null;
+
+            if (!date || !description) {
+                avisar('Completá fecha y descripción.', 'error');
+                return;
+            }
+
+            if (metodoPago === 'credito' && !diaCierreTarjeta) {
+                const dia = parseInt(diaCierreInput.value, 10);
+                if (!dia || dia < 1 || dia > 31) {
+                    avisar('Decinos qué día del mes cierra tu tarjeta (1 a 31).', 'error');
+                    return;
+                }
+                diaCierreTarjeta = dia;
+                await guardarDiaCierreTarjeta(uid, dia);
+                campoDiaCierre.style.display = 'none';
+            }
+
+            if (esEnCuotas.checked) {
+                const cantidad = parseInt(cantidadCuotasInput.value, 10);
+                const precio = parseFloat(precioCuotaInput.value);
+                const fechaInicio = cuotaEmpezoAntes.checked ? fechaCuotaInicialInput.value : date;
+
+                if (!cantidad || cantidad < 2 || !precio || precio <= 0 || !fechaInicio) {
+                    avisar('Completá cantidad de cuotas, precio de la cuota y la fecha de la primera.', 'error');
+                    return;
+                }
+                if (cantidad > 60) {
+                    avisar('No se pueden cargar más de 60 cuotas de una vez (5 años). Si es más, cargalas en tandas.', 'error');
+                    return;
+                }
+
+                for (let i = 0; i < cantidad; i++) {
+                    agregarPago(uid, {
+                        date: sumarMeses(fechaInicio, i),
+                        amount: precio,
+                        description: `${description} (cuota ${i + 1}/${cantidad})`,
+                        categoria, metodoPago, moneda, cotizacionManual,
+                    });
+                }
+                avisar(`${cantidad} cuotas cargadas, una por mes desde ${fechaInicio}`, 'exito');
+            } else {
+                const amount = parseFloat(document.getElementById('payment-amount').value);
+                if (!amount || amount <= 0) {
+                    avisar('Completá el monto con un valor válido.', 'error');
+                    return;
+                }
+                agregarPago(uid, { date, amount, description, categoria, metodoPago, moneda, cotizacionManual });
+                avisar('Gasto agregado', 'exito');
+            }
+            registrarGastoPersonalCargado(categoria);
+
+            // reset() vacía los campos y desmarca los checkboxes, pero no
+            // dispara 'change' — sin esto, los paneles que dependían de
+            // "crédito" o "cuotas" quedarían visibles aunque ya no
+            // correspondan. Disparándolo a mano se encadena solo: el de
+            // método esconde/muestra cuotas, y ese a su vez el resto.
+            event.target.reset();
+            metodoSelect.dispatchEvent(new Event('change'));
+            categoriaSelect.dispatchEvent(new Event('change'));
+            cuotaEmpezoAntes.dispatchEvent(new Event('change'));
+            actualizarCampoCotizacion();
+            textoTotalCuotas.textContent = '';
+        });
+
+        document.getElementById('form-pagar-tarjeta').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const date = document.getElementById('tarjeta-pago-fecha').value;
+            const amount = parseFloat(document.getElementById('tarjeta-pago-monto').value);
+            const moneda = document.getElementById('tarjeta-pago-moneda').value;
+            const description = document.getElementById('tarjeta-pago-descripcion').value;
+
+            if (!date || !amount || amount <= 0) {
+                avisar('Completá fecha y monto con valores válidos.', 'error');
+                return;
+            }
+
+            agregarPagoTarjeta(uid, { date, amount, moneda, description });
+            avisar('Pago de tarjeta registrado', 'exito');
+            event.target.reset();
+        });
+
+        document.getElementById('form-sueldo').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const date = document.getElementById('sueldo-fecha').value;
+            const amount = parseFloat(document.getElementById('sueldo-monto').value);
+            const description = document.getElementById('sueldo-descripcion').value || 'Ingreso';
+
+            if (!date || !amount || amount <= 0) {
+                avisar('Completá fecha y monto con valores válidos.', 'error');
+                return;
+            }
+
+            agregarIngreso(uid, { date, amount, description });
+            avisar('Ingreso registrado', 'exito');
+            event.target.reset();
+        });
+
+        // --- Recurrentes (gastos e ingresos fijos) ---
+
+        // El tipo se elige una sola vez (al crear) — cambiar de gasto a
+        // ingreso en un recurrente ya existente no tendría mucho sentido
+        // (son campos distintos), así que el select queda deshabilitado
+        // al editar.
+        function abrirModalRecurrente(recurrente = null, tipoPorDefecto = 'gasto') {
+            const tipo = recurrente ? (recurrente.tipo || 'gasto') : tipoPorDefecto;
+            abrirModal(`
+                <h3 style="margin-top:0;">${recurrente ? 'Editar' : 'Nuevo'} recurrente</h3>
+                <form id="form-recurrente" class="form">
+                    <div class="campo-ancho">
+                        <label for="recurrente-tipo">Tipo</label>
+                        <select id="recurrente-tipo" ${recurrente ? 'disabled' : ''}>
+                            <option value="gasto">💸 Gasto (algo que pagás)</option>
+                            <option value="ingreso">💰 Ingreso (sueldo u otro)</option>
+                        </select>
+                    </div>
+                    <div class="campo-ancho">
+                        <label for="recurrente-descripcion">Descripción</label>
+                        <input type="text" id="recurrente-descripcion" maxlength="200" required value="${recurrente ? esc(recurrente.descripcion) : ''}" placeholder="${tipo === 'ingreso' ? 'Ej: Sueldo' : 'Ej: Alquiler, Netflix...'}">
+                    </div>
+                    <div>
+                        <label for="recurrente-monto">Monto</label>
+                        <input type="number" id="recurrente-monto" min="0.01" step="0.01" required value="${recurrente ? recurrente.monto : ''}">
+                    </div>
+                    <div>
+                        <label for="recurrente-dia">Día del mes (aprox.)</label>
+                        <input type="number" id="recurrente-dia" min="1" max="31" required value="${recurrente ? recurrente.diaDelMes : ''}">
+                    </div>
+                    <div class="subgrupo-campos" id="recurrente-campos-gasto">
+                        <div>
+                            <label for="recurrente-moneda">Moneda</label>
+                            <select id="recurrente-moneda">${opcionesDeMonedas()}</select>
+                        </div>
+                        <div>
+                            <label for="recurrente-categoria">Categoría</label>
+                            <select id="recurrente-categoria">${opcionesDeCategorias()}</select>
+                        </div>
+                        <div>
+                            <label for="recurrente-metodo">Método de pago</label>
+                            <select id="recurrente-metodo">
+                                <option value="efectivo">💵 Efectivo</option>
+                                <option value="debito">💳 Débito</option>
+                                <option value="credito">💳 Crédito</option>
+                                <option value="transferencia">🏦 Transferencia</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="campo-ancho">${recurrente ? 'Guardar cambios' : 'Agregar'}</button>
+                </form>
+            `);
+            document.getElementById('recurrente-tipo').value = tipo;
+            document.getElementById('recurrente-moneda').value = recurrente ? (recurrente.moneda || 'ARS') : 'ARS';
+            document.getElementById('recurrente-categoria').value = recurrente ? (recurrente.categoria || 'otros') : 'otros';
+            document.getElementById('recurrente-metodo').value = recurrente ? (recurrente.metodoPago || 'efectivo') : 'efectivo';
+
+            // Los ingresos en esta app son siempre en pesos (el propio
+            // "Registrar ingreso" no tiene selector de moneda) y no
+            // tienen categoría ni método de pago — esos 3 campos solo
+            // aplican a un recurrente de tipo gasto.
+            const camposGasto = document.getElementById('recurrente-campos-gasto');
+            const descripcionInput = document.getElementById('recurrente-descripcion');
+            function actualizarCamposSegunTipo() {
+                const esIngreso = document.getElementById('recurrente-tipo').value === 'ingreso';
+                camposGasto.style.display = esIngreso ? 'none' : 'grid';
+                descripcionInput.placeholder = esIngreso ? 'Ej: Sueldo' : 'Ej: Alquiler, Netflix...';
+            }
+            actualizarCamposSegunTipo();
+            document.getElementById('recurrente-tipo').addEventListener('change', actualizarCamposSegunTipo);
+
+            document.getElementById('form-recurrente').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const tipoElegido = document.getElementById('recurrente-tipo').value;
+                const datos = {
+                    tipo: tipoElegido,
+                    descripcion: document.getElementById('recurrente-descripcion').value.trim(),
+                    monto: parseFloat(document.getElementById('recurrente-monto').value),
+                    diaDelMes: parseInt(document.getElementById('recurrente-dia').value, 10),
+                    activo: true,
+                };
+                if (tipoElegido === 'gasto') {
+                    datos.moneda = document.getElementById('recurrente-moneda').value;
+                    datos.categoria = document.getElementById('recurrente-categoria').value;
+                    datos.metodoPago = document.getElementById('recurrente-metodo').value;
+                }
+                if (!datos.descripcion || !datos.monto || datos.monto <= 0 || !datos.diaDelMes) {
+                    avisar('Completá todos los campos con valores válidos.', 'error');
+                    return;
+                }
+                try {
+                    if (recurrente) {
+                        await actualizarRecurrente(uid, recurrente.id, datos);
+                        avisar('Recurrente actualizado', 'exito');
+                    } else {
+                        await agregarRecurrente(uid, datos);
+                        avisar(tipoElegido === 'ingreso' ? 'Ingreso recurrente agregado' : 'Gasto recurrente agregado', 'exito');
+                    }
+                    cerrarModal();
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+        }
+
+        document.getElementById('boton-nuevo-recurrente').addEventListener('click', () => abrirModalRecurrente());
+
+        // Precarga el panel correspondiente (Agregar gasto o Registrar
+        // ingreso, según el tipo) con los datos de un recurrente y lo
+        // abre — a propósito NO lo carga solo (el monto pudo cambiar
+        // desde la última vez, ej. un aumento de sueldo), así el usuario
+        // confirma antes de guardar.
+        function cargarRecurrenteEnFormulario(recurrente) {
+            if (recurrente.tipo === 'ingreso') {
+                cargarRecurrenteComoIngreso(recurrente);
+                return;
+            }
+            alternarPanel('gasto');
+            // Por las dudas el panel hubiera quedado con "Fue en cuotas"
+            // tildado de una carga anterior sin terminar — si no se
+            // resetea, el campo de monto queda oculto y el submit se va
+            // por la rama de cuotas en vez de cargar este gasto simple.
+            esEnCuotas.checked = false;
+            esEnCuotas.dispatchEvent(new Event('change'));
+            document.getElementById('payment-date').value = new Date().toISOString().slice(0, 10);
+            document.getElementById('payment-description').value = recurrente.descripcion;
+            document.getElementById('payment-amount').value = recurrente.monto;
+            document.getElementById('payment-moneda').value = recurrente.moneda || 'ARS';
+            document.getElementById('payment-cotizacion').value = '';
+            categoriaSelect.value = recurrente.categoria || 'otros';
+            metodoSelect.value = recurrente.metodoPago || 'efectivo';
+            metodoSelect.dispatchEvent(new Event('change'));
+            // Asignar .value por JS no dispara 'change' solo — sin esto,
+            // el campo de "valor del cambio" quedaba oculto aunque el
+            // recurrente sea en dólares o euros.
+            actualizarCampoCotizacion();
+            document.getElementById('panel-agregar-gasto').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function cargarRecurrenteComoIngreso(recurrente) {
+            alternarPanel('sueldo');
+            const hoy = new Date();
+            const dia = diaSueldo || hoy.getDate();
+            document.getElementById('sueldo-fecha').value = new Date(hoy.getFullYear(), hoy.getMonth(), dia).toISOString().slice(0, 10);
+            document.getElementById('sueldo-monto').value = recurrente.monto;
+            document.getElementById('sueldo-descripcion').value = recurrente.descripcion;
+            document.getElementById('panel-registrar-sueldo').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // Abre el modal para cargar un % de aumento sobre un recurrente
+        // (sueldo u otro ingreso fijo) — actualiza el monto vigente y
+        // deja guardado un historial chico con cada aumento.
+        function abrirModalAumento(recurrente) {
+            abrirModal(`
+                <h3 style="margin-top:0;">📈 Registrar aumento — ${esc(recurrente.descripcion)}</h3>
+                <p class="texto-muted" style="font-size:.85rem;">Monto actual: $${recurrente.monto.toFixed(2)}</p>
+                <form id="form-aumento" class="form">
+                    <div>
+                        <label for="aumento-porcentaje">Porcentaje de aumento</label>
+                        <input type="number" id="aumento-porcentaje" step="0.01" placeholder="Ej: 15">
+                    </div>
+                    <div>
+                        <label for="aumento-fecha">Desde cuándo aplica</label>
+                        <input type="date" id="aumento-fecha" value="${new Date().toISOString().slice(0, 10)}" required>
+                    </div>
+                    <p class="texto-muted" style="font-size:.8rem;" id="aumento-preview"></p>
+                    <button type="submit" class="campo-ancho">Guardar aumento</button>
+                </form>
+            `);
+
+            const inputPorcentaje = document.getElementById('aumento-porcentaje');
+            const preview = document.getElementById('aumento-preview');
+            inputPorcentaje.addEventListener('input', () => {
+                const porcentaje = parseFloat(inputPorcentaje.value);
+                if (!porcentaje) { preview.textContent = ''; return; }
+                const nuevo = recurrente.monto * (1 + porcentaje / 100);
+                preview.textContent = `Nuevo monto: $${nuevo.toFixed(2)}`;
+            });
+
+            document.getElementById('form-aumento').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const porcentaje = parseFloat(inputPorcentaje.value);
+                const fecha = document.getElementById('aumento-fecha').value;
+                if (!porcentaje || !fecha) {
+                    avisar('Completá el porcentaje y la fecha.', 'error');
+                    return;
+                }
+                try {
+                    await registrarAumento(uid, recurrente, porcentaje, fecha);
+                    avisar('Aumento registrado', 'exito');
+                    cerrarModal();
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+        }
+
+        function renderRecurrentes() {
+            const listaContenedor = document.getElementById('recurrentes-lista-contenido');
+            const pendientesContenedor = document.getElementById('recurrentes-pendientes-contenido');
+
+            if (recurrentesActuales.length === 0) {
+                listaContenedor.innerHTML = '<p class="texto-muted" style="font-size:.85rem;">Todavía no agregaste ningún recurrente.</p>';
+                pendientesContenedor.innerHTML = '';
+                return;
+            }
+
+            // BUG REAL encontrado y corregido: escucharRecurrentes()/
+            // escucharPagos()/escucharIngresos() son 3 listeners
+            // independientes — no hay garantía de en qué orden entrega
+            // cada uno su primer snapshot. Si el de recurrentes llegaba
+            // ANTES que el de pagos/ingresos, esta sección se ejecutaba
+            // con gastosActuales/ingresosActuales todavía en su []
+            // inicial: un recurrente YA cargado ese mes (ej. el alquiler,
+            // pagado el día 1) se veía como "pendiente" por un instante,
+            // y avisarSiRecurrentesPendientes() ya mandaba la
+            // notificación — que se queda pegada (yaAvisadoHoy) aunque un
+            // instante después este mismo render se repita con los datos
+            // reales y la lista de pendientes dé vacía: avisarSi... no
+            // "retira" un aviso que ya mandó, solo evita mandarlo de
+            // nuevo. Se guarda nada más esta sección (no toda la
+            // función) — la tabla de "Mis recurrentes" de más abajo no
+            // depende de pagos/ingresos, no hay motivo para demorarla.
+            if (gastosPersonalesListos && ingresosListos) {
+                const pendientes = recurrentesPendientes(recurrentesActuales, gastosActuales, ingresosActuales);
+                pendientesContenedor.innerHTML = pendientes.length
+                    ? pendientes.map(r => `
+                        <div class="sugerencia-pago">
+                            <span>💡 Todavía no cargaste "${esc(r.descripcion)}" este mes</span>
+                            <button type="button" class="secundario boton-cargar-recurrente" data-id="${r.id}">Cargar ahora</button>
+                        </div>
+                    `).join('')
+                    : '';
+                pendientesContenedor.querySelectorAll('.boton-cargar-recurrente').forEach(boton => {
+                    boton.addEventListener('click', () => {
+                        const r = recurrentesActuales.find(x => x.id === boton.dataset.id);
+                        if (r) cargarRecurrenteEnFormulario(r);
+                    });
+                });
+
+                if (preferenciasNotif.recurrentes) avisarSiRecurrentesPendientes(pendientes);
+            }
+
+            const filas = recurrentesActuales.map(r => {
+                const esIngreso = r.tipo === 'ingreso';
+                return `
+                <tr>
+                    <td>${esIngreso ? '💰' : '💸'} ${esc(r.descripcion)}</td>
+                    <td>${simboloDeMoneda(r.moneda || 'ARS')}${r.monto.toFixed(2)}</td>
+                    <td>día ${r.diaDelMes}</td>
+                    <td>${esIngreso ? 'Ingreso' : etiquetaDeCategoria(r.categoria)}</td>
+                    <td>
+                        ${esIngreso ? `<button class="icono" data-aumento-id="${r.id}" title="Registrar aumento">📈</button>` : ''}
+                        <button class="icono" data-editar-id="${r.id}" title="Editar">✏️</button>
+                        <button class="icono" data-id="${r.id}" title="Eliminar">🗑️</button>
+                    </td>
+                </tr>
+            `;
+            }).join('');
+            listaContenedor.innerHTML = `
+                <div class="tabla-wrap">
+                    <table>
+                        <thead><tr><th>Descripción</th><th>Monto</th><th>Cuándo</th><th>Categoría</th><th></th></tr></thead>
+                        <tbody>${filas}</tbody>
+                    </table>
+                </div>
+            `;
+            listaContenedor.querySelectorAll('button[data-id]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    if (!confirmar('¿Eliminar este recurrente? (no borra los movimientos ya cargados, solo el recordatorio)')) return;
+                    eliminarRecurrente(uid, boton.dataset.id);
+                });
+            });
+            listaContenedor.querySelectorAll('button[data-editar-id]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    const r = recurrentesActuales.find(x => x.id === boton.dataset.editarId);
+                    if (r) abrirModalRecurrente(r);
+                });
+            });
+            listaContenedor.querySelectorAll('button[data-aumento-id]').forEach(boton => {
+                boton.addEventListener('click', () => {
+                    const r = recurrentesActuales.find(x => x.id === boton.dataset.aumentoId);
+                    if (r) abrirModalAumento(r);
+                });
+            });
+        }
+
+        requerirSesion(async (user) => {
+            uid = user.uid;
+            diaCierreTarjeta = await obtenerDiaCierreTarjeta(uid);
+            const presupuesto = await obtenerPresupuesto(uid);
+            presupuestoMensual = presupuesto.presupuestoMensual;
+            diaSueldo = presupuesto.diaSueldo;
+            presupuestosPorCategoria = await obtenerPresupuestosPorCategoria(uid);
+            preferenciasNotif = await obtenerPreferenciasNotif(uid);
+            alquilerConfigurado = !!(await obtenerAlquiler(uid));
+            // No se espera (await) a propósito: si tarda o falla, el resto
+            // de la página arranca igual — los cálculos en pesos siguen
+            // funcionando con el valor por defecto hasta que llegue.
+            obtenerCotizaciones().then(datos => { cotizaciones = datos; actualizarTodo(); actualizarCampoCotizacion(); });
+
+            escucharRecurrentes(uid, (data) => { recurrentesActuales = data; renderRecurrentes(); });
+            escucharPagos(uid, (data) => { gastosActuales = data; gastosPersonalesListos = true; actualizarTodo(); renderRecurrentes(); });
+            escucharPagosTarjeta(uid, (data) => {
+                pagosTarjetaActuales = data;
+                document.getElementById('tarjeta-historial-card').style.display = data.length ? 'block' : 'none';
+                renderHistorialSimple(
+                    document.getElementById('pagos-tarjeta-contenido'), data, eliminarPagoTarjeta,
+                    'Todavía no registraste ningún pago de tarjeta.', abrirModalEditarPagoTarjeta
+                );
+                renderTarjeta();
+                renderEvolucionSaldoTarjeta();
+            });
+            escucharIngresos(uid, (data) => {
+                ingresosActuales = data;
+                ingresosListos = true;
+                document.getElementById('ingresos-historial-card').style.display = data.length ? 'block' : 'none';
+                renderHistorialSimple(
+                    document.getElementById('ingresos-contenido'), data, eliminarIngreso,
+                    'Todavía no registraste ningún ingreso.', abrirModalEditarIngreso
+                );
+                renderBalance();
+                renderRecurrentes();
+            });
+
+            // --- Movimientos de mis grupos, para el historial unificado ---
+            misGrupos = await obtenerMisGrupos(uid);
+            document.getElementById('filtro-grupo').innerHTML =
+                '<option value="">Todos los grupos</option>' +
+                misGrupos.map(g => `<option value="${g.id}">${esc(g.nombre)}</option>`).join('');
+
+            misGrupos.forEach((g) => {
+                // En tiempo real (antes era una lectura única al cargar la
+                // página): si alguien le cambia el nombre al grupo, o a
+                // algún integrante, mientras esta pestaña sigue abierta, el
+                // historial de acá lo refleja solo en vez de quedar
+                // mostrando el nombre viejo hasta recargar.
+                dejarDeEscucharGrupos.push(escucharGrupo(g.id, (datos) => {
+                    datosGrupos[g.id] = datos;
+                    renderTablaHistorial();
+                    renderBalance();
+                }));
+                dejarDeEscucharGrupos.push(escucharGastos(g.id, (data) => {
+                    gastosGrupales[g.id] = data;
+                    renderTablaHistorial();
+                    renderBalance(); // el Balance del mes también cuenta los gastos de grupo — ver renderBalance
+                }));
+                dejarDeEscucharGrupos.push(escucharPagosDeuda(g.id, (data) => {
+                    pagosGrupales[g.id] = data;
+                    renderTablaHistorial();
+                }));
+            });
+        });
+    </script>
+</body>
+</html>

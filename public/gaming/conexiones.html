@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conexiones · GamingApp</title>
+    <meta name="theme-color" content="#0f0e0c">
+    <script>
+        var tema = localStorage.getItem('tema') || 'oscuro';
+        document.documentElement.setAttribute('data-tema', tema);
+        if (tema === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page">
+        <div class="card">
+            <div class="card-header"><h2 style="margin:0;">🔌 Conexiones</h2></div>
+            <p style="margin:0;">Conectá cuentas de otras plataformas para traer tu biblioteca y horas jugadas automáticamente.</p>
+        </div>
+
+        <div id="zona-cargando-sesion" style="text-align:center;">
+            <p class="texto-muted">Comprobando tu sesión…</p>
+        </div>
+
+        <div id="zona-contenido" style="display:none;">
+            <!-- Sin PROXY_STEAM configurado todavía (ver cloudflare-worker/README.md) -->
+            <div class="card" id="card-proxy-sin-configurar" style="display:none;">
+                <div class="card-header"><h3 style="margin:0;">⚙️ Falta un paso</h3></div>
+                <p style="margin:0;">Todavía no se cargó la URL del proxy de Steam (<code>PROXY_STEAM</code>, acá abajo en el script) — sin eso Steam no puede conectarse. Los pasos están en <code>cloudflare-worker/README.md</code>.</p>
+            </div>
+
+            <div class="card" id="card-conectar-steam" style="display:none; text-align:center;">
+                <div class="card-header" style="justify-content:center;"><h3 style="margin:0;">🎮 Conectá tu cuenta de Steam</h3></div>
+                <button type="button" id="boton-login-steam" style="width:100%;">🔐 Iniciar sesión con Steam</button>
+                <p class="texto-muted" style="font-size:.78rem; margin: var(--space-2) 0 0;">Te lleva a la pantalla de login de Steam — ahí mismo podés elegir escanear el código QR con la app de Steam del celular en vez de escribir tu usuario y contraseña.</p>
+
+                <div class="drawer-separador" style="margin: var(--space-4) 0;"></div>
+
+                <p class="texto-muted" style="font-size:.82rem; margin: 0 0 var(--space-2);">O escribí tu perfil a mano, sin loguearte (solo sirve si tu perfil es público):</p>
+                <form id="form-conectar-steam" class="form" style="text-align:left;">
+                    <div class="campo-ancho">
+                        <label for="input-steam-id">Perfil de Steam</label>
+                        <input type="text" id="input-steam-id" placeholder="Ej: gaben">
+                    </div>
+                    <button type="submit" class="secundario">Buscar por nombre</button>
+                </form>
+                <p class="texto-muted" style="font-size:.78rem; margin: var(--space-3) 0 0;">Tu perfil de Steam tiene que estar en público (Steam → Editar perfil → Privacidad del juego) para que esto funcione.</p>
+            </div>
+
+            <div id="zona-cargando-steam" style="display:none; text-align:center;">
+                <p class="texto-muted">Consultando Steam…</p>
+            </div>
+
+            <div id="card-error-steam" class="card" style="display:none;">
+                <p style="margin:0;" id="texto-error-steam"></p>
+                <button type="button" class="secundario" id="boton-reintentar-steam" style="margin-top: var(--space-3);">Probar con otro perfil</button>
+            </div>
+
+            <div id="zona-biblioteca" style="display:none;">
+                <div class="card" style="text-align:center;">
+                    <img id="avatar-steam" src="" alt="" style="width:64px; height:64px; border-radius:50%; margin-bottom: var(--space-2);">
+                    <p style="margin:0; font-weight:700;" id="nombre-steam"></p>
+                    <p class="texto-muted" style="font-size:.85rem; margin: 4px 0 0;" id="resumen-biblioteca"></p>
+                    <button type="button" class="secundario" id="boton-cambiar-steam" style="margin-top: var(--space-3);">Conectar otro perfil</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h3 style="margin:0;">📚 Tu biblioteca</h3></div>
+                    <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Ordenada por horas jugadas — Steam no da el precio ni la fecha de compra, solo esto.</p>
+                    <div id="lista-biblioteca"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { esc } from '../ui.js';
+        import { iniciarNavbarGaming, requerirSesionGaming } from './nav-gaming.js';
+
+        iniciarNavbarGaming('conexiones.html');
+
+        // URL del Worker (ver cloudflare-worker/README.md). Sin esto no
+        // hay forma de hablar con Steam (ver el comentario largo en
+        // cloudflare-worker/src/index.js sobre por qué hace falta un
+        // proxy en el medio).
+        const PROXY_STEAM = 'https://tu-worker.tu-subdominio.workers.dev';
+
+        const zonaCargandoSesion = document.getElementById('zona-cargando-sesion');
+        const zonaContenido = document.getElementById('zona-contenido');
+        const cardProxySinConfigurar = document.getElementById('card-proxy-sin-configurar');
+        const cardConectarSteam = document.getElementById('card-conectar-steam');
+        const zonaCargandoSteam = document.getElementById('zona-cargando-steam');
+        const cardErrorSteam = document.getElementById('card-error-steam');
+        const zonaBiblioteca = document.getElementById('zona-biblioteca');
+
+        requerirSesionGaming('conexiones.html', () => {
+            zonaCargandoSesion.style.display = 'none';
+            zonaContenido.style.display = 'block';
+            iniciarSteam();
+        });
+
+        // --- Steam ---
+        // El SteamID conectado se guarda en localStorage (no en
+        // Firestore todavía — es un dato por dispositivo, no por cuenta,
+        // y así no hace falta sumar reglas nuevas para esto recién
+        // ahora). Si en algún momento GamingApp junta más datos que
+        // valga la pena tener en todos tus dispositivos, ahí sí
+        // conviene moverlo a gaming/{uid}.
+        const CLAVE_STEAM_ID = 'gamingapp-steamid';
+
+        async function iniciarSteam() {
+            if (!PROXY_STEAM) {
+                cardProxySinConfigurar.style.display = 'block';
+                return;
+            }
+
+            // Si venimos de "Iniciar sesión con Steam" (ver
+            // iniciarLoginSteam más abajo), la URL trae los parámetros
+            // openid.* que Steam agrega al volver — se resuelven antes
+            // de mirar localStorage, porque significa que la persona
+            // recién ahora está confirmando quién es.
+            if (await comprobarVueltaDeSteam()) return;
+
+            const steamIdGuardado = localStorage.getItem(CLAVE_STEAM_ID);
+            if (steamIdGuardado) {
+                cargarBiblioteca(steamIdGuardado);
+            } else {
+                cardConectarSteam.style.display = 'block';
+            }
+        }
+
+        // Manda a la pantalla de login de Steam — ahí (no acá) es donde
+        // aparece la opción de escanear un QR con la app de Steam del
+        // celular para aprobar el ingreso, además de usuario/contraseña.
+        // Es el protocolo OpenID 2.0 que Steam ofrece para "iniciar
+        // sesión con Steam" en webs de terceros, gratis y sin pedir
+        // ningún registro de app aparte (a diferencia de Google/etc).
+        function iniciarLoginSteam() {
+            const volverA = window.location.origin + window.location.pathname;
+            const parametros = new URLSearchParams({
+                'openid.ns': 'http://specs.openid.net/auth/2.0',
+                'openid.mode': 'checkid_setup',
+                'openid.return_to': volverA,
+                'openid.realm': window.location.origin,
+                'openid.identity': 'http://specs.openid.net/auth/2.0/identifier_select',
+                'openid.claimed_id': 'http://specs.openid.net/auth/2.0/identifier_select',
+            });
+            window.location.href = `https://steamcommunity.com/openid/login?${parametros.toString()}`;
+        }
+
+        document.getElementById('boton-login-steam').addEventListener('click', iniciarLoginSteam);
+
+        // Confirma con Steam (a través del Worker, ver /openid-verify en
+        // cloudflare-worker/src/index.js) que la vuelta del login es de
+        // verdad válida antes de creerle el SteamID — devuelve true si
+        // esta carga de página YA se trató de eso (haya salido bien o
+        // mal), para no seguir con el resto del flujo normal encima.
+        async function comprobarVueltaDeSteam() {
+            const parametrosUrl = new URLSearchParams(window.location.search);
+            if (parametrosUrl.get('openid.mode') !== 'id_res') return false;
+
+            zonaCargandoSteam.style.display = 'block';
+            // Se limpia la URL ya de una (no hace falta esperar la
+            // respuesta) — son datos de un solo uso, no tiene sentido
+            // que queden pegados ahí si se recarga la página o se
+            // comparte el link por error.
+            window.history.replaceState({}, '', window.location.pathname);
+
+            try {
+                const respuesta = await fetch(`${PROXY_STEAM}/openid-verify?${parametrosUrl.toString()}`);
+                const datos = await respuesta.json();
+                if (datos.valid && datos.steamid) {
+                    localStorage.setItem(CLAVE_STEAM_ID, datos.steamid);
+                    await cargarBiblioteca(datos.steamid);
+                } else {
+                    mostrarErrorSteam('Steam no pudo confirmar el login — probá de nuevo.');
+                }
+            } catch {
+                mostrarErrorSteam('No se pudo confirmar el login con Steam ahora mismo — probá de nuevo en un rato.');
+            }
+            return true;
+        }
+
+        document.getElementById('form-conectar-steam').addEventListener('submit', async (evento) => {
+            evento.preventDefault();
+            const entrada = document.getElementById('input-steam-id').value.trim();
+            if (!entrada) return;
+
+            cardConectarSteam.style.display = 'none';
+            zonaCargandoSteam.style.display = 'block';
+
+            try {
+                // Si ya parece un SteamID64 (17 dígitos) no hace falta
+                // resolverlo — si no, se asume que es el nombre de la
+                // URL del perfil (steamcommunity.com/id/ESTO).
+                const steamId = /^\d{17}$/.test(entrada) ? entrada : await resolverVanity(entrada);
+                localStorage.setItem(CLAVE_STEAM_ID, steamId);
+                await cargarBiblioteca(steamId);
+            } catch (error) {
+                mostrarErrorSteam(error.message);
+            }
+        });
+
+        document.getElementById('boton-reintentar-steam').addEventListener('click', () => {
+            cardErrorSteam.style.display = 'none';
+            cardConectarSteam.style.display = 'block';
+        });
+
+        document.getElementById('boton-cambiar-steam').addEventListener('click', () => {
+            localStorage.removeItem(CLAVE_STEAM_ID);
+            zonaBiblioteca.style.display = 'none';
+            cardConectarSteam.style.display = 'block';
+        });
+
+        async function resolverVanity(vanity) {
+            const respuesta = await fetch(`${PROXY_STEAM}/resolve?vanity=${encodeURIComponent(vanity)}`);
+            const datos = await respuesta.json();
+            const resultado = datos?.response;
+            if (!resultado || resultado.success !== 1) {
+                throw new Error(`No se encontró ningún perfil de Steam con "${vanity}" — revisá que esté bien escrito.`);
+            }
+            return resultado.steamid;
+        }
+
+        async function cargarBiblioteca(steamId) {
+            zonaCargandoSteam.style.display = 'block';
+            cardErrorSteam.style.display = 'none';
+            zonaBiblioteca.style.display = 'none';
+
+            try {
+                const [perfil, biblioteca] = await Promise.all([
+                    fetch(`${PROXY_STEAM}/profile?steamid=${steamId}`).then(r => r.json()),
+                    fetch(`${PROXY_STEAM}/owned-games?steamid=${steamId}`).then(r => r.json()),
+                ]);
+
+                const jugador = perfil?.response?.players?.[0];
+                if (!jugador) throw new Error('No se pudo leer ese perfil de Steam.');
+
+                const juegos = biblioteca?.response?.games || [];
+                // Sin juegos Y sin cantidad total es casi siempre un
+                // perfil con la biblioteca en privado — Steam no avisa
+                // con un error, devuelve una lista vacía nomás (ver
+                // README del proxy).
+                if (juegos.length === 0 && !('game_count' in (biblioteca?.response || {}))) {
+                    throw new Error(`El perfil de "${jugador.personaname}" existe, pero su biblioteca de juegos está en privado — no hay nada que se pueda leer desde acá.`);
+                }
+
+                document.getElementById('avatar-steam').src = jugador.avatarfull;
+                document.getElementById('nombre-steam').textContent = jugador.personaname;
+
+                const horasTotal = juegos.reduce((suma, j) => suma + (j.playtime_forever || 0), 0) / 60;
+                document.getElementById('resumen-biblioteca').textContent =
+                    `${juegos.length} juego${juegos.length === 1 ? '' : 's'} — ${horasTotal.toFixed(0)}h jugadas en total`;
+
+                const ordenados = [...juegos].sort((a, b) => (b.playtime_forever || 0) - (a.playtime_forever || 0));
+                renderizarBiblioteca(ordenados);
+
+                zonaCargandoSteam.style.display = 'none';
+                zonaBiblioteca.style.display = 'block';
+            } catch (error) {
+                mostrarErrorSteam(error.message || 'No se pudo consultar Steam ahora — probá de nuevo más tarde.');
+            }
+        }
+
+        // Colapsada por defecto (los primeros LIMITE_COLAPSADO nomás,
+        // que ya vienen ordenados por horas jugadas — o sea, los juegos
+        // más jugados) con un botón para desplegar el resto — bibliotecas
+        // grandes de Steam pueden tener cientos de juegos, mostrarlos
+        // todos de entrada hacía la card gigantesca.
+        const LIMITE_COLAPSADO = 8;
+
+        function renderizarBiblioteca(ordenados, mostrarTodos = false) {
+            const contenedor = document.getElementById('lista-biblioteca');
+            if (ordenados.length === 0) {
+                contenedor.innerHTML = '<p class="texto-muted" style="font-size:.85rem;">Sin juegos en la biblioteca.</p>';
+                return;
+            }
+
+            const visibles = mostrarTodos ? ordenados : ordenados.slice(0, LIMITE_COLAPSADO);
+            const filasHtml = visibles.map(j => {
+                const horas = (j.playtime_forever || 0) / 60;
+                const caratula = j.img_icon_url
+                    ? `https://media.steampowered.com/steamcommunity/public/images/apps/${j.appid}/${j.img_icon_url}.jpg`
+                    : '';
+                return `
+                    <div class="balance-item">
+                        <span style="display:flex; align-items:center; gap:8px;">
+                            ${caratula ? `<img src="${esc(caratula)}" alt="" style="width:32px; height:32px; border-radius:4px;">` : ''}
+                            ${esc(j.name)}
+                        </span>
+                        <span class="monto">${horas === 0 ? 'Sin jugar' : `${horas.toFixed(1)}h`}</span>
+                    </div>
+                `;
+            }).join('');
+
+            const restantes = ordenados.length - visibles.length;
+            const botonHtml = restantes > 0
+                ? `<button type="button" class="secundario" id="boton-toggle-biblioteca" style="width:100%; margin-top: var(--space-2);">Ver ${restantes} juego${restantes === 1 ? '' : 's'} más</button>`
+                : (mostrarTodos && ordenados.length > LIMITE_COLAPSADO
+                    ? `<button type="button" class="secundario" id="boton-toggle-biblioteca" style="width:100%; margin-top: var(--space-2);">Mostrar menos</button>`
+                    : '');
+
+            contenedor.innerHTML = filasHtml + botonHtml;
+
+            const botonToggle = document.getElementById('boton-toggle-biblioteca');
+            if (botonToggle) {
+                botonToggle.addEventListener('click', () => renderizarBiblioteca(ordenados, !mostrarTodos));
+            }
+        }
+
+        function mostrarErrorSteam(mensaje) {
+            zonaCargandoSteam.style.display = 'none';
+            document.getElementById('texto-error-steam').textContent = mensaje;
+            cardErrorSteam.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Opciones</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <meta name="theme-color" content="#0f0e0c" id="meta-theme-color">
+    <!-- "Opciones" general del mega sistema — se abre desde cualquiera
+         de las 5 apps (ver el link "⚙ Opciones" en cada navbar/☰), con
+         ?app=gastos|gaming|agenda|tareas|comfy en la URL diciendo desde
+         cuál. Este script (mismo criterio que el de cada app: tiene que
+         correr ANTES del CSS para no mostrar un parpadeo del tema
+         equivocado) elige la clave de localStorage y los valores de
+         data-tema correctos para esa app — mismo dato que ya vive
+         repetido en cada nav-X.js, ver el comentario grande del script
+         del módulo, más abajo, para el resto de la adaptación (qué
+         secciones se muestran, con qué preferencias). -->
+    <script>
+        var TEMAS_POR_APP = {
+            gastos: { clave: 'tema', defecto: 'oscuro', oscuro: 'oscuro', claro: 'claro', color: '#0f0e0c' },
+            gaming: { clave: 'tema', defecto: 'oscuro', oscuro: 'oscuro', claro: 'claro', color: '#0f0e0c' },
+            agenda: { clave: 'tema-agenda', defecto: 'claro', oscuro: 'agenda-oscura', claro: 'agenda', color: '#fbf4f1' },
+            tareas: { clave: 'tema-tareas', defecto: 'claro', oscuro: 'tareas-oscura', claro: 'tareas', color: '#fdf9ec' },
+            comfy: { clave: 'tema-comfy', defecto: 'claro', oscuro: 'cafeteria-oscura', claro: 'cafeteria', color: '#ede0cb' },
+        };
+        var appActual = new URLSearchParams(location.search).get('app') || 'gastos';
+        var configTema = TEMAS_POR_APP[appActual] || TEMAS_POR_APP.gastos;
+        var modoTema = localStorage.getItem(configTema.clave) || configTema.defecto;
+        document.documentElement.setAttribute('data-tema', modoTema === 'oscuro' ? configTema.oscuro : configTema.claro);
+        if (modoTema === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+        document.getElementById('meta-theme-color').setAttribute('content', configTema.color);
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@twemoji/api@17.0.3/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div id="pantalla-carga" class="pantalla-carga"><div class="spinner"></div></div>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page">
+        <nav class="tabs opciones-nav">
+            <a href="#seccion-cuenta" class="tab">👤 Cuenta</a>
+            <a href="#seccion-notificaciones" class="tab">🔔 Notificaciones</a>
+            <a href="#seccion-configuracion" class="tab">⚙️ Configuración</a>
+            <a href="#seccion-seguridad" class="tab">🔒 Seguridad</a>
+        </nav>
+
+        <section class="opciones-seccion" id="seccion-cuenta">
+            <h2 class="opciones-seccion-titulo">👤 Cuenta</h2>
+
+            <div class="card">
+                <div class="card-header"><h2 style="margin:0;">Perfil</h2></div>
+
+                <div class="fila-foto-perfil">
+                    <div class="avatar-grande" id="avatar-preview">😊</div>
+                    <div>
+                        <label for="input-foto-perfil" class="btn secundario">📷 Cambiar foto</label>
+                        <input type="file" id="input-foto-perfil" accept="image/*" style="display:none;">
+                        <p class="texto-muted" style="font-size:.78rem; margin:6px 0 0;">Se recorta a un cuadrado y se comprime sola — la ven tus compañeros de grupo, junto al nombre.</p>
+                    </div>
+                </div>
+
+                <form id="form-perfil" class="form">
+                    <div class="campo-ancho">
+                        <label for="nombre-perfil">Nombre para mostrar</label>
+                        <input type="text" id="nombre-perfil" maxlength="60" required>
+                    </div>
+                    <p class="campo-ancho texto-muted" style="margin: -8px 0 0; font-size: .82rem;">
+                        Este nombre es el que ven tus compañeros de grupo en los gastos. Al guardar se actualiza en todos tus grupos.
+                    </p>
+                    <button type="submit" class="campo-ancho">Guardar nombre</button>
+                </form>
+            </div>
+        </section>
+
+        <section class="opciones-seccion" id="seccion-notificaciones">
+            <h2 class="opciones-seccion-titulo">🔔 Notificaciones</h2>
+
+            <!-- Un solo card de acá abajo se muestra por vez, según
+                 desde qué app se abrió "Opciones" (?app= en la URL) —
+                 ver el comentario grande en el script, más abajo. La
+                 campanita 🔔 es compartida por las 5 apps, pero CADA UNA
+                 dispara sus propios avisos con su propia preferencia
+                 (GastosApp: deuda saldada, cierre de tarjeta,
+                 presupuesto, recurrentes — GamingApp: alguien se unió a
+                 un torneo — AgendaApp: evento por comenzar — TareasApp:
+                 asignada/completada), así que no tendría sentido
+                 mostrar las 5 juntas cuando solo una aplica. -->
+            <div class="card" id="notif-card-gastos">
+                <div class="card-header"><h2 style="margin:0;">Avisos de GastosApp</h2></div>
+                <p class="texto-muted" style="font-size:.85rem; margin-top:-8px;">Qué avisos automáticos querés recibir por la campanita 🔔 de arriba.</p>
+                <div class="form" id="form-notificaciones">
+                    <div class="campo-ancho drawer-item" style="padding:0;">
+                        <span>💸 Cuando me salden una deuda</span>
+                        <sl-switch id="notif-deuda-saldada"></sl-switch>
+                    </div>
+                    <div class="campo-ancho drawer-item" style="padding:0;">
+                        <span>💳 Cierre de tarjeta próximo</span>
+                        <sl-switch id="notif-cierre-tarjeta"></sl-switch>
+                    </div>
+                    <div class="campo-ancho" id="zona-cierre-dias-antes" style="padding-left: var(--space-3); border-left: 2px solid var(--color-border);">
+                        <label for="notif-cierre-dias-antes" style="font-size:.82rem; color:var(--color-text-muted);">¿Con cuánta anticipación?</label>
+                        <select id="notif-cierre-dias-antes">
+                            <option value="0">El mismo día</option>
+                            <option value="1">1 día antes</option>
+                            <option value="2">2 días antes</option>
+                            <option value="3">3 días antes</option>
+                            <option value="5">5 días antes</option>
+                            <option value="7">1 semana antes</option>
+                        </select>
+                    </div>
+                    <div class="campo-ancho drawer-item" style="padding:0;">
+                        <span>🎯 Cuando me acerque al presupuesto</span>
+                        <sl-switch id="notif-presupuesto"></sl-switch>
+                    </div>
+                    <div class="campo-ancho drawer-item" style="padding:0;">
+                        <span>🔁 Gastos recurrentes sin cargar</span>
+                        <sl-switch id="notif-recurrentes"></sl-switch>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="notif-card-gaming" style="display:none;">
+                <div class="card-header"><h2 style="margin:0;">Avisos de GamingApp</h2></div>
+                <div class="drawer-item" style="padding:0;">
+                    <span>🏆 Cuando se unan a mis torneos</span>
+                    <sl-switch id="notif-gaming-union-torneo"></sl-switch>
+                </div>
+            </div>
+
+            <div class="card" id="notif-card-agenda" style="display:none;">
+                <div class="card-header"><h2 style="margin:0;">Avisos de AgendaApp</h2></div>
+                <div class="drawer-item" style="padding:0;">
+                    <span>🔔 Evento por comenzar</span>
+                    <sl-switch id="notif-agenda-eventos"></sl-switch>
+                </div>
+                <div class="campo-ancho" id="notif-agenda-zona-minutos" style="padding-left: var(--space-3); border-left: 2px solid var(--color-border); margin-top: var(--space-2);">
+                    <label for="notif-agenda-minutos" style="font-size:.82rem; color:var(--color-text-muted);">¿Con cuánta anticipación?</label>
+                    <select id="notif-agenda-minutos">
+                        <option value="15">15 minutos antes</option>
+                        <option value="30">30 minutos antes</option>
+                        <option value="60">1 hora antes</option>
+                        <option value="120">2 horas antes</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="card" id="notif-card-tareas" style="display:none;">
+                <div class="card-header"><h2 style="margin:0;">Avisos de TareasApp</h2></div>
+                <p class="texto-muted" style="font-size:.85rem; margin-top:-8px;">El aviso de vencimiento de cada tarea se configura aparte, al crearla o editarla.</p>
+                <div class="drawer-item" style="padding:0;">
+                    <span>📋 Cuando me asignen una tarea</span>
+                    <sl-switch id="notif-tareas-asignada"></sl-switch>
+                </div>
+                <div class="drawer-item" style="padding:0;">
+                    <span>✅ Cuando completen una tarea que creé</span>
+                    <sl-switch id="notif-tareas-completada"></sl-switch>
+                </div>
+            </div>
+
+            <div class="card" id="notif-card-comfy" style="display:none;">
+                <div class="card-header"><h2 style="margin:0;">Avisos de ComfyApp</h2></div>
+                <p class="texto-muted" style="font-size:.85rem; margin:0;">ComfyApp es el punto de entrada del sistema — no genera notificaciones propias. Elegí otra app arriba (☰ → Otras apps) para configurar las suyas.</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><h2 style="margin:0;">Notificación del navegador</h2></div>
+                <p class="texto-muted" style="font-size:.85rem; margin-top:-8px;">Un aviso del sistema (fuera de la pestaña), además de la campanita — general para las 5 apps, mientras alguna esté abierta en alguna pestaña.</p>
+                <div class="drawer-item" style="padding:0;">
+                    <span>Activar avisos del navegador</span>
+                    <sl-switch id="switch-notificaciones"></sl-switch>
+                </div>
+                <p class="texto-muted" id="notificaciones-no-soportado" style="font-size:.8rem; display:none; margin:8px 0 0;">Tu navegador no soporta notificaciones.</p>
+            </div>
+        </section>
+
+        <section class="opciones-seccion" id="seccion-configuracion">
+            <h2 class="opciones-seccion-titulo">⚙️ Configuración</h2>
+
+        <div class="card">
+            <div class="card-header"><h2 style="margin:0;">🎨 Apariencia</h2></div>
+            <div class="tabs" id="selector-tema" style="border-bottom: none;">
+                <button type="button" class="tab" data-tema="oscuro">🌙 Oscuro</button>
+                <button type="button" class="tab" data-tema="claro">☀️ Claro</button>
+            </div>
+        </div>
+
+        <!-- Lo que sigue es específico de GastosApp (tarjeta, Mercado
+             Pago, alquiler, presupuesto) — no tiene sentido mostrarlo si
+             "Opciones" se abrió desde otra app (ver ?app= en la URL,
+             comentario grande más abajo en el script). Se oculta con
+             CSS nada más — el JS de cada form sigue funcionando igual
+             que siempre (sigue leyendo/guardando los datos de GastosApp
+             de la persona, que existen igual sin importar desde qué app
+             entró — no tendría sentido partirlos), simplemente no se
+             ven ni se pueden tocar si no se muestra esta sección. -->
+        <div id="config-solo-gastos">
+        <div class="card">
+            <div class="card-header"><h2 style="margin:0;">💳 Tarjeta de crédito</h2></div>
+            <p class="texto-muted" style="font-size:.85rem; margin-top:-8px;">Se usa en Gastos personales para calcular cuánto va en el próximo resumen cuando cargás algo como "Crédito".</p>
+            <form id="form-tarjeta" class="form">
+                <div>
+                    <label for="dia-cierre-perfil">Día del mes en que cierra</label>
+                    <input type="number" id="dia-cierre-perfil" min="1" max="31" placeholder="Ej: 10">
+                </div>
+                <button type="submit" class="secundario">Guardar</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h2 style="margin:0;">💳 Mercado Pago</h2></div>
+            <p class="texto-muted" style="font-size:.85rem; margin-top:-8px;">Opcional — si lo cargás, el resto de tus grupos va a ver un botón "Pagar con Mercado Pago" cuando te deban plata, en vez de tener que preguntarte tu alias por chat.</p>
+            <form id="form-mercadopago" class="form">
+                <div class="campo-ancho">
+                    <label for="alias-mercadopago">Tu alias, CVU o link de cobro</label>
+                    <input type="text" id="alias-mercadopago" placeholder="Ej: roy.gastos.mp o https://link.mercadopago.com.ar/roy" maxlength="200">
+                </div>
+                <button type="submit" class="secundario">Guardar</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h2 style="margin:0;">🔑 Alquiler</h2></div>
+            <p class="texto-muted" style="font-size:.85rem; margin-top:-8px;">Configurá tu contrato para que Gastos personales te avise cuándo toca ajustarlo y te sugiera el nuevo monto.</p>
+            <form id="form-alquiler" class="form">
+                <div>
+                    <label for="alquiler-inicio">¿Cuándo empezó el contrato?</label>
+                    <input type="date" id="alquiler-inicio">
+                </div>
+                <div>
+                    <label for="alquiler-frecuencia">¿Cada cuántos meses se ajusta?</label>
+                    <select id="alquiler-frecuencia">
+                        <option value="3">3 meses</option>
+                        <option value="4">4 meses</option>
+                        <option value="6">6 meses</option>
+                        <option value="12">12 meses</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="alquiler-indice">¿Con qué se calcula el aumento?</label>
+                    <select id="alquiler-indice">
+                        <option value="ipc">📈 Automático (IPC / inflación)</option>
+                        <option value="icl">🏦 Automático (ICL, BCRA)</option>
+                        <option value="manual">✍️ Lo cargo yo a mano (dólar, UVA, etc.)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="alquiler-monto">Monto actual del alquiler</label>
+                    <input type="number" id="alquiler-monto" min="0" step="0.01" placeholder="Ej: 350000">
+                </div>
+                <div>
+                    <label for="alquiler-tipo">¿Lo pagás solo o compartido?</label>
+                    <select id="alquiler-tipo">
+                        <option value="personal">🏠 Yo solo</option>
+                        <option value="grupo">👥 Compartido con un grupo</option>
+                    </select>
+                </div>
+
+                <div class="campo-ancho drawer-item" id="campo-alquiler-como-recurrente" style="padding:0;">
+                    <span>Agregarlo también como gasto recurrente</span>
+                    <sl-switch id="alquiler-como-recurrente" checked></sl-switch>
+                </div>
+                <p class="campo-ancho texto-muted" id="texto-alquiler-personal" style="font-size:.78rem; margin:-4px 0 0;">Así te va a avisar en Gastos personales cuando no lo cargaste ese mes, con el monto siempre actualizado.</p>
+
+                <div class="campo-ancho" id="campo-alquiler-grupo" style="display:none;">
+                    <label for="alquiler-grupo">¿Con quién lo compartís?</label>
+                    <select id="alquiler-grupo"><option value="">Elegí un grupo...</option></select>
+                    <button type="button" class="secundario" id="boton-generar-codigo-alquiler" style="width:auto; margin-top: var(--space-2); font-size:.82rem;">✨ Generar código para compartir con una persona</button>
+                    <div id="codigo-alquiler-generado" style="display:none; margin-top: var(--space-3);">
+                        <p class="texto-muted" style="font-size:.82rem; margin-bottom:4px;">Pasale este código a la otra persona — cuando lo use en "🔑 Unirme a un grupo" (en Grupos), va a quedar sumada acá.</p>
+                        <span class="codigo-invitacion" id="texto-codigo-alquiler"></span>
+                        <button type="button" class="secundario icono" id="boton-copiar-codigo-alquiler" title="Copiar código" style="margin-left:8px;">📋</button>
+                    </div>
+                </div>
+                <div class="campo-ancho" id="campo-alquiler-participantes" style="display:none;">
+                    <label>¿Entre quiénes se divide?</label>
+                    <div id="alquiler-participantes" class="chips"></div>
+                </div>
+                <p class="campo-ancho texto-muted" id="texto-alquiler-grupo" style="font-size:.78rem; margin:-4px 0 0; display:none;">Se va a avisar en "Recurrentes del grupo" (Grupos) cuando nadie lo haya cargado ese mes, ya dividido entre quienes elijas — y con el monto siempre actualizado cuando confirmes un ajuste.</p>
+
+                <button type="submit" class="campo-ancho secundario">Guardar</button>
+            </form>
+            <div id="alquiler-resumen" style="margin-top: var(--space-4);"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h2 style="margin:0;">🎯 Presupuesto y sueldo</h2></div>
+            <p class="texto-muted" style="font-size:.85rem; margin-top:-8px;">Se usan en Gastos personales para mostrar cuánto llevás gastado contra tu presupuesto, y tu balance de ingresos y gastos del mes.</p>
+            <form id="form-presupuesto" class="form">
+                <div>
+                    <label for="presupuesto-mensual">Presupuesto mensual</label>
+                    <input type="number" id="presupuesto-mensual" min="0" step="0.01" placeholder="Ej: 500000">
+                </div>
+                <div>
+                    <label for="dia-sueldo">Día de cobro del sueldo (opcional)</label>
+                    <input type="number" id="dia-sueldo" min="1" max="31" placeholder="Ej: 1">
+                </div>
+                <button type="submit" class="campo-ancho secundario">Guardar</button>
+            </form>
+
+            <p class="texto-muted" style="font-size:.85rem; margin: var(--space-4) 0 4px;">Opcional: poné un tope por categoría (dejá vacío el que no quieras limitar).</p>
+            <form id="form-presupuesto-categoria" class="form">
+                <div id="campos-presupuesto-categoria" class="subgrupo-campos"></div>
+                <button type="submit" class="campo-ancho secundario">Guardar topes por categoría</button>
+            </form>
+        </div>
+        </div><!-- /config-solo-gastos -->
+
+        </section>
+
+        <section class="opciones-seccion" id="seccion-seguridad">
+            <h2 class="opciones-seccion-titulo">🔒 Seguridad</h2>
+
+        <div class="card">
+            <div class="card-header"><h2 style="margin:0;">Métodos de acceso</h2></div>
+
+            <div class="metodo-vinculado">
+                <span>Google</span>
+                <span class="badge" id="badge-google"></span>
+            </div>
+            <div class="metodo-vinculado">
+                <span>Contraseña</span>
+                <span class="badge" id="badge-password"></span>
+            </div>
+
+            <div id="seccion-vincular-password" style="margin-top: var(--space-4);">
+                <p class="texto-muted" style="font-size:.85rem;">Agregá una contraseña para poder entrar sin usar Google.</p>
+                <form id="form-vincular-password" class="form">
+                    <div>
+                        <label for="nueva-password">Nueva contraseña</label>
+                        <input type="password" id="nueva-password" minlength="6" required>
+                    </div>
+                    <div>
+                        <label for="confirmar-password">Confirmar</label>
+                        <input type="password" id="confirmar-password" minlength="6" required>
+                    </div>
+                    <button type="submit" class="campo-ancho secundario">Vincular contraseña</button>
+                </form>
+            </div>
+
+            <div id="seccion-cambiar-password" style="margin-top: var(--space-4); display:none;">
+                <p class="texto-muted" style="font-size:.85rem;">Te mandamos un mail con un link para elegir una contraseña nueva.</p>
+                <button type="button" id="boton-cambiar-password" class="secundario">Cambiar contraseña por mail</button>
+            </div>
+
+            <div style="margin-top: var(--space-5); border-top: 1px solid var(--color-border); padding-top: var(--space-4);">
+                <button type="button" id="boton-cerrar-sesion" class="peligro">Cerrar sesión</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 style="margin:0;">🔐 Verificación en dos pasos</h2>
+                <span class="badge" id="badge-2fa"></span>
+            </div>
+
+            <div id="2fa-sin-verificar" style="display:none;">
+                <p class="texto-muted" style="font-size:.85rem;">Para activarla primero hay que verificar tu email.</p>
+                <button type="button" id="boton-verificar-email" class="secundario">Reenviar mail de verificación</button>
+            </div>
+
+            <div id="2fa-desactivada" style="display:none;">
+                <p class="texto-muted" style="font-size:.85rem;">Sumá un código de tu app autenticadora (Google Authenticator, Authy, etc.) además de tu contraseña o Google.</p>
+                <button type="button" id="boton-activar-2fa" class="secundario">Activar verificación en dos pasos</button>
+
+                <div id="2fa-alta" style="display:none; margin-top: var(--space-4);">
+                    <p style="font-size:.85rem;">1. Abrí tu app autenticadora (Google Authenticator, Authy, etc.) y escaneá este código:</p>
+                    <div style="background:#fff; border-radius: var(--radius-md); padding: var(--space-3); display:inline-block;">
+                        <img id="2fa-qr" width="200" height="200" alt="Código QR para la app autenticadora">
+                    </div>
+                    <p style="font-size:.82rem; margin-top: var(--space-3);">¿No podés escanear? Cargala a mano — Cuenta: <strong id="2fa-cuenta-email"></strong>, Clave:</p>
+                    <p>
+                        <span class="codigo-invitacion" id="2fa-secreto"></span>
+                        <button type="button" class="secundario icono" id="boton-copiar-secreto" title="Copiar clave">📋</button>
+                    </p>
+                    <form id="form-confirmar-2fa" class="form" style="margin-top: var(--space-3);">
+                        <div class="campo-ancho">
+                            <label for="2fa-codigo-alta">2. Escribí el código de 6 dígitos que te muestra la app</label>
+                            <input type="text" id="2fa-codigo-alta" inputmode="numeric" pattern="[0-9]*" maxlength="6" required>
+                        </div>
+                        <button type="submit" class="campo-ancho">Confirmar y activar</button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="2fa-activada" style="display:none;">
+                <p class="texto-muted" style="font-size:.85rem;">Activada. Te la va a pedir cada vez que inicies sesión.</p>
+                <button type="button" id="boton-desactivar-2fa" class="peligro">Desactivar verificación en dos pasos</button>
+            </div>
+        </div>
+
+        <!-- Zona de peligro — a pedido de los testers, no había forma de
+             borrar la cuenta. Card con borde en rojo para que se note que
+             es distinta al resto (mismo --color-danger que el resto de
+             los botones "peligro"). -->
+        <div class="card" style="border-color: var(--color-danger);">
+            <div class="card-header"><h2 style="margin:0; color: var(--color-danger);">⚠️ Eliminar cuenta</h2></div>
+            <p class="texto-muted" style="font-size:.85rem;">
+                Borra TODO lo tuyo en las 5 apps del sistema (GastosApp, ComfyApp, GamingApp, AgendaApp y TareasApp): tu perfil, gastos, ingresos, tarjeta, alquiler, gastos recurrentes, tareas y la conexión con Google Calendar — y te saca de tus grupos (sin borrarlos, siguen existiendo para el resto). El código/historial de torneos de GamingApp en los que participaste puede seguir mostrando tu nombre.
+            </p>
+            <p style="font-weight:600; font-size:.85rem;">Esto no se puede deshacer.</p>
+            <button type="button" id="boton-eliminar-cuenta" class="peligro">🗑️ Eliminar mi cuenta para siempre</button>
+        </div>
+        </section>
+    </main>
+
+    <footer>
+        <p id="footer-copyright">&copy; 2026 GastosApp</p>
+    </footer>
+
+    <script type="module">
+        import { iniciarNavbar } from './nav.js';
+        import {
+            iniciarWidgetDeSesion, refrescarWidgetDeSesion, requerirSesion, actualizarNombrePerfil,
+            vincularContrasena, enviarEmailDeReseteo, obtenerMetodosVinculados,
+            cerrarSesion, mensajeDeError, estaEmailVerificado, enviarVerificacionEmail,
+            generarSecreto2FA, confirmarAlta2FA, obtenerFactoresInscriptos, quitar2FA,
+            reautenticar, eliminarCuentaAuth,
+        } from './auth.js';
+        import { borrarTodosLosDatos } from './eliminarCuenta.js';
+        import {
+            actualizarNombreEnMisGrupos, actualizarFotoEnMisGrupos, obtenerMisGrupos, escucharGrupo,
+            crearCuentaRapida, copiarAlPortapapeles, actualizarAliasMercadoPagoEnMisGrupos,
+            actualizarPreferenciaDeudaSaldadaEnMisGrupos,
+        } from './grupos.js';
+        import {
+            obtenerDiaCierreTarjeta, guardarDiaCierreTarjeta, obtenerPresupuesto, guardarPresupuesto,
+            obtenerFotoPerfil, guardarFotoPerfil,
+            obtenerPresupuestosPorCategoria, guardarPresupuestosPorCategoria,
+            obtenerAliasMercadoPago, guardarAliasMercadoPago,
+            obtenerPreferenciasNotif, guardarPreferenciasNotif,
+        } from './perfil.js';
+        import { CATEGORIAS } from './categorias.js';
+        import { obtenerAlquiler, guardarAlquiler, calcularAjuste, aplicarAjuste } from './alquiler.js';
+        import {
+            agregarRecurrente, actualizarRecurrente, eliminarRecurrente,
+            agregarRecurrenteGrupo, actualizarRecurrenteGrupo, eliminarRecurrenteGrupo,
+        } from './recurrentes.js';
+        import { redimensionarImagenComoDataURI } from './imagen.js';
+        import { aplicarTema, obtenerTema } from './tema.js';
+        import { avisar, confirmar, esc, abrirModal, cerrarModal } from './ui.js';
+        import {
+            notificacionesSoportadas, notificacionesActivadas,
+            activarNotificaciones, desactivarNotificaciones,
+        } from './notificaciones.js';
+        // Las 4 líneas de acá abajo son SOLO para que "Opciones" pueda
+        // mostrar/tocar el tema y las notificaciones propias de cada
+        // otra app cuando se abre con ?app=esa-app — ver el comentario
+        // grande de "Secciones tipo acordeón", más abajo. No crean
+        // ninguna dependencia real entre apps (cada una sigue siendo
+        // independiente, con sus propios datos) — es la MISMA idea que
+        // ya usa el "🛋️ volver a ComfyApp" de cada navbar: código que
+        // cruza carpetas porque están todas en el mismo dominio, nada
+        // más.
+        import { obtenerPreferenciaAvisoUnionTorneo, guardarPreferenciaAvisoUnionTorneo } from './gaming/torneos.js';
+        import {
+            obtenerTemaAgenda, aplicarTemaAgenda,
+            avisosDeEventosActivados, minutosAntesDeAviso, guardarAvisosActivados, guardarMinutosAntesDeAviso,
+        } from './agenda/nav-agenda.js';
+        import { obtenerTemaTareas, aplicarTemaTareas } from './tareas/nav-tareas.js';
+        import { obtenerPreferenciasNotifTareas, guardarPreferenciasNotifTareas } from './tareas/tareas.js';
+        // Genera el QR enteramente en el navegador (canvas local) — esta
+        // librería solo se DESCARGA una vez desde el CDN, nunca le manda tu
+        // clave secreta a ningún servidor para "armar" el QR (a diferencia
+        // de esos generadores de QR "gratis" online, que sí la mandarían).
+        import QRCode from 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/+esm';
+
+        // --- Adaptación según qué app abrió "Opciones" (?app=) ---
+        //
+        // cuenta.html es la única pantalla de "Opciones" de las 5 apps
+        // del mega sistema — en vez de que cada una tenga la suya
+        // (repitiendo Perfil/Seguridad/Eliminar cuenta 5 veces), se abre
+        // esta MISMA página desde cualquiera (ver el link "⚙ Opciones"
+        // en cada navbar/☰), con ?app=gastos|gaming|agenda|tareas|comfy
+        // en la URL. Lo que cambia según eso:
+        //   - El tema visual (ya resuelto en el <script> del <head>,
+        //     antes de que cargue el CSS — acá solo hace falta saber
+        //     CUÁL usar para que el switch de Apariencia lea/escriba la
+        //     clave correcta).
+        //   - La marca de arriba a la izquierda del navbar (nombre +
+        //     ícono + a dónde lleva) y sus links de sección — sin esto,
+        //     entrando desde otra app se seguía viendo "💸 GastosApp"
+        //     con los links de Gastos personales/Grupos/Más datos, que
+        //     no tienen nada que ver con la app de origen.
+        //   - Qué tarjeta de "🔔 Notificaciones" se muestra (cada app
+        //     dispara sus propios avisos, con su propia preferencia).
+        //   - Si se ve "⚙️ Configuración" completa (tarjeta, Mercado
+        //     Pago, alquiler, presupuesto — todo específico de
+        //     GastosApp) o solo Apariencia.
+        // Perfil, Seguridad y Eliminar cuenta son iguales para las 5 —
+        // es la MISMA cuenta de Firebase Auth, no cambian con el origen.
+        const APP_ACTUAL = new URLSearchParams(window.location.search).get('app') || 'gastos';
+
+        // Mismo dato que MARCA_POR_APP no existe en ningún otro lado —
+        // cada nav-X.js ya arma su propia marca fija (siempre la de su
+        // propia app), así que no hay de dónde importarlo.
+        const MARCA_POR_APP = {
+            gastos: { href: 'index.html', texto: '💸 GastosApp' },
+            gaming: { href: 'gaming/index.html', texto: '🎮 GamingApp' },
+            agenda: { href: 'agenda/index.html', texto: '🗓️ AgendaApp' },
+            tareas: { href: 'tareas/index.html', texto: '🗒️ TareasApp' },
+            comfy: { href: 'sistema.html', texto: '🛋️ ComfyApp' },
+        };
+        iniciarNavbar('cuenta.html', {
+            marca: MARCA_POR_APP[APP_ACTUAL] || MARCA_POR_APP.gastos,
+            // Los links de Gastos personales/Grupos/Más datos son
+            // secciones DE GastosApp — no tienen sentido si se entró
+            // desde otra app (mismo criterio que sistema.html).
+            ocultarSecciones: APP_ACTUAL !== 'gastos',
+            // El switch de tema del propio ☰ (distinto del selector
+            // "Apariencia" de la sección Configuración, que sí está
+            // adaptado) solo conoce la clave de localStorage de
+            // GastosApp — mostrarlo con otra app tocaría el tema
+            // equivocado sin que se note.
+            ocultarSwitchTema: APP_ACTUAL !== 'gastos',
+        });
+        iniciarWidgetDeSesion('cuenta.html');
+        // Mismo texto que la marca del navbar, para el pie de página.
+        document.getElementById('footer-copyright').textContent = `© 2026 ${(MARCA_POR_APP[APP_ACTUAL] || MARCA_POR_APP.gastos).texto}`;
+
+        if (APP_ACTUAL !== 'gastos') {
+            document.getElementById('config-solo-gastos').style.display = 'none';
+        }
+        ['notif-card-gastos', 'notif-card-gaming', 'notif-card-agenda', 'notif-card-tareas', 'notif-card-comfy'].forEach(id => {
+            document.getElementById(id).style.display = id === `notif-card-${APP_ACTUAL}` ? 'block' : 'none';
+        });
+
+        // --- Secciones tipo acordeón (Cuenta / Notificaciones /
+        // Configuración / Seguridad) ---
+        //
+        // A pedido de Roy: antes los links de arriba solo hacían scroll
+        // hasta la sección (todas visibles a la vez, una página larga);
+        // ahora se abre UNA sola sección a la vez, como cualquier
+        // pantalla de "Configuración" con pestañas — más fácil de
+        // recorrer sin perderse en un scroll largo.
+        //
+        // El hash de la URL (#seccion-x) es la única fuente de verdad de
+        // cuál está abierta — así los links de arriba siguen siendo
+        // <a href="#..."> normales (sin JS interceptando el click), y de
+        // paso queda como bonus un link directo a una sección puntual
+        // (ej. cuenta.html#seccion-seguridad) y anda bien el
+        // adelante/atrás del navegador.
+        const SECCIONES_OPCIONES = ['seccion-cuenta', 'seccion-notificaciones', 'seccion-configuracion', 'seccion-seguridad'];
+
+        function seccionActivaDesdeHash() {
+            const id = window.location.hash.slice(1);
+            return SECCIONES_OPCIONES.includes(id) ? id : SECCIONES_OPCIONES[0];
+        }
+
+        function mostrarSeccionOpciones() {
+            const activa = seccionActivaDesdeHash();
+            SECCIONES_OPCIONES.forEach(id => {
+                document.getElementById(id).style.display = id === activa ? 'block' : 'none';
+            });
+            document.querySelectorAll('.opciones-nav .tab').forEach(tab => {
+                tab.classList.toggle('activa', tab.getAttribute('href') === '#' + activa);
+            });
+            // Sin esto, cambiar de sección con las flechas del teclado o
+            // un link externo dejaba el scroll donde estaba antes (a
+            // mitad de la sección vieja) en vez de arrancar arriba de la
+            // nueva.
+            window.scrollTo({ top: 0, behavior: 'instant' });
+        }
+        mostrarSeccionOpciones();
+        window.addEventListener('hashchange', mostrarSeccionOpciones);
+
+        // --- Tema ---
+        //
+        // GastosApp/GamingApp comparten tema.js (clave "tema");
+        // AgendaApp/TareasApp/ComfyApp tienen cada una la suya propia
+        // (mismo patrón, funciones distintas — ver el comentario grande
+        // de "Adaptación", más arriba). ComfyApp no tiene un módulo de
+        // nav propio del que importar las suyas (vive inline en
+        // sistema.html), así que van acá nomás, mismas 2 líneas de
+        // siempre.
+        function obtenerTemaComfy() {
+            return localStorage.getItem('tema-comfy') || 'claro';
+        }
+        function aplicarTemaComfy(tema) {
+            document.documentElement.setAttribute('data-tema', tema === 'oscuro' ? 'cafeteria-oscura' : 'cafeteria');
+            localStorage.setItem('tema-comfy', tema);
+        }
+
+        const TEMA_POR_APP = {
+            gastos: { obtener: obtenerTema, aplicar: aplicarTema },
+            gaming: { obtener: obtenerTema, aplicar: aplicarTema },
+            agenda: { obtener: obtenerTemaAgenda, aplicar: aplicarTemaAgenda },
+            tareas: { obtener: obtenerTemaTareas, aplicar: aplicarTemaTareas },
+            comfy: { obtener: obtenerTemaComfy, aplicar: aplicarTemaComfy },
+        };
+        const temaDeEstaApp = TEMA_POR_APP[APP_ACTUAL] || TEMA_POR_APP.gastos;
+
+        // No alcanza con actualizar los tabs solo cuando SE LOS TOCA A
+        // ELLOS: si el tema se cambia desde el switch del menú lateral
+        // (nav.js), estos tabs quedaban mostrando el valor viejo hasta
+        // recargar la página. Escuchando "tema-cambiado" (lo dispara
+        // aplicarTema, venga de donde venga) quedan sincronizados
+        // siempre — pero ese evento solo lo dispara tema.js, así que
+        // solo hace falta escucharlo para gastos/gaming: para las otras
+        // 3 apps este switch es el único control de tema en pantalla,
+        // no hay nada más con qué sincronizarlo.
+        function marcarTemaActivo() {
+            const actual = temaDeEstaApp.obtener();
+            document.querySelectorAll('#selector-tema .tab').forEach(tab => {
+                tab.classList.toggle('activa', tab.dataset.tema === actual);
+            });
+        }
+        document.querySelectorAll('#selector-tema .tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                temaDeEstaApp.aplicar(tab.dataset.tema);
+                marcarTemaActivo();
+            });
+        });
+        if (APP_ACTUAL === 'gastos' || APP_ACTUAL === 'gaming') {
+            document.addEventListener('tema-cambiado', marcarTemaActivo);
+        }
+        marcarTemaActivo();
+
+        document.getElementById('boton-cerrar-sesion').addEventListener('click', () => {
+            cerrarSesion();
+        });
+
+        // --- Notificaciones ---
+        const switchNotificaciones = document.getElementById('switch-notificaciones');
+        if (!notificacionesSoportadas()) {
+            switchNotificaciones.disabled = true;
+            document.getElementById('notificaciones-no-soportado').style.display = 'block';
+        } else {
+            switchNotificaciones.checked = notificacionesActivadas();
+        }
+        switchNotificaciones.addEventListener('sl-change', async (evento) => {
+            if (evento.target.checked) {
+                try {
+                    const concedido = await activarNotificaciones();
+                    if (!concedido) {
+                        // El usuario le dijo que no al permiso del navegador
+                        // — el switch tiene que reflejar eso, no quedar
+                        // prendido mostrando algo que en realidad no va a
+                        // funcionar.
+                        switchNotificaciones.checked = false;
+                        avisar('No se concedió el permiso de notificaciones.', 'error');
+                        return;
+                    }
+                    avisar('Notificaciones activadas', 'exito');
+                } catch (error) {
+                    switchNotificaciones.checked = false;
+                    avisar(error.message, 'error');
+                }
+            } else {
+                desactivarNotificaciones();
+                avisar('Notificaciones desactivadas', 'info');
+            }
+        });
+
+        requerirSesion(async (user) => {
+            // --- Perfil ---
+            document.getElementById('nombre-perfil').value = user.displayName || '';
+            document.getElementById('form-perfil').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const nombre = document.getElementById('nombre-perfil').value.trim();
+                if (!nombre) return;
+                try {
+                    await actualizarNombrePerfil(nombre);
+                    await actualizarNombreEnMisGrupos(user.uid, nombre);
+                    // updateProfile() no dispara onAuthStateChanged (no es
+                    // un cambio de sesión) — sin esto, el saludo de arriba
+                    // seguía mostrando el nombre viejo hasta recargar.
+                    refrescarWidgetDeSesion();
+                    avisar('Nombre actualizado', 'exito');
+                } catch (error) {
+                    avisar(mensajeDeError(error), 'error');
+                }
+            });
+
+            // --- Foto de perfil ---
+            const avatarPreview = document.getElementById('avatar-preview');
+            const fotoActual = await obtenerFotoPerfil(user.uid);
+            if (fotoActual) avatarPreview.innerHTML = `<img src="${esc(fotoActual)}" alt="">`;
+
+            document.getElementById('input-foto-perfil').addEventListener('change', async (evento) => {
+                const archivo = evento.target.files[0];
+                if (!archivo) return;
+                try {
+                    avatarPreview.textContent = '⏳';
+                    const dataURI = await redimensionarImagenComoDataURI(archivo);
+                    await guardarFotoPerfil(user.uid, dataURI);
+                    await actualizarFotoEnMisGrupos(user.uid, dataURI);
+                    avatarPreview.innerHTML = `<img src="${esc(dataURI)}" alt="">`;
+                    refrescarWidgetDeSesion();
+                    avisar('Foto de perfil actualizada', 'exito');
+                } catch (error) {
+                    avatarPreview.innerHTML = fotoActual ? `<img src="${esc(fotoActual)}" alt="">` : '😊';
+                    avisar(error.message || 'No se pudo actualizar la foto.', 'error');
+                } finally {
+                    evento.target.value = ''; // por si eligen el mismo archivo dos veces seguidas
+                }
+            });
+
+            // --- Notificaciones ---
+            //
+            // Cada control guarda apenas se toca — no hace falta un botón
+            // "Guardar" aparte para esto (mismo criterio que el switch de
+            // tema, más arriba).
+            const prefsNotif = await obtenerPreferenciasNotif(user.uid);
+            const switchDeuda = document.getElementById('notif-deuda-saldada');
+            const switchCierre = document.getElementById('notif-cierre-tarjeta');
+            const selectCierreDias = document.getElementById('notif-cierre-dias-antes');
+            const zonaCierreDiasAntes = document.getElementById('zona-cierre-dias-antes');
+            const switchPresupuesto = document.getElementById('notif-presupuesto');
+            const switchRecurrentes = document.getElementById('notif-recurrentes');
+
+            switchDeuda.checked = prefsNotif.deudaSaldada;
+            switchCierre.checked = prefsNotif.cierreTarjeta;
+            selectCierreDias.value = String(prefsNotif.cierreTarjetaDiasAntes);
+            switchPresupuesto.checked = prefsNotif.presupuesto;
+            switchRecurrentes.checked = prefsNotif.recurrentes;
+
+            // El selector de anticipación solo tiene sentido con el aviso
+            // de cierre prendido.
+            function actualizarVisibilidadDiasAntes() {
+                zonaCierreDiasAntes.style.display = switchCierre.checked ? 'block' : 'none';
+            }
+            actualizarVisibilidadDiasAntes();
+
+            async function guardarPreferenciaNotif(cambios) {
+                Object.assign(prefsNotif, cambios);
+                try {
+                    await guardarPreferenciasNotif(user.uid, prefsNotif);
+                } catch (error) {
+                    avisar('No se pudo guardar la preferencia: ' + error.message, 'error');
+                }
+            }
+
+            switchDeuda.addEventListener('sl-change', async () => {
+                await guardarPreferenciaNotif({ deudaSaldada: switchDeuda.checked });
+                // Esta es la única que hace falta denormalizar en cada
+                // grupo — quien te salda una deuda es OTRO usuario, y sus
+                // reglas de Firestore no le dejan leer tu perfil privado
+                // (ver el comentario grande en grupos.js).
+                actualizarPreferenciaDeudaSaldadaEnMisGrupos(user.uid, switchDeuda.checked)
+                    .catch(error => avisar('No se pudo actualizar la preferencia en tus grupos: ' + error.message, 'error'));
+            });
+            switchCierre.addEventListener('sl-change', () => {
+                actualizarVisibilidadDiasAntes();
+                guardarPreferenciaNotif({ cierreTarjeta: switchCierre.checked });
+            });
+            selectCierreDias.addEventListener('change', () => {
+                guardarPreferenciaNotif({ cierreTarjetaDiasAntes: Number(selectCierreDias.value) });
+            });
+            switchPresupuesto.addEventListener('sl-change', () => {
+                guardarPreferenciaNotif({ presupuesto: switchPresupuesto.checked });
+            });
+            switchRecurrentes.addEventListener('sl-change', () => {
+                guardarPreferenciaNotif({ recurrentes: switchRecurrentes.checked });
+            });
+
+            // --- Notificaciones de GamingApp/AgendaApp/TareasApp ---
+            //
+            // Sus tarjetas están ocultas salvo que "Opciones" se haya
+            // abierto con ?app=esa-app (ver más arriba), pero igual se
+            // cablean siempre acá adentro — mismo criterio que
+            // config-solo-gastos: los datos de la persona en esas apps
+            // existen sin importar desde dónde entró, así que no tiene
+            // sentido partir este código en 5 copias condicionales.
+
+            // GamingApp
+            const switchAvisoUnionTorneo = document.getElementById('notif-gaming-union-torneo');
+            switchAvisoUnionTorneo.checked = await obtenerPreferenciaAvisoUnionTorneo(user.uid);
+            switchAvisoUnionTorneo.addEventListener('sl-change', () => {
+                guardarPreferenciaAvisoUnionTorneo(user.uid, switchAvisoUnionTorneo.checked)
+                    .catch(error => avisar('No se pudo guardar: ' + error.message, 'error'));
+            });
+
+            // AgendaApp — a diferencia de las demás, esta preferencia
+            // vive en localStorage (no Firestore, ver el comentario
+            // grande en nav-agenda.js), así que no hace falta await ni
+            // manejo de error de red.
+            const switchAvisoEventos = document.getElementById('notif-agenda-eventos');
+            const selectAvisoMinutos = document.getElementById('notif-agenda-minutos');
+            const zonaAvisoMinutos = document.getElementById('notif-agenda-zona-minutos');
+            switchAvisoEventos.checked = avisosDeEventosActivados();
+            selectAvisoMinutos.value = String(minutosAntesDeAviso());
+            function actualizarVisibilidadAvisoMinutos() {
+                zonaAvisoMinutos.style.display = switchAvisoEventos.checked ? 'block' : 'none';
+            }
+            actualizarVisibilidadAvisoMinutos();
+            switchAvisoEventos.addEventListener('sl-change', () => {
+                guardarAvisosActivados(switchAvisoEventos.checked);
+                actualizarVisibilidadAvisoMinutos();
+            });
+            selectAvisoMinutos.addEventListener('change', () => {
+                guardarMinutosAntesDeAviso(selectAvisoMinutos.value);
+            });
+
+            // TareasApp
+            const prefsNotifTareas = await obtenerPreferenciasNotifTareas(user.uid);
+            const switchTareaAsignada = document.getElementById('notif-tareas-asignada');
+            const switchTareaCompletada = document.getElementById('notif-tareas-completada');
+            switchTareaAsignada.checked = prefsNotifTareas.tareaAsignada;
+            switchTareaCompletada.checked = prefsNotifTareas.tareaCompletada;
+            switchTareaAsignada.addEventListener('sl-change', () => {
+                prefsNotifTareas.tareaAsignada = switchTareaAsignada.checked;
+                guardarPreferenciasNotifTareas(user.uid, prefsNotifTareas).catch(error => avisar('No se pudo guardar: ' + error.message, 'error'));
+            });
+            switchTareaCompletada.addEventListener('sl-change', () => {
+                prefsNotifTareas.tareaCompletada = switchTareaCompletada.checked;
+                guardarPreferenciasNotifTareas(user.uid, prefsNotifTareas).catch(error => avisar('No se pudo guardar: ' + error.message, 'error'));
+            });
+
+            // --- Tarjeta de crédito ---
+            const diaCierreActual = await obtenerDiaCierreTarjeta(user.uid);
+            if (diaCierreActual) {
+                document.getElementById('dia-cierre-perfil').value = diaCierreActual;
+            }
+            document.getElementById('form-tarjeta').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const dia = parseInt(document.getElementById('dia-cierre-perfil').value, 10);
+                if (!dia || dia < 1 || dia > 31) {
+                    avisar('Ingresá un día válido (1 a 31).', 'error');
+                    return;
+                }
+                try {
+                    await guardarDiaCierreTarjeta(user.uid, dia);
+                    avisar('Día de cierre guardado', 'exito');
+                } catch (error) {
+                    avisar(mensajeDeError(error), 'error');
+                }
+            });
+
+            // --- Mercado Pago ---
+            const aliasActual = await obtenerAliasMercadoPago(user.uid);
+            if (aliasActual) {
+                document.getElementById('alias-mercadopago').value = aliasActual;
+            }
+            document.getElementById('form-mercadopago').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const alias = document.getElementById('alias-mercadopago').value.trim();
+                try {
+                    await guardarAliasMercadoPago(user.uid, alias);
+                    await actualizarAliasMercadoPagoEnMisGrupos(user.uid, alias);
+                    avisar(alias ? 'Alias de Mercado Pago guardado' : 'Alias de Mercado Pago borrado', 'exito');
+                } catch (error) {
+                    avisar(mensajeDeError(error), 'error');
+                }
+            });
+
+            // --- Alquiler ---
+            let alquilerActual = await obtenerAlquiler(user.uid);
+            const tipoSelect = document.getElementById('alquiler-tipo');
+            const grupoSelect = document.getElementById('alquiler-grupo');
+            const participantesContenedor = document.getElementById('alquiler-participantes');
+            let nombresPorUidGrupoAlquiler = {};
+            let participantesAlquiler = new Set();
+            let dejarDeEscucharGrupoAlquiler = null;
+
+            function actualizarCamposSegunTipo() {
+                const esGrupo = tipoSelect.value === 'grupo';
+                document.getElementById('campo-alquiler-como-recurrente').style.display = esGrupo ? 'none' : 'flex';
+                document.getElementById('texto-alquiler-personal').style.display = esGrupo ? 'none' : 'block';
+                document.getElementById('campo-alquiler-grupo').style.display = esGrupo ? 'block' : 'none';
+                document.getElementById('campo-alquiler-participantes').style.display = esGrupo ? 'block' : 'none';
+                document.getElementById('texto-alquiler-grupo').style.display = esGrupo ? 'block' : 'none';
+            }
+            tipoSelect.addEventListener('change', actualizarCamposSegunTipo);
+
+            const misGruposAlquiler = await obtenerMisGrupos(user.uid);
+            grupoSelect.innerHTML += misGruposAlquiler.map(g => `<option value="${g.id}">${esc(g.nombre)}</option>`).join('');
+
+            // "Generar código" es un atajo para no obligar a ir primero
+            // a Grupos y crear uno a mano — por dentro sigue siendo un
+            // grupo real (con su código, en tiempo real), solo que
+            // arranca "liviano": sin nombre para elegir, pensado para
+            // vincular a una sola persona (ver crearCuentaRapida en
+            // grupos.js — el mismo mecanismo de "⚡ Cuenta rápida").
+            document.getElementById('boton-generar-codigo-alquiler').addEventListener('click', async () => {
+                try {
+                    const grupo = await crearCuentaRapida(user, 'Alquiler compartido');
+                    const opcion = document.createElement('option');
+                    opcion.value = grupo.id;
+                    opcion.textContent = grupo.nombre;
+                    grupoSelect.appendChild(opcion);
+                    grupoSelect.value = grupo.id;
+                    grupoSelect.dispatchEvent(new Event('change'));
+
+                    document.getElementById('texto-codigo-alquiler').textContent = grupo.codigoInvitacion;
+                    document.getElementById('codigo-alquiler-generado').style.display = 'block';
+                    avisar('Código generado — no te olvides de guardar el formulario.', 'exito');
+                } catch (error) {
+                    avisar(mensajeDeError(error), 'error');
+                }
+            });
+            document.getElementById('boton-copiar-codigo-alquiler').addEventListener('click', () => {
+                copiarAlPortapapeles(document.getElementById('texto-codigo-alquiler').textContent);
+            });
+
+            function renderChipsParticipantesAlquiler() {
+                participantesContenedor.innerHTML = Object.entries(nombresPorUidGrupoAlquiler).map(([uid, nombre]) => `
+                    <button type="button" class="chip" data-uid="${uid}" aria-pressed="${participantesAlquiler.has(uid)}">${esc(nombre)}</button>
+                `).join('');
+                participantesContenedor.querySelectorAll('.chip').forEach(chip => {
+                    chip.addEventListener('click', () => {
+                        const uid = chip.dataset.uid;
+                        if (participantesAlquiler.has(uid)) participantesAlquiler.delete(uid);
+                        else participantesAlquiler.add(uid);
+                        chip.setAttribute('aria-pressed', participantesAlquiler.has(uid));
+                    });
+                });
+            }
+
+            // Al elegir un grupo, se escuchan sus integrantes para armar
+            // los chips — por defecto todos tildados (caso más común:
+            // el alquiler se divide entre todo el grupo).
+            grupoSelect.addEventListener('change', () => {
+                dejarDeEscucharGrupoAlquiler?.();
+                if (!grupoSelect.value) {
+                    nombresPorUidGrupoAlquiler = {};
+                    participantesAlquiler = new Set();
+                    renderChipsParticipantesAlquiler();
+                    return;
+                }
+                dejarDeEscucharGrupoAlquiler = escucharGrupo(grupoSelect.value, (datosGrupo) => {
+                    nombresPorUidGrupoAlquiler = datosGrupo?.nombresPorUid || {};
+                    // Si ya había participantes guardados para ESTE grupo
+                    // (se está reabriendo/editando lo mismo), se respetan;
+                    // si no, arrancan todos tildados.
+                    if (participantesAlquiler.size === 0) {
+                        participantesAlquiler = new Set(Object.keys(nombresPorUidGrupoAlquiler));
+                    }
+                    renderChipsParticipantesAlquiler();
+                    // El nombre real recién se sabe acá — reemplaza el
+                    // texto genérico que se le puso a la opción cuando
+                    // se agregó a mano (grupo de "código liviano" que no
+                    // está en misGruposAlquiler).
+                    const opcionSeleccionada = grupoSelect.querySelector(`option[value="${grupoSelect.value}"]`);
+                    if (opcionSeleccionada && datosGrupo?.nombre) opcionSeleccionada.textContent = datosGrupo.nombre;
+                });
+            });
+
+            if (alquilerActual) {
+                document.getElementById('alquiler-inicio').value = alquilerActual.fechaInicio;
+                document.getElementById('alquiler-frecuencia').value = alquilerActual.frecuenciaMeses;
+                document.getElementById('alquiler-indice').value = alquilerActual.indice;
+                document.getElementById('alquiler-monto').value = alquilerActual.montoActual;
+                document.getElementById('alquiler-como-recurrente').checked = !!alquilerActual.recurrenteId;
+                tipoSelect.value = alquilerActual.compartido ? 'grupo' : 'personal';
+                if (alquilerActual.compartido && alquilerActual.grupoId) {
+                    participantesAlquiler = new Set(alquilerActual.divididoEntre || []);
+                    // Si el grupo vinculado se generó con "código liviano"
+                    // (Cuenta rápida), no está en misGruposAlquiler — no
+                    // aparece en "Tus grupos" a propósito — así que el
+                    // <select> todavía no tiene esa opción; se agrega acá
+                    // para no perder la selección al volver a abrir esta
+                    // pantalla.
+                    if (!misGruposAlquiler.some(g => g.id === alquilerActual.grupoId)) {
+                        const opcion = document.createElement('option');
+                        opcion.value = alquilerActual.grupoId;
+                        opcion.textContent = 'Grupo compartido (código liviano)';
+                        grupoSelect.appendChild(opcion);
+                    }
+                    grupoSelect.value = alquilerActual.grupoId;
+                    grupoSelect.dispatchEvent(new Event('change'));
+                }
+            }
+            actualizarCamposSegunTipo();
+
+            // Crea, actualiza o borra el recurrente vinculado al
+            // alquiler (personal o del grupo, según lo elegido) —
+            // devuelve { recurrenteId, compartido, grupoId, divididoEntre }
+            // para guardar en el propio documento de alquiler, y no
+            // tener que buscarlo por descripción después (frágil si
+            // alguien lo renombra).
+            async function sincronizarRecurrenteAlquiler(fechaInicio, monto) {
+                const compartido = tipoSelect.value === 'grupo';
+                const recurrenteIdActual = alquilerActual?.recurrenteId || null;
+                const eraCompartido = !!alquilerActual?.compartido;
+                const diaDelMes = new Date(`${fechaInicio}T00:00:00`).getDate();
+
+                // Si se cambió de modo (personal↔grupo) o de grupo, el
+                // recurrente viejo queda huérfano — se borra antes de
+                // crear el nuevo en el lugar que corresponda.
+                async function borrarRecurrenteViejoSiCorresponde(nuevoGrupoId) {
+                    if (!recurrenteIdActual) return;
+                    const cambioDeModo = eraCompartido !== compartido;
+                    const cambioDeGrupo = compartido && eraCompartido && alquilerActual.grupoId !== nuevoGrupoId;
+                    if (cambioDeModo || cambioDeGrupo) {
+                        if (eraCompartido) await eliminarRecurrenteGrupo(alquilerActual.grupoId, recurrenteIdActual);
+                        else await eliminarRecurrente(user.uid, recurrenteIdActual);
+                    }
+                }
+
+                if (!compartido) {
+                    await borrarRecurrenteViejoSiCorresponde(null);
+                    const comoRecurrente = document.getElementById('alquiler-como-recurrente').checked;
+                    if (!comoRecurrente) {
+                        if (recurrenteIdActual && !eraCompartido) await eliminarRecurrente(user.uid, recurrenteIdActual);
+                        return { recurrenteId: null, compartido: false, grupoId: null, divididoEntre: null };
+                    }
+                    const datosRecurrente = {
+                        tipo: 'gasto', descripcion: 'Alquiler', monto, moneda: 'ARS',
+                        categoria: 'alquiler', metodoPago: 'efectivo', diaDelMes, activo: true,
+                    };
+                    const idVigente = !eraCompartido ? recurrenteIdActual : null;
+                    if (idVigente) {
+                        await actualizarRecurrente(user.uid, idVigente, datosRecurrente);
+                        return { recurrenteId: idVigente, compartido: false, grupoId: null, divididoEntre: null };
+                    }
+                    const ref = await agregarRecurrente(user.uid, datosRecurrente);
+                    return { recurrenteId: ref.id, compartido: false, grupoId: null, divididoEntre: null };
+                }
+
+                // --- Compartido con un grupo ---
+                const grupoId = grupoSelect.value;
+                const divididoEntre = Array.from(participantesAlquiler);
+                if (!grupoId) throw new Error('Elegí con qué grupo se comparte.');
+                if (divididoEntre.length === 0) throw new Error('Elegí entre quiénes se divide.');
+
+                await borrarRecurrenteViejoSiCorresponde(grupoId);
+                const datosRecurrenteGrupo = {
+                    descripcion: 'Alquiler', monto, moneda: 'ARS', categoria: 'alquiler',
+                    diaDelMes, divididoEntre, partes: null, activo: true,
+                };
+                const idVigente = (eraCompartido && alquilerActual.grupoId === grupoId) ? recurrenteIdActual : null;
+                if (idVigente) {
+                    await actualizarRecurrenteGrupo(grupoId, idVigente, datosRecurrenteGrupo);
+                    return { recurrenteId: idVigente, compartido: true, grupoId, divididoEntre };
+                }
+                const ref = await agregarRecurrenteGrupo(grupoId, datosRecurrenteGrupo);
+                return { recurrenteId: ref.id, compartido: true, grupoId, divididoEntre };
+            }
+
+            // Consulta la API recién si hay algo configurado — nada que
+            // mostrar todavía si el usuario nunca cargó su contrato.
+            async function renderResumenAlquiler() {
+                const contenedor = document.getElementById('alquiler-resumen');
+                if (!alquilerActual) {
+                    contenedor.innerHTML = '';
+                    return;
+                }
+
+                contenedor.innerHTML = '<p class="texto-muted" style="font-size:.85rem;">Calculando...</p>';
+                let ajuste;
+                try {
+                    ajuste = await calcularAjuste(alquilerActual);
+                } catch (error) {
+                    contenedor.innerHTML = `<p class="texto-muted" style="font-size:.85rem;">No se pudo consultar el índice ahora — probá de nuevo más tarde. (${esc(error.message)})</p>`;
+                    return;
+                }
+
+                const fechaTexto = ajuste.proximoAjuste.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+                const cuandoTexto = ajuste.diasParaAjuste <= 0
+                    ? '¡ya está! (o pasó sin marcarlo)'
+                    : `en ${ajuste.diasParaAjuste} día${ajuste.diasParaAjuste === 1 ? '' : 's'}`;
+
+                const nombreIndice = alquilerActual.indice === 'icl' ? 'ICL' : 'IPC';
+                const bloqueSugerido = ajuste.montoSugerido ? `
+                    <p style="margin: var(--space-2) 0;">Aumento acumulado (${nombreIndice}): <strong>+${ajuste.inflacionAcumulada.toFixed(1)}%</strong> → monto sugerido: <strong>$${ajuste.montoSugerido.toFixed(2)}</strong></p>
+                    <button type="button" class="secundario" id="boton-aplicar-ajuste" style="width:auto;">✅ Ya lo apliqué, actualizar monto</button>
+                ` : `
+                    <p class="texto-muted" style="font-size:.85rem;">Elegiste calcularlo manualmente — cuando sepas el nuevo monto, actualizalo arriba y guardá.</p>
+                `;
+
+                contenedor.innerHTML = `
+                    <div class="card" style="background: var(--color-surface-2); box-shadow:none;">
+                        <p style="margin:0 0 4px;">🗓️ Próximo ajuste: <strong>${fechaTexto}</strong> (${cuandoTexto})</p>
+                        ${bloqueSugerido}
+                    </div>
+                `;
+
+                document.getElementById('boton-aplicar-ajuste')?.addEventListener('click', async () => {
+                    try {
+                        const montoNuevo = Math.round(ajuste.montoSugerido * 100) / 100;
+                        await aplicarAjuste(user.uid, alquilerActual, montoNuevo);
+                        // El recurrente vinculado (si hay uno) también se
+                        // actualiza acá — personal o del grupo, según
+                        // corresponda — si no, "Cargar ahora" seguiría
+                        // sugiriendo el monto viejo hasta la próxima vez
+                        // que se guarde el formulario de Alquiler.
+                        if (alquilerActual.recurrenteId) {
+                            if (alquilerActual.compartido) {
+                                await actualizarRecurrenteGrupo(alquilerActual.grupoId, alquilerActual.recurrenteId, { monto: montoNuevo });
+                            } else {
+                                await actualizarRecurrente(user.uid, alquilerActual.recurrenteId, { monto: montoNuevo });
+                            }
+                        }
+                        alquilerActual = await obtenerAlquiler(user.uid);
+                        document.getElementById('alquiler-monto').value = alquilerActual.montoActual;
+                        avisar('Monto actualizado — arranca a contarse el próximo período desde hoy.', 'exito');
+                        renderResumenAlquiler();
+                    } catch (error) {
+                        avisar(mensajeDeError(error), 'error');
+                    }
+                });
+            }
+            renderResumenAlquiler();
+
+            document.getElementById('form-alquiler').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const fechaInicio = document.getElementById('alquiler-inicio').value;
+                const monto = parseFloat(document.getElementById('alquiler-monto').value);
+                if (!fechaInicio || !monto || monto <= 0) {
+                    avisar('Completá la fecha de inicio y el monto con valores válidos.', 'error');
+                    return;
+                }
+                try {
+                    const { recurrenteId, compartido, grupoId, divididoEntre } = await sincronizarRecurrenteAlquiler(fechaInicio, monto);
+                    const datos = {
+                        fechaInicio,
+                        frecuenciaMeses: parseInt(document.getElementById('alquiler-frecuencia').value, 10),
+                        indice: document.getElementById('alquiler-indice').value,
+                        montoActual: monto,
+                        // Si ya había un último ajuste guardado se conserva
+                        // (cambiar estos datos no reinicia el conteo del
+                        // período actual); si es la primera vez, no hay.
+                        fechaUltimoAjuste: alquilerActual?.fechaUltimoAjuste || null,
+                        recurrenteId, compartido, grupoId, divididoEntre,
+                    };
+                    await guardarAlquiler(user.uid, datos);
+                    alquilerActual = datos;
+                    avisar('Alquiler guardado', 'exito');
+                    renderResumenAlquiler();
+                } catch (error) {
+                    avisar(mensajeDeError(error), 'error');
+                }
+            });
+
+            // --- Presupuesto y sueldo ---
+            const { presupuestoMensual, diaSueldo } = await obtenerPresupuesto(user.uid);
+            if (presupuestoMensual) document.getElementById('presupuesto-mensual').value = presupuestoMensual;
+            if (diaSueldo) document.getElementById('dia-sueldo').value = diaSueldo;
+
+            document.getElementById('form-presupuesto').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const presupuesto = parseFloat(document.getElementById('presupuesto-mensual').value) || null;
+                const dia = parseInt(document.getElementById('dia-sueldo').value, 10) || null;
+                try {
+                    await guardarPresupuesto(user.uid, presupuesto, dia);
+                    avisar('Guardado', 'exito');
+                } catch (error) {
+                    avisar(mensajeDeError(error), 'error');
+                }
+            });
+
+            // --- Presupuesto por categoría ---
+            const presupuestosCategoria = await obtenerPresupuestosPorCategoria(user.uid);
+            document.getElementById('campos-presupuesto-categoria').innerHTML = CATEGORIAS.map(c => `
+                <div>
+                    <label for="tope-${c.valor}">${c.icono} ${c.texto}</label>
+                    <input type="number" id="tope-${c.valor}" min="0" step="0.01" placeholder="Sin tope" value="${presupuestosCategoria[c.valor] || ''}">
+                </div>
+            `).join('');
+
+            document.getElementById('form-presupuesto-categoria').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const mapa = {};
+                CATEGORIAS.forEach(c => {
+                    const valor = parseFloat(document.getElementById(`tope-${c.valor}`).value);
+                    if (valor > 0) mapa[c.valor] = valor;
+                });
+                try {
+                    await guardarPresupuestosPorCategoria(user.uid, mapa);
+                    avisar('Topes por categoría guardados', 'exito');
+                } catch (error) {
+                    avisar(mensajeDeError(error), 'error');
+                }
+            });
+
+            // --- Seguridad: métodos vinculados ---
+            const metodos = obtenerMetodosVinculados();
+            const tieneGoogle = metodos.includes('google.com');
+            const tienePassword = metodos.includes('password');
+
+            const badgeGoogle = document.getElementById('badge-google');
+            badgeGoogle.textContent = tieneGoogle ? '✓ Vinculado' : 'No vinculado';
+            badgeGoogle.className = 'badge ' + (tieneGoogle ? 'on' : 'off');
+
+            const badgePassword = document.getElementById('badge-password');
+            badgePassword.textContent = tienePassword ? '✓ Vinculado' : 'No vinculado';
+            badgePassword.className = 'badge ' + (tienePassword ? 'on' : 'off');
+
+            document.getElementById('seccion-vincular-password').style.display = tienePassword ? 'none' : 'block';
+            document.getElementById('seccion-cambiar-password').style.display = tienePassword ? 'block' : 'none';
+
+            document.getElementById('form-vincular-password').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const nueva = document.getElementById('nueva-password').value;
+                // Ojo con el nombre: hay una función confirmar() importada
+                // de ui.js — si esto se llamara igual, la taparía dentro de
+                // este bloque (nada roto hoy, pero sería una trampa para
+                // el día que alguien agregue un confirmar(...) acá adentro).
+                const confirmarPassword = document.getElementById('confirmar-password').value;
+                if (nueva !== confirmarPassword) {
+                    avisar('Las contraseñas no coinciden.', 'error');
+                    return;
+                }
+                try {
+                    await vincularContrasena(nueva);
+                    avisar('Contraseña vinculada. Ya podés entrar sin Google.', 'exito');
+                    document.getElementById('seccion-vincular-password').style.display = 'none';
+                    document.getElementById('seccion-cambiar-password').style.display = 'block';
+                    badgePassword.textContent = '✓ Vinculado';
+                    badgePassword.className = 'badge on';
+                } catch (error) {
+                    avisar(mensajeDeError(error), 'error');
+                }
+            });
+
+            // Se deshabilita mientras se manda — sin esto, un doble clic
+            // (fácil si el mail tarda en aparecer y parece que "no pasó
+            // nada") manda dos pedidos seguidos, y Firebase bloquea unos
+            // minutos ante varios pedidos de reseteo muy seguidos para
+            // el mismo mail (auth/too-many-requests) — un tester real
+            // llegó a toparse con este mensaje sin traducir, ver
+            // mensajeDeError() en auth.js.
+            document.getElementById('boton-cambiar-password').addEventListener('click', async () => {
+                if (!confirmar('¿Enviar un mail a ' + user.email + ' para cambiar tu contraseña?')) return;
+                const boton = document.getElementById('boton-cambiar-password');
+                boton.disabled = true;
+                try {
+                    await enviarEmailDeReseteo(user.email);
+                    avisar('Mail enviado. Revisá tu bandeja de entrada.', 'exito');
+                } catch (error) {
+                    avisar(mensajeDeError(error), 'error');
+                } finally {
+                    boton.disabled = false;
+                }
+            });
+
+            // --- Verificación en dos pasos ---
+            function renderEstado2FA() {
+                const badge = document.getElementById('badge-2fa');
+                const factores = obtenerFactoresInscriptos();
+                const activada = factores.length > 0;
+
+                document.getElementById('2fa-sin-verificar').style.display = 'none';
+                document.getElementById('2fa-desactivada').style.display = 'none';
+                document.getElementById('2fa-activada').style.display = 'none';
+                document.getElementById('2fa-alta').style.display = 'none';
+
+                if (activada) {
+                    badge.textContent = '✓ Activada';
+                    badge.className = 'badge on';
+                    document.getElementById('2fa-activada').style.display = 'block';
+                } else if (!estaEmailVerificado()) {
+                    badge.textContent = 'Requiere email verificado';
+                    badge.className = 'badge off';
+                    document.getElementById('2fa-sin-verificar').style.display = 'block';
+                } else {
+                    badge.textContent = 'Desactivada';
+                    badge.className = 'badge off';
+                    document.getElementById('2fa-desactivada').style.display = 'block';
+                }
+            }
+            renderEstado2FA();
+
+            document.getElementById('boton-verificar-email').addEventListener('click', () => {
+                enviarVerificacionEmail()
+                    .then(() => avisar('Te mandamos un mail para verificar tu email. Después de confirmarlo, volvé a esta página.', 'exito'))
+                    .catch(error => avisar(mensajeDeError(error), 'error'));
+            });
+
+            let secretoPendiente = null;
+
+            document.getElementById('boton-activar-2fa').addEventListener('click', async () => {
+                try {
+                    secretoPendiente = await generarSecreto2FA();
+                    document.getElementById('2fa-cuenta-email').textContent = user.email;
+                    // La clave se muestra en grupos de 4 caracteres — igual
+                    // de válida para la app autenticadora, pero mucho más
+                    // fácil de copiar bien a mano si hiciera falta.
+                    document.getElementById('2fa-secreto').textContent =
+                        secretoPendiente.secretKey.match(/.{1,4}/g).join(' ');
+
+                    const uriTotp = secretoPendiente.generateQrCodeUrl(user.email, 'GastosApp');
+                    document.getElementById('2fa-qr').src = await QRCode.toDataURL(uriTotp, { width: 200, margin: 1 });
+
+                    document.getElementById('2fa-alta').style.display = 'block';
+                } catch (error) {
+                    avisar(mensajeDeError(error), 'error');
+                }
+            });
+
+            document.getElementById('boton-copiar-secreto').addEventListener('click', () => {
+                copiarAlPortapapeles(secretoPendiente.secretKey);
+            });
+
+            document.getElementById('form-confirmar-2fa').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const codigo = document.getElementById('2fa-codigo-alta').value.trim();
+                try {
+                    await confirmarAlta2FA(secretoPendiente, codigo, 'App autenticadora');
+                    avisar('Verificación en dos pasos activada', 'exito');
+                    renderEstado2FA();
+                } catch (error) {
+                    avisar(mensajeDeError(error), 'error');
+                }
+            });
+
+            document.getElementById('boton-desactivar-2fa').addEventListener('click', async () => {
+                if (!confirmar('¿Desactivar la verificación en dos pasos?')) return;
+                try {
+                    const factor = obtenerFactoresInscriptos()[0];
+                    await quitar2FA(factor.uid);
+                    avisar('Verificación en dos pasos desactivada', 'info');
+                    renderEstado2FA();
+                } catch (error) {
+                    avisar(mensajeDeError(error), 'error');
+                }
+            });
+
+            // --- Eliminar cuenta ---
+            //
+            // Modal con dos capas de confirmación aparte del botón mismo:
+            // hay que escribir "ELIMINAR" a mano (nada de tocar sin
+            // querer un solo botón para algo irreversible), y si la
+            // cuenta no tiene Google vinculado, también la contraseña
+            // (reautenticar() la necesita — ver auth.js). El orden
+            // importa: primero reautenticar (Firebase lo exige para
+            // poder borrar la cuenta), después borrar los DATOS de las
+            // 5 apps, y recién al final la cuenta de Auth en sí — una
+            // vez borrada esa, ya no queda sesión válida para poder
+            // borrar nada más.
+            document.getElementById('boton-eliminar-cuenta').addEventListener('click', () => {
+                abrirModal(`
+                    <h3 style="margin-top:0; color: var(--color-danger);">⚠️ Eliminar cuenta</h3>
+                    <p style="font-size:.9rem;">
+                        Esto borra TODO lo tuyo en las 5 apps del sistema — gastos, ingresos, tarjeta, alquiler, recurrentes, tareas, la conexión con Google Calendar — y te saca de tus grupos (sin borrarlos para el resto). <strong>No se puede deshacer.</strong>
+                    </p>
+                    <form id="form-eliminar-cuenta" class="form">
+                        ${!tieneGoogle ? `
+                            <div class="campo-ancho">
+                                <label for="eliminar-password">Tu contraseña (para confirmar)</label>
+                                <input type="password" id="eliminar-password" required>
+                            </div>
+                        ` : ''}
+                        <div class="campo-ancho">
+                            <label for="eliminar-confirmacion">Escribí <strong>ELIMINAR</strong> para confirmar</label>
+                            <input type="text" id="eliminar-confirmacion" autocomplete="off" required>
+                        </div>
+                        <div class="campo-ancho" style="display:flex; gap:8px; margin-top: var(--space-2);">
+                            <button type="submit" class="peligro" id="boton-confirmar-eliminar" disabled>Eliminar cuenta para siempre</button>
+                            <button type="button" class="secundario" id="boton-cancelar-eliminar">Cancelar</button>
+                        </div>
+                    </form>
+                `);
+
+                document.getElementById('boton-cancelar-eliminar').addEventListener('click', cerrarModal);
+
+                const inputConfirmacion = document.getElementById('eliminar-confirmacion');
+                const botonConfirmar = document.getElementById('boton-confirmar-eliminar');
+                inputConfirmacion.addEventListener('input', () => {
+                    botonConfirmar.disabled = inputConfirmacion.value.trim().toUpperCase() !== 'ELIMINAR';
+                });
+
+                document.getElementById('form-eliminar-cuenta').addEventListener('submit', async (evento) => {
+                    evento.preventDefault();
+                    botonConfirmar.disabled = true;
+                    botonConfirmar.textContent = 'Eliminando...';
+                    try {
+                        const password = document.getElementById('eliminar-password')?.value;
+                        await reautenticar(password);
+                        await borrarTodosLosDatos(user.uid);
+                        await eliminarCuentaAuth();
+                        cerrarModal();
+                        avisar('Cuenta eliminada. Gracias por haber probado la app.', 'info');
+                        // Un momentito para que se llegue a leer el aviso
+                        // antes de irse — eliminarCuentaAuth() ya invalidó
+                        // la sesión sola, no hay nada más para hacer acá.
+                        setTimeout(() => { window.location.href = 'index.html'; }, 1800);
+                    } catch (error) {
+                        avisar(mensajeDeError(error), 'error');
+                        botonConfirmar.disabled = false;
+                        botonConfirmar.textContent = 'Eliminar cuenta para siempre';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

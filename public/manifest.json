@@ -1,0 +1,16 @@
+{
+    "name": "GastosApp",
+    "short_name": "GastosApp",
+    "description": "Gastos personales y división de gastos compartidos entre grupos.",
+    "start_url": "index.html",
+    "scope": ".",
+    "display": "standalone",
+    "background_color": "#0f0e0c",
+    "theme_color": "#0f0e0c",
+    "orientation": "portrait-primary",
+    "lang": "es-AR",
+    "icons": [
+        { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+        { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    ]
+}

@@ -1,0 +1,3398 @@
+/* Sistema de diseño compartido por todas las páginas. Todo vive acá (nada
+   de estilos inline en el HTML) para que cambiar un color o un espaciado
+   sea un cambio en un solo lugar.
+
+   Identidad: negro y dorado por defecto (tema "oscuro"), con un tema
+   "claro" alternativo. El atributo data-tema en <html> decide cuál se
+   usa — lo pone tema.js, guardado en localStorage. Todos los pares
+   texto/fondo de acá están elegidos para quedar legibles en los dos
+   temas (nada de gris clarito sobre negro, ni dorado brillante sobre
+   blanco: donde el contraste no alcanzaba se usó un dorado más oscuro
+   tipo "bronce" para texto/íconos, reservando el dorado brillante para
+   fondos de botones). */
+
+:root {
+    /* Tema oscuro (por defecto) */
+    --color-bg: #0f0e0c;
+    --color-surface: #1a1815;
+    --color-surface-2: #221f1a;
+    --color-border: #3a3527;
+    --color-text: #f5f1e6;
+    --color-text-muted: #b9ac8c;
+
+    --color-primary: #d4af37;
+    --color-primary-dark: #e8c565;
+    --color-primary-soft: rgba(212, 175, 55, .16);
+    --color-on-primary: #14120d;
+
+    --color-success: #5cc98a;
+    --color-success-soft: rgba(92, 201, 138, .14);
+    --color-warning: #eab04e;
+    --color-warning-soft: rgba(234, 176, 78, .16);
+    --color-danger: #e8756a;
+    --color-danger-soft: rgba(232, 117, 106, .14);
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, .4);
+
+    --space-1: 4px;
+    --space-2: 6px;
+    --space-3: 10px;
+    --space-4: 14px;
+    --space-5: 20px;
+    --space-6: 26px;
+
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+    /* 0 en escritorio (no hay barra inferior) — se redefine a la altura
+       real de .bottom-nav en el @media de celular/tablet más abajo, así
+       todo lo que flota abajo de la pantalla (la burbuja de Gastón, su
+       cartelito, su panel) se corre solo para no quedar tapado por la
+       barra, sin tener que repetir la cuenta en cada uno. */
+    --altura-nav-inferior: 0px;
+}
+
+:root[data-tema="claro"] {
+    --color-bg: #faf7ef;
+    --color-surface: #ffffff;
+    --color-surface-2: #f3ecd8;
+    --color-border: #e3d9b8;
+    --color-text: #24211a;
+    --color-text-muted: #6b6250;
+
+    --color-primary: #9c7311;
+    --color-primary-dark: #7d5b0d;
+    --color-primary-soft: rgba(156, 115, 17, .12);
+    --color-on-primary: #fffaf0;
+
+    --color-success: #1e7d42;
+    --color-success-soft: rgba(30, 125, 66, .1);
+    --color-warning: #a5670f;
+    --color-warning-soft: rgba(165, 103, 15, .1);
+    --color-danger: #c62828;
+    --color-danger-soft: rgba(198, 40, 40, .1);
+
+    --shadow-sm: 0 1px 2px rgba(36, 33, 26, .08);
+    --shadow-md: 0 8px 24px rgba(36, 33, 26, .12);
+}
+
+/* ---------- Tema "cafetería" — solo para sistema.html (ComfyApp) ----------
+   Identidad propia de esa página, beige y madera en vez del negro/dorado
+   del resto de la app — un tono más "café de especialidad con lofi de
+   fondo" que "finanzas". Tiene su PROPIO oscuro/claro (`data-tema`
+   pasa a ser "cafeteria" o "cafeteria-oscura", con su propio switch y
+   su propia clave de localStorage — ver sistema.html), separado del
+   oscuro/claro de GastosApp/GamingApp: son identidades visuales
+   distintas, no tendría sentido que compartieran la preferencia. Los
+   selectores de estructura (madera, humito) más abajo usan
+   `[data-tema^="cafeteria"]` ("empieza con") para valer en los dos
+   modos a la vez, en vez de repetirlos — solo estos dos bloques de
+   variables de color cambian entre uno y otro. Mismas variables que los
+   otros temas, así que todo lo que ya está armado con ellas (cards,
+   botones, chips...) se adapta solo, sin tocar ni un selector más. */
+:root[data-tema="cafeteria"] {
+    --color-bg: #e2cda1;
+    --color-surface: #f5ecd9;
+    --color-surface-2: #dcc196;
+    --color-border: #b8895a;
+    --color-text: #3b2a1a;
+    --color-text-muted: #7c6448;
+
+    --color-primary: #8b5a2b;
+    --color-primary-dark: #6e4520;
+    --color-primary-soft: rgba(139, 90, 43, .16);
+    --color-on-primary: #fdf6ec;
+
+    --color-success: #4b7f52;
+    --color-success-soft: rgba(75, 127, 82, .14);
+    --color-warning: #b3781f;
+    --color-warning-soft: rgba(179, 120, 31, .16);
+    --color-danger: #a8442f;
+    --color-danger-soft: rgba(168, 68, 47, .14);
+
+    --shadow-sm: 0 1px 2px rgba(59, 42, 26, .18);
+    --shadow-md: 0 8px 24px rgba(59, 42, 26, .22);
+
+    /* Textura de madera (ver más abajo, "ComfyApp — madera") — pedido
+       de Roy: basarla en https://definicion.de/madera/ (tablones de
+       piso/pared, vetas verticales, costuras entre tablón y tablón,
+       nudos). Se arma en capas, de adelante hacia atrás:
+         Capa 1, costuras: una línea oscura fina cada 70px, ancho fijo
+            de "tablón" (repeating-linear-gradient — acá SÍ tiene
+            sentido que sea perfectamente recta, es la unión entre dos
+            tablas).
+         Capa 2, veta: un filtro SVG feTurbulence (ruido fractal) con
+            más frecuencia en el eje horizontal que en el vertical,
+            para que salgan hilos LARGOS Y VERTICALES en vez de un
+            ruido parejo — del mismo ancho que el tablón (70px), así se
+            repite en fase con las costuras de arriba. Ninguna imagen
+            guardada en ningún lado: es un <svg> armado ahí mismo como
+            data URI.
+         Capa 3, un par de nudos (radial-gradient).
+         Capa 4, un brillo suave general (linear-gradient). */
+    --madera-color: #4f3218;
+    --madera-borde: #4a2c14;
+    --madera-imagen:
+        repeating-linear-gradient(90deg, rgba(18, 9, 3, .5) 0px, rgba(18, 9, 3, .5) 2px, transparent 2px, transparent 70px),
+        url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'70'%20height%3D'220'%3E%3Cfilter%20id%3D'n'%3E%3CfeTurbulence%20type%3D'fractalNoise'%20baseFrequency%3D'0.07%200.012'%20numOctaves%3D'4'%20seed%3D'23'%20stitchTiles%3D'stitch'%2F%3E%3CfeColorMatrix%20type%3D'matrix'%20values%3D'0%200%200%200%200.14%20%200%200%200%200%200.08%20%200%200%200%200%200.03%20%200%200%200%200.85%200'%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D'100%25'%20height%3D'100%25'%20filter%3D'url(%23n)'%2F%3E%3C%2Fsvg%3E"),
+        radial-gradient(ellipse 20px 46px at 22% 30%, rgba(20, 10, 3, .4), transparent 72%),
+        radial-gradient(ellipse 16px 36px at 68% 66%, rgba(20, 10, 3, .35), transparent 72%),
+        linear-gradient(100deg, rgba(255, 255, 255, .05), rgba(0, 0, 0, .18));
+}
+
+/* Modo oscuro de ComfyApp — tonos invertidos respecto del de arriba:
+   donde el claro es beige con texto café oscuro, este es "café oscuro"
+   de verdad (fondo casi negro, con calidez marrón en vez de negro puro)
+   con texto claro — y el dorado/caramelo pasa a ser más brillante para
+   seguir destacando sobre fondo oscuro (mismo criterio que ya usa el
+   tema oscuro de GastosApp: el dorado del modo oscuro es más claro que
+   el mostaza del modo claro, no el mismo tono en los dos). */
+:root[data-tema="cafeteria-oscura"] {
+    --color-bg: #1f1610;
+    --color-surface: #2b1f16;
+    --color-surface-2: #3a2a1c;
+    --color-border: #5c4530;
+    --color-text: #f0e2c8;
+    --color-text-muted: #b39b78;
+
+    --color-primary: #d9a45e;
+    --color-primary-dark: #f0c17f;
+    --color-primary-soft: rgba(217, 164, 94, .18);
+    --color-on-primary: #241a0f;
+
+    --color-success: #7fbf8a;
+    --color-success-soft: rgba(127, 191, 138, .16);
+    --color-warning: #e0b45c;
+    --color-warning-soft: rgba(224, 180, 92, .18);
+    --color-danger: #e08a72;
+    --color-danger-soft: rgba(224, 138, 114, .16);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .35);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, .5);
+
+    /* Mismo dibujo de veta que el modo claro (ver el comentario largo de
+       arriba) — la madera ya era oscura de por sí, así que alcanza con
+       aclararla un toque para que siga contrastando contra un fondo de
+       página ahora todavía más oscuro que ella. */
+    --madera-color: #5c3a1e;
+    --madera-borde: #6e4826;
+    --madera-imagen:
+        repeating-linear-gradient(90deg, rgba(18, 9, 3, .5) 0px, rgba(18, 9, 3, .5) 2px, transparent 2px, transparent 70px),
+        url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'70'%20height%3D'220'%3E%3Cfilter%20id%3D'n'%3E%3CfeTurbulence%20type%3D'fractalNoise'%20baseFrequency%3D'0.07%200.012'%20numOctaves%3D'4'%20seed%3D'23'%20stitchTiles%3D'stitch'%2F%3E%3CfeColorMatrix%20type%3D'matrix'%20values%3D'0%200%200%200%200.14%20%200%200%200%200%200.08%20%200%200%200%200%200.03%20%200%200%200%200.85%200'%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D'100%25'%20height%3D'100%25'%20filter%3D'url(%23n)'%2F%3E%3C%2Fsvg%3E"),
+        radial-gradient(ellipse 20px 46px at 22% 30%, rgba(20, 10, 3, .4), transparent 72%),
+        radial-gradient(ellipse 16px 36px at 68% 66%, rgba(20, 10, 3, .35), transparent 72%),
+        linear-gradient(100deg, rgba(255, 255, 255, .05), rgba(0, 0, 0, .18));
+}
+
+/* ---------- AgendaApp — paleta propia ("terracota") ----------
+   Identidad visual propia (como la "cafetería" de ComfyApp), a pedido de
+   Roy — terracota/coral cálido, a propósito distinto del dorado de
+   GastosApp/GamingApp y de la madera de ComfyApp. Con su propio oscuro/
+   claro, guardado en una clave de localStorage aparte ("tema-agenda",
+   ver agenda/nav-agenda.js) — no tendría sentido compartir la
+   preferencia con las otras apps, son identidades visuales distintas.
+   A propósito con tonos NEUTROS/apagados (nada muy saturado) — los
+   colores fuertes ya los aportan los propios eventos del calendario
+   (colores de categoría y de calendario, ver agenda/index.html): si el
+   fondo de la app también fuera saturado, competiría con esos en vez de
+   dejarlos resaltar. */
+:root[data-tema="agenda"] {
+    --color-bg: #fbf4f1;
+    --color-surface: #ffffff;
+    --color-surface-2: #f0dfd6;
+    --color-border: #e8c9bc;
+    --color-text: #3a241c;
+    --color-text-muted: #8a6f62;
+
+    --color-primary: #c5603f;
+    --color-primary-dark: #a34a2e;
+    --color-primary-soft: rgba(197, 96, 63, .16);
+    --color-on-primary: #fdf6f2;
+
+    --color-success: #5f8a52;
+    --color-success-soft: rgba(95, 138, 82, .14);
+    --color-warning: #c08a2e;
+    --color-warning-soft: rgba(192, 138, 46, .16);
+    --color-danger: #a33636;
+    --color-danger-soft: rgba(163, 54, 54, .14);
+
+    --shadow-sm: 0 1px 2px rgba(58, 36, 28, .18);
+    --shadow-md: 0 8px 24px rgba(58, 36, 28, .22);
+}
+
+:root[data-tema="agenda-oscura"] {
+    --color-bg: #201512;
+    --color-surface: #2e1e19;
+    --color-surface-2: #3d2620;
+    --color-border: #4f332a;
+    --color-text: #f5e7df;
+    --color-text-muted: #c4a594;
+
+    --color-primary: #e38a65;
+    --color-primary-dark: #f0a47f;
+    --color-primary-soft: rgba(227, 138, 101, .18);
+    --color-on-primary: #241209;
+
+    --color-success: #7fb56e;
+    --color-success-soft: rgba(127, 181, 110, .16);
+    --color-warning: #e0b45c;
+    --color-warning-soft: rgba(224, 180, 92, .18);
+    --color-danger: #e07b7b;
+    --color-danger-soft: rgba(224, 123, 123, .16);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .35);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, .5);
+}
+
+/* ---------- TareasApp — paleta propia ("mostaza") ----------
+   Identidad visual propia (mismo criterio que la "terracota" de
+   AgendaApp), a pedido de Roy — mostaza cálido, a tono con el widget de
+   post-its de ComfyApp (que reusa --color-warning, tipo papel de
+   notita), pero con --color-warning DE ESTE tema corrido a un naranja
+   más distinguible del dorado principal — si "primary" y "warning"
+   fueran casi el mismo tono, se perdería el aviso de "vence pronto" en
+   la lista de tareas (ver .tarea-item-vencimiento.proxima en
+   tareas/index.html). Con su propio oscuro/claro, clave de localStorage
+   aparte ("tema-tareas", ver tareas/nav-tareas.js). Default: claro (como
+   AgendaApp y ComfyApp) — el amarillo mostaza se lee mejor como "papel"
+   en claro que en oscuro. */
+:root[data-tema="tareas"] {
+    --color-bg: #fdf9ec;
+    --color-surface: #ffffff;
+    --color-surface-2: #f5ecc9;
+    --color-border: #e8d48f;
+    --color-text: #3d3013;
+    --color-text-muted: #8a7a4a;
+
+    --color-primary: #b8860b;
+    --color-primary-dark: #96690a;
+    --color-primary-soft: rgba(184, 134, 11, .16);
+    --color-on-primary: #fffaf0;
+
+    --color-success: #5f8a3f;
+    --color-success-soft: rgba(95, 138, 63, .14);
+    --color-warning: #d97706;
+    --color-warning-soft: rgba(217, 118, 6, .16);
+    --color-danger: #b33636;
+    --color-danger-soft: rgba(179, 54, 54, .14);
+
+    --shadow-sm: 0 1px 2px rgba(61, 48, 19, .18);
+    --shadow-md: 0 8px 24px rgba(61, 48, 19, .22);
+}
+
+:root[data-tema="tareas-oscura"] {
+    --color-bg: #211c0f;
+    --color-surface: #2e2716;
+    --color-surface-2: #3d331d;
+    --color-border: #52441f;
+    --color-text: #f5edd3;
+    --color-text-muted: #c2b183;
+
+    --color-primary: #e0b34a;
+    --color-primary-dark: #efc766;
+    --color-primary-soft: rgba(224, 179, 74, .18);
+    --color-on-primary: #241a06;
+
+    --color-success: #8bbf6a;
+    --color-success-soft: rgba(139, 191, 106, .16);
+    --color-warning: #f0994a;
+    --color-warning-soft: rgba(240, 153, 74, .18);
+    --color-danger: #e0807a;
+    --color-danger-soft: rgba(224, 128, 122, .16);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .35);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, .5);
+}
+
+/* ---------- ComfyApp — madera ----------
+   Los 4 elementos que "enmarcan" la pantalla de Inicio (la barra de
+   arriba, la de navegación de celular, el cartel de "Inicio" y el
+   recuadro de Apps) pasan de beige plano a la textura de madera de
+   arriba — el resto de las cards se quedan en el beige/crema de
+   --color-surface, así no termina siendo TODO madera y perdiendo el
+   contraste. Como el fondo ahora es oscuro ahí, el texto/íconos de esos
+   4 elementos pasan a --color-on-primary (el crema clarito que ya usan
+   los botones) en vez del texto oscuro de siempre. */
+:root[data-tema^="cafeteria"] .navbar,
+:root[data-tema^="cafeteria"] .bottom-nav,
+:root[data-tema^="cafeteria"] #card-inicio-hero,
+:root[data-tema^="cafeteria"] #card-apps {
+    background-color: var(--madera-color);
+    background-image: var(--madera-imagen);
+    border-color: var(--madera-borde);
+}
+
+:root[data-tema^="cafeteria"] .bottom-nav {
+    /* Vacía en ComfyApp (sin secciones de GastosApp que listar, ver
+       nav.js) — sin esto quedaba como una línea casi invisible en vez
+       de la franja de madera que hace juego con la barra de arriba. */
+    min-height: 60px;
+}
+
+:root[data-tema^="cafeteria"] .navbar-brand,
+:root[data-tema^="cafeteria"] .navbar-auth,
+:root[data-tema^="cafeteria"] .boton-navbar-icono,
+:root[data-tema^="cafeteria"] #card-inicio-hero,
+:root[data-tema^="cafeteria"] #card-inicio-hero h1,
+:root[data-tema^="cafeteria"] #card-inicio-hero .texto-muted,
+:root[data-tema^="cafeteria"] #card-apps > .card-header h3 {
+    color: var(--color-on-primary);
+}
+
+:root[data-tema^="cafeteria"] .boton-navbar-icono {
+    border-color: rgba(253, 246, 236, .35);
+}
+
+/* ---------- Shoelace: enganchar sus tokens a nuestra paleta ----------
+   Los componentes de Shoelace (sl-drawer, sl-switch) viven en su propio
+   Shadow DOM y no ven nuestras clases — pero sí leen estas variables CSS
+   estándar de la librería. Pisándolas acá con nuestra escala dorada (en
+   vez del celeste por defecto) y nuestras superficies, quedan integrados
+   con el resto de la app en vez de parecer un componente pegado aparte.
+   Van en :root (sin condicionar por tema) porque el color de marca no
+   cambia entre modo oscuro/claro, solo lo hacen --color-surface/-border,
+   que sí están definidos por tema más arriba. */
+:root {
+    --sl-color-primary-50: hsl(48, 92%, 96%);
+    --sl-color-primary-100: hsl(47, 88%, 91%);
+    --sl-color-primary-200: hsl(46, 85%, 82%);
+    --sl-color-primary-300: hsl(46, 80%, 70%);
+    --sl-color-primary-400: hsl(46, 72%, 60%);
+    --sl-color-primary-500: hsl(46, 65%, 52%);
+    --sl-color-primary-600: hsl(45, 68%, 45%);
+    --sl-color-primary-700: hsl(44, 70%, 37%);
+    --sl-color-primary-800: hsl(43, 72%, 29%);
+    --sl-color-primary-900: hsl(42, 74%, 22%);
+    --sl-color-primary-950: hsl(40, 76%, 14%);
+
+    --sl-font-sans: var(--font);
+    --sl-border-radius-small: var(--radius-sm);
+    --sl-border-radius-medium: var(--radius-md);
+    --sl-border-radius-large: var(--radius-lg);
+    --sl-border-radius-x-large: var(--radius-lg);
+
+    --sl-panel-background-color: var(--color-surface);
+    --sl-panel-border-color: var(--color-border);
+    --sl-focus-ring-color: var(--color-primary);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* Para los links de "saltar a esta sección" de cuenta.html (ver
+   .opciones-nav más abajo) — sin esto, tocarlos saltaba de golpe en vez
+   de deslizarse, que se siente más brusco en una página tan larga. */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Twemoji (ver emoji.js) reemplaza cada emoji por un <img class="emoji">
+   apuntando a su dibujo — pero la librería NO le pone tamaño solo (queda
+   documentado así en su propio README): sin esto, salen al tamaño nativo
+   del SVG en vez de acompañar el tamaño del texto de al lado, gigantes. */
+img.emoji {
+    height: 1em;
+    width: 1em;
+    margin: 0 .05em 0 .1em;
+    vertical-align: -0.1em;
+}
+
+/* ---------- Pantalla de carga ----------
+   Presente por defecto en el HTML de cada página (visible antes de que
+   corra ningún JS) y se saca sola en cuanto auth.js confirma si hay
+   sesión o no — ver ocultarPantallaDeCarga() en auth.js. Sin esto se
+   veía, por un instante, el contenido por defecto "equivocado" (ej. el
+   login de Inicio con sesión ya iniciada) antes de corregirse solo. */
+.pantalla-carga {
+    position: fixed;
+    inset: 0;
+    background: var(--color-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    transition: opacity .2s ease;
+}
+
+.pantalla-carga.oculta {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.spinner {
+    width: 34px;
+    height: 34px;
+    border: 3px solid var(--color-border);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: girar-spinner .7s linear infinite;
+}
+
+@keyframes girar-spinner {
+    to { transform: rotate(360deg); }
+}
+
+body {
+    margin: 0;
+    font-family: var(--font);
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    line-height: 1.5;
+    transition: background-color .15s ease, color .15s ease;
+}
+
+h1, h2, h3, h4 {
+    margin: 0 0 var(--space-3);
+    line-height: 1.25;
+    color: var(--color-text);
+}
+
+h2 { font-size: 1.15rem; }
+h3 { font-size: .92rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: .03em; }
+
+p { margin: 0 0 var(--space-3); color: var(--color-text); }
+
+a { color: var(--color-primary); }
+
+small, .texto-muted { color: var(--color-text-muted); }
+
+/* ---------- Layout ---------- */
+
+.navbar {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-2) var(--space-4);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+/* Links horizontales — solo en pantallas grandes (ver @media más abajo);
+   en celular/tablet la navegación entre secciones vive en el ☰. */
+.navbar-links {
+    list-style: none;
+    display: flex;
+    gap: var(--space-1);
+    padding: 0;
+    margin: 0;
+}
+
+.navbar-links a {
+    display: inline-block;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: .92rem;
+}
+
+.navbar-links a:hover {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+}
+
+.navbar-links a.activo {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+}
+
+.navbar-auth {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-size: .9rem;
+    color: var(--color-text-muted);
+}
+
+/* Botón cuadrado de ícono en la navbar: abrir el menú lateral. */
+.boton-navbar-icono {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .95rem;
+    line-height: 1;
+    text-decoration: none;
+}
+
+.boton-navbar-icono:hover {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+}
+
+/* ---------- Barra de navegación inferior (celular/tablet) ----------
+   Oculta por defecto (display:none) — se muestra recién en el @media
+   de más abajo, junto con --altura-nav-inferior (que le da a todo lo
+   demás que flota abajo de la pantalla el espacio para correrse). Las
+   mismas 4 secciones que ya viven en la navbar de escritorio y en el
+   menú ☰, no una navegación aparte — un solo lugar (nav.js) arma las
+   tres versiones para que nunca queden desincronizadas entre sí. */
+.bottom-nav {
+    display: none;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 140;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.bottom-nav a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-size: .68rem;
+    font-weight: 600;
+}
+
+.bottom-nav a.activo {
+    color: var(--color-primary);
+}
+
+.bottom-nav-icono {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+/* ---------- Menú lateral (sl-drawer) ----------
+   El <sl-drawer> en sí (overlay, animación de deslizado, cierre con Esc/
+   clic afuera, foco atrapado) lo resuelve Shoelace solo — acá solo se
+   estiliza su contenido, que es HTML nuestro de siempre, y se ajustan
+   sus "parts" (los puntos de la Shadow DOM pensados para esto) para que
+   el título y el padding queden con la misma pinta que el resto de la
+   app en vez del look por defecto de la librería. */
+.drawer-menu::part(title) {
+    font-size: .92rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--color-text-muted);
+}
+
+.drawer-menu::part(body) {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: 0 var(--space-4) var(--space-4);
+}
+
+.drawer-nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.drawer-link {
+    display: block;
+    padding: var(--space-3);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: .95rem;
+    background: none;
+    border: none;
+    text-align: left;
+    width: 100%;
+    cursor: pointer;
+}
+
+.drawer-link:hover {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+}
+
+.drawer-link.activo {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+}
+
+.drawer-link.peligro {
+    color: var(--color-danger);
+}
+
+.drawer-link.peligro:hover {
+    background: var(--color-danger-soft);
+}
+
+.drawer-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-2) var(--space-3);
+    font-weight: 600;
+    font-size: .95rem;
+}
+
+.drawer-separador {
+    height: 1px;
+    background: var(--color-border);
+    margin: var(--space-2) 0;
+}
+
+.page {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: var(--space-4) var(--space-4) var(--space-6);
+    background: var(--color-bg);
+}
+
+footer {
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: .8rem;
+    padding: var(--space-5) 0;
+}
+
+/* ---------- Tarjetas ---------- */
+
+/* Mismo degradé sutil que el recuadro de resultado de la calculadora de
+   cambio (se apaga a transparente a los 2/3, dejando el resto de la
+   card en el color de superficie de siempre) — acá en TODA card de la
+   app, en vez de un color plano. Dos fondos superpuestos (coma): el
+   degradé arriba, el color sólido de siempre abajo, así la card sigue
+   siendo opaca de punta a punta y no deja ver lo que hay detrás. */
+.card {
+    background: linear-gradient(135deg, var(--color-primary-soft), transparent 70%), var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: var(--space-4);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+/* ---------- Formularios ---------- */
+
+form.form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3) var(--space-4);
+    align-items: end;
+}
+
+form.form .campo-ancho {
+    grid-column: 1 / -1;
+}
+
+.subgrupo-campos {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3) var(--space-4);
+    background: var(--color-surface-2);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+}
+
+label {
+    display: block;
+    font-weight: 600;
+    font-size: .85rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-1);
+}
+
+input, select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: .9rem;
+    font-family: inherit;
+    background: var(--color-surface-2);
+    color: var(--color-text);
+}
+
+input::placeholder {
+    color: var(--color-text-muted);
+    opacity: .8;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+input[type="color"] {
+    padding: 4px;
+    height: 40px;
+    cursor: pointer;
+}
+
+/* ---------- Botones ---------- */
+
+button, .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    font-size: .88rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    transition: background-color .15s ease, transform .05s ease, box-shadow .15s ease;
+}
+
+/* Lista larga de exclusiones a propósito (mismo criterio que ya se usa
+   más abajo para el área táctil de celular): TODOS los botones con
+   identidad visual propia — secundario, peligro, íconos, tabs, chips,
+   navbar, controles de la burbuja de Gastón, notitas de la campanita —
+   quedan afuera. Lo que sobra son los CTA "de verdad" de cada pantalla
+   (Guardar, Agregar, Entrar, Confirmar...), que son los que reciben el
+   tratamiento metálico (mismo que se probó primero en la calculadora de
+   cambio de Inicio: degradé de varias franjas simulando una lámina,
+   luz/sombra internas para dar relieve, y en :hover un brillo que la
+   "barre").
+
+   BUG REAL encontrado y corregido: a .campanita-item (un <button>, ver
+   notificacionesCentro.js) le faltaba estar en esta lista — por eso
+   NINGÚN cambio de color que se probó en .campanita-item/.no-leida (4
+   rondas distintas) se llegaba a notar nunca: este selector es MUCHO
+   más específico (button + ~17 :not(), especificidad altísima) que
+   cualquier regla escrita para .campanita-item a secas, así que el
+   degradé metálico dorado ganaba siempre, sin importar si estaba leída
+   o no. Roy lo estuvo viendo así desde el primer commit de la
+   campanita. Con :not(.campanita-item) acá, recién ahora entran a
+   jugar las reglas propias de más abajo (.campanita-item,
+   .campanita-item.no-leida, :hover). */
+button:not(.secundario):not(.peligro):not(.icono):not(.tab):not(.mini-carrusel-anterior):not(.mini-carrusel-siguiente):not(.mini-carrusel-punto):not(.stat-tile-editar):not(.calculadora-boton-invertir):not(.boton-navbar-icono):not(.boton-grupo):not(.callout-cerrar):not(.burbuja-asistente):not(.minimizar-asistente-burbuja):not(.asistente-opcion):not(.drawer-link):not(.chip):not(.chat-borrar):not(.campanita-item):not(.hex-celda-click),
+.btn:not(.secundario):not(.peligro) {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(120deg,
+        var(--color-primary-dark) 0%,
+        var(--color-primary) 22%,
+        var(--color-primary-dark) 45%,
+        var(--color-primary) 68%,
+        var(--color-primary-dark) 100%);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, .2);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .4),
+        inset 0 -2px 3px rgba(0, 0, 0, .25),
+        0 2px 8px var(--color-primary-soft);
+}
+
+/* El brillo que barre el botón al pasar el mouse (ver la explicación
+   completa en la sección de la calculadora de cambio, más abajo). */
+button:not(.secundario):not(.peligro):not(.icono):not(.tab):not(.mini-carrusel-anterior):not(.mini-carrusel-siguiente):not(.mini-carrusel-punto):not(.stat-tile-editar):not(.calculadora-boton-invertir):not(.boton-navbar-icono):not(.boton-grupo):not(.callout-cerrar):not(.burbuja-asistente):not(.minimizar-asistente-burbuja):not(.asistente-opcion):not(.drawer-link):not(.chip):not(.chat-borrar):not(.campanita-item):not(.hex-celda-click)::before,
+.btn:not(.secundario):not(.peligro)::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -75%;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(120deg, transparent, rgba(255, 255, 255, .55), transparent);
+    transform: skewX(-20deg);
+    transition: left .6s ease;
+    pointer-events: none;
+}
+
+button:hover, .btn:hover {
+    background: var(--color-primary-dark);
+}
+
+button:not(.secundario):not(.peligro):not(.icono):not(.tab):not(.mini-carrusel-anterior):not(.mini-carrusel-siguiente):not(.mini-carrusel-punto):not(.stat-tile-editar):not(.calculadora-boton-invertir):not(.boton-navbar-icono):not(.boton-grupo):not(.callout-cerrar):not(.burbuja-asistente):not(.minimizar-asistente-burbuja):not(.asistente-opcion):not(.drawer-link):not(.chip):not(.chat-borrar):not(.campanita-item):not(.hex-celda-click):hover,
+.btn:not(.secundario):not(.peligro):hover {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .5),
+        inset 0 -2px 3px rgba(0, 0, 0, .25),
+        0 4px 14px var(--color-primary-soft);
+}
+
+button:not(.secundario):not(.peligro):not(.icono):not(.tab):not(.mini-carrusel-anterior):not(.mini-carrusel-siguiente):not(.mini-carrusel-punto):not(.stat-tile-editar):not(.calculadora-boton-invertir):not(.boton-navbar-icono):not(.boton-grupo):not(.callout-cerrar):not(.burbuja-asistente):not(.minimizar-asistente-burbuja):not(.asistente-opcion):not(.drawer-link):not(.chip):not(.chat-borrar):not(.campanita-item):not(.hex-celda-click):hover::before,
+.btn:not(.secundario):not(.peligro):hover::before {
+    left: 130%;
+}
+
+button:active, .btn:active {
+    transform: translateY(1px);
+}
+
+/* Mismo relieve (luz arriba, sombra abajo) que los botones primarios,
+   pero en tonos neutros/rojos en vez de dorados — así se siguen
+   "tocando" parecido en toda la app, sin pintar de dorado un botón
+   secundario o uno de borrar (ahí el color es el que ya usaba la app
+   para decir "esto no es la acción principal" / "esto es peligroso",
+   no hace falta gold para darle vida). */
+button.secundario, .btn.secundario {
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    border-color: var(--color-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), inset 0 -2px 3px rgba(0, 0, 0, .18);
+}
+
+button.secundario:hover, .btn.secundario:hover {
+    background: var(--color-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), inset 0 -2px 3px rgba(0, 0, 0, .2), 0 2px 8px rgba(0, 0, 0, .12);
+}
+
+button.peligro, .btn.peligro {
+    background: var(--color-danger-soft);
+    color: var(--color-danger);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), inset 0 -2px 3px rgba(0, 0, 0, .12);
+}
+
+button.peligro:hover, .btn.peligro:hover {
+    background: var(--color-danger);
+    color: var(--color-on-primary);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), inset 0 -2px 3px rgba(0, 0, 0, .2), 0 2px 10px var(--color-danger-soft);
+}
+
+button.icono {
+    background: transparent;
+    color: var(--color-text-muted);
+    border: none;
+    padding: 4px 8px;
+    font-size: 1rem;
+}
+
+button.icono:hover {
+    background: var(--color-danger-soft);
+    color: var(--color-danger);
+}
+
+button:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+/* ---------- Pestañas (login por email: Entrar / Crear cuenta) ---------- */
+
+.tabs {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.tab {
+    background: transparent;
+    color: var(--color-text-muted);
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: var(--space-2) var(--space-1);
+}
+
+.tab:hover {
+    background: transparent;
+    color: var(--color-primary);
+}
+
+.tab.activa {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+/* ---------- cuenta.html: secciones tipo acordeón ----------
+   La página de Opciones reúne bastantes cards (perfil, notificaciones,
+   tarjeta, alquiler, seguridad...) — a pedido de Roy, agrupadas en 4
+   secciones con un título propio, mostrando UNA sola por vez (como
+   pestañas): la barra de arriba (son <a href="#...">, funcionan igual
+   que un botón dentro de un contenedor flex) elige cuál, y el resto
+   queda oculto — ver el JS de cuenta.html (mostrarSeccionOpciones), que
+   hace show/hide según el hash de la URL. */
+.opciones-nav {
+    margin-bottom: var(--space-5);
+    flex-wrap: wrap;
+    /* Ya no reusa el estilo de .tabs (línea subrayando la fila entera +
+       cada link con solo una rayita abajo al estar activo) — a pedido
+       de Roy, "un recuadro más bonito de clickear" en vez de texto
+       subrayado. Ahora son chips (mismo look que ya usan los chips de
+       categoría/participantes en el resto de la app — .chip, más abajo
+       — así queda consistente en vez de inventar un estilo nuevo). Sin
+       borde abajo (el de .tabs) porque ya no hace falta separar nada. */
+    border-bottom: none;
+    gap: var(--space-2);
+}
+
+.opciones-nav .tab {
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+    font-weight: 600;
+    font-size: .85rem;
+    text-decoration: none;
+    transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.opciones-nav .tab:hover {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+/* La sección abierta — mismo tratamiento "lleno" que un chip
+   tildado (.chip[aria-pressed="true"]) o un link activo del drawer. */
+.opciones-nav .tab.activa {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-on-primary);
+}
+
+.opciones-seccion-titulo {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--color-text-muted);
+    margin: 0 0 var(--space-3);
+}
+
+/* ---------- gaming/tracker.html: mismo patrón de chips que
+   .opciones-nav de acá arriba (Roy pidió el mismo look "recuadro
+   bonito de clickear" en vez de reinventar algo nuevo) — se duplica en
+   vez de reusar .opciones-nav tal cual porque son dos features
+   distintas (elegir juego / elegir sección DENTRO de un juego, ambas
+   mostrando una sola cosa por vez) que conviene poder estilar aparte
+   más adelante sin que un cambio en una arrastre a la otra. */
+.tracker-nav {
+    flex-wrap: wrap;
+    border-bottom: none;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+}
+
+.tracker-nav .tab {
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+    font-weight: 600;
+    font-size: .85rem;
+    text-decoration: none;
+    transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.tracker-nav .tab:hover {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.tracker-nav .tab.activa {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-on-primary);
+}
+
+/* Selector de juego (League of Legends/TFT) — un escalón más grande que
+   el de secciones, para que se note que es la elección "de arriba de
+   todo" (que ábre un dashboard entero distinto), no una pestaña más. */
+.tracker-nav.tracker-nav-juego .tab {
+    padding: 10px 20px;
+    font-size: .95rem;
+}
+
+.tracker-seccion-titulo {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--color-text-muted);
+    margin: 0 0 var(--space-3);
+}
+
+/* ---------- Filtro avanzado (condiciones con Y/O) ---------- */
+
+.fila-condicion-filtro {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.fila-condicion-filtro select,
+.fila-condicion-filtro input {
+    width: auto;
+    min-width: 110px;
+}
+
+.fila-condicion-filtro .condicion-quitar {
+    margin-left: auto;
+}
+
+/* ---------- Selector de miembros (chips clickeables) ---------- */
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+    font-size: .8rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+}
+
+.chip[aria-pressed="true"] {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-on-primary);
+}
+
+.chip.estatico {
+    cursor: default;
+    background: var(--color-surface-2);
+    color: var(--color-text);
+}
+
+/* ---------- Tooltip de ícono (gaming/tracker.html) ----------
+   Para mostrar la descripción de una runa/ítem/campeón al pasar el
+   mouse por su ícono — CSS puro, sin JS, y con :focus-within además
+   de :hover para que también funcione con teclado/toque (el ícono
+   necesita tabindex="0" para poder recibir foco). Se armó acá en vez
+   del title nativo del navegador porque se ve mejor y no depende de
+   la demora/tamaño de letra que impone cada navegador. */
+.tooltip-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.tooltip-wrap .tooltip-texto {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-6px);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: .75rem;
+    font-weight: 400;
+    line-height: 1.35;
+    white-space: normal;
+    width: max-content;
+    max-width: 220px;
+    text-align: left;
+    z-index: 20;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .12s ease;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .3);
+}
+
+.tooltip-wrap .tooltip-texto strong {
+    display: block;
+    color: var(--color-primary);
+    margin-bottom: 2px;
+}
+
+.tooltip-wrap:hover .tooltip-texto,
+.tooltip-wrap:focus-within .tooltip-texto {
+    opacity: 1;
+}
+
+/* ---------- Tablero de hexágonos (gaming/tracker.html, comps de TFT)
+   ----------
+   4 filas (fila 4 = frontline, arriba, más cerca del rival; fila 1 =
+   backline, abajo, la más segura) x 7 columnas — mismo tamaño de
+   tablero que el juego real, pero el POSICIONAMIENTO de cada campeón
+   es orientativo (según su rol: tanque adelante, carry atrás en las
+   puntas), no la coordenada exacta de una guía — ver el comentario
+   grande en metaCurada.js. Las filas pares se corren medio hexágono
+   para que se entrelacen visualmente como un panal de verdad. */
+.hex-tablero {
+    display: flex;
+    flex-direction: column;
+    /* Se arma en tracker.html recorriendo fila 4 (frontline) primero y
+       fila 1 (backline) último, así con flex normal fila 4 queda
+       arriba (más cerca del rival) y fila 1 abajo (la más segura) —
+       mismo criterio visual que el tablero real. */
+    gap: 4px;
+    align-items: center;
+    margin: 0 auto var(--space-2);
+    padding: var(--space-2) 0;
+    /* Nada de overflow acá a propósito (ni "auto" ni "hidden") — el
+       tooltip de cada hexágono necesita "salirse" hacia arriba del
+       tablero para mostrarse, y overflow-x:auto (lo que había antes)
+       también recorta el overflow vertical por una regla de CSS: si un
+       eje queda en "visible" y el otro no, el visible pasa a
+       comportarse como "auto" también — quedaba clippeado justo lo que
+       se necesitaba que se viera. Las celdas de acá abajo se
+       achicaron un poco para que 7 columnas entren bien en una
+       pantalla de celular sin hacer falta scroll horizontal. */
+}
+
+.hex-fila {
+    display: flex;
+    gap: 4px;
+}
+
+.hex-fila.hex-fila-corrida {
+    margin-left: 23px;
+}
+
+/* Variante clickeable — el armador visual de "Mis composiciones" usa
+   <button> en vez de <div> para cada celda (agregar/editar/quitar
+   campeón con un click, accesible por teclado) — reseteado a look de
+   hexágono normal, ninguna de las reglas de .hex-celda de acá abajo
+   cambia. */
+.hex-celda-click {
+    border: none;
+    background: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    cursor: pointer;
+    display: block;
+}
+
+.hex-celda-mas {
+    color: var(--color-text-muted);
+    font-size: 1.1rem;
+    font-weight: 700;
+    position: relative;
+    z-index: 1;
+}
+
+.hex-celda {
+    width: 42px;
+    height: 37px;
+    flex-shrink: 0;
+    /* SIN clip-path acá — antes lo tenía este mismo elemento, y como
+       clip-path recorta TODO lo que se sale de esa forma (no solo el
+       fondo, también a los hijos posicionados fuera, como el tooltip
+       que necesita aparecer arriba del hexágono) el tooltip quedaba
+       invisible aunque el hover andaba bien. La forma del hexágono se
+       dibuja en .hex-borde/.hex-forma de acá abajo, adentro de este
+       elemento SIN recortarlo a él — así el tooltip puede salirse. */
+    position: relative;
+}
+
+.hex-celda .tooltip-wrap {
+    width: 100%;
+    height: 100%;
+}
+
+/* Doble capa (borde detrás, relleno encima, un poco más chico) en vez
+   de un `border` común — el border normal de CSS no sigue bien un
+   clip-path en varios navegadores (queda fino/parejo de forma poco
+   confiable) — así el borde del hexágono se ve nítido siempre. */
+.hex-borde,
+.hex-forma {
+    position: absolute;
+    inset: 0;
+    clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hex-borde {
+    background: var(--color-border);
+}
+
+.hex-forma {
+    inset: 2px;
+    background: var(--color-surface-2);
+}
+
+/* Ocupada por un campeón — se resalta con el color primario para que
+   se note de un vistazo cuál hexágono tiene ficha y cuál no (antes el
+   fondo casi no se distinguía del resto de la tarjeta). */
+.hex-celda.hex-ocupada .hex-borde {
+    background: var(--color-primary);
+}
+
+.hex-celda.hex-ocupada .hex-forma {
+    background: color-mix(in srgb, var(--color-primary) 22%, var(--color-surface-2));
+}
+
+.hex-celda.hex-vacia .hex-borde {
+    opacity: .3;
+}
+
+.hex-celda.hex-vacia .hex-forma {
+    background: transparent;
+}
+
+.hex-celda img {
+    width: 74%;
+    height: 74%;
+    object-fit: cover;
+    border-radius: 50%;
+    position: relative;
+    z-index: 1;
+}
+
+.hex-celda .tooltip-texto {
+    /* Se cae fuera del hexágono chico (position:relative implícito del
+       padre .tooltip-wrap adentro de la celda) — mismo componente que
+       el resto, solo un poco más angosto para que entre en el ancho
+       del tablero sin cortarse. */
+    max-width: 180px;
+}
+
+/* ---------- División desigual de un gasto grupal (montos distintos
+   por persona, en vez de repartir por igual) ---------- */
+
+.fila-parte-desigual {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.fila-parte-desigual:last-of-type {
+    border-bottom: none;
+}
+
+.fila-parte-desigual input {
+    width: 110px;
+}
+
+/* ---------- Avatares (foto de perfil) ----------
+   Un solo tamaño no alcanza: chico junto al nombre en la navbar/chips,
+   más chico todavía adentro de una fila de tabla, más grande en la
+   vista previa de Cuenta. object-fit:cover para que no se deforme,
+   venga la foto del tamaño/proporción que venga (en teoría siempre
+   sale cuadrada de imagen.js, pero por las dudas). */
+.avatar-chico {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+    vertical-align: middle;
+    border: 1px solid var(--color-border);
+}
+
+.avatar-mini {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    object-fit: cover;
+    vertical-align: middle;
+    border: 1px solid var(--color-border);
+}
+
+/* .avatar-grande envuelve la vista previa en Cuenta: es un <div>, no un
+   <img>, porque sin foto tiene que poder mostrar el 😊 de relleno como
+   texto adentro (un <img> no puede tener contenido). Con foto, el <img>
+   de adentro ocupa el círculo entero. */
+.avatar-grande {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    border: 2px solid var(--color-border);
+    background: var(--color-surface-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2rem;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.avatar-grande img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* El "😊 Bienvenido" de Inicio — mismo criterio que .avatar-grande
+   (texto de relleno si no hay foto, la imagen ocupa el círculo entero
+   si hay), pero de un tamaño intermedio, pensado al lado de un <h1>
+   en vez de solo en Cuenta. */
+.avatar-hero {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    vertical-align: middle;
+    font-size: 1.4rem;
+    line-height: 1;
+}
+
+.avatar-hero img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--color-border);
+}
+
+.fila-foto-perfil {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+/* ---------- Tablas ---------- */
+
+.tabla-wrap {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .86rem;
+}
+
+th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+}
+
+th {
+    color: var(--color-text-muted);
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    font-weight: 700;
+}
+
+tbody tr:hover {
+    background: var(--color-surface-2);
+}
+
+/* ---------- Estado vacío ---------- */
+
+.estado-vacio {
+    text-align: center;
+    padding: var(--space-5) var(--space-4);
+    color: var(--color-text-muted);
+}
+
+.estado-vacio .icono-grande {
+    font-size: 1.6rem;
+    display: block;
+    margin-bottom: var(--space-2);
+}
+
+/* ---------- Tarjetas de estadística (totales) ---------- */
+
+.stats-row {
+    display: flex;
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+}
+
+.stat-tile {
+    position: relative;
+    flex: 1;
+    /* Sin esto, un flex item nunca se encoge más allá del ancho de su
+       contenido (es el comportamiento por defecto de flexbox, min-width:
+       auto) — así que si el número no entraba, en vez de ajustarse se
+       salía del recuadro y se montaba sobre lo que estuviera al lado
+       (pasó con las burbujas del dólar al ponerlas en una fila más
+       angosta). Con min-width:0 el tile sí se puede achicar, y el
+       número simplemente pasa a la línea de abajo si hace falta — no se
+       pierde ningún dígito, solo ocupa dos líneas en vez de una. */
+    min-width: 0;
+    overflow-wrap: break-word;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    text-align: center;
+}
+
+/* Antes era un lapicito solo (✏️) flotando en la esquina de la tarjeta —
+   fácil de no ver y, sin pasar el mouse por encima, imposible de saber
+   qué hacía. Ahora es un botón de texto normal, debajo del dato, que dice
+   qué hace sin que haga falta adivinar ni pasar el mouse (importa en
+   celular, donde no hay "hover" para leer el title). */
+.stat-tile-editar {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: var(--space-2);
+    padding: 3px 10px;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-size: .72rem;
+    font-weight: 600;
+}
+
+.stat-tile-editar:hover {
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.stat-tile .stat-valor {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--color-primary); /* respaldo si el navegador no soporta el degradé de texto de abajo */
+    font-variant-numeric: tabular-nums;
+}
+
+/* Mismo tratamiento "metal grabado" que el resultado de la calculadora
+   de cambio, acá para todos los números clave de la app (cotizaciones,
+   saldo de tarjeta, totales y promedios de Gastos personales...): un
+   degradé de varias franjas recortado con la forma del propio texto
+   en vez de pintado atrás. Envuelto en @supports porque sin esto el
+   texto se volvería invisible (color transparent) en un navegador que
+   no lo soporte — ahí se queda con el color sólido de respaldo de
+   arriba. */
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+    .stat-tile .stat-valor {
+        background: linear-gradient(120deg,
+            var(--color-primary-dark) 0%,
+            var(--color-primary) 35%,
+            var(--color-primary-dark) 60%,
+            var(--color-primary) 85%,
+            var(--color-primary-dark) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+    }
+}
+
+.stat-tile .stat-etiqueta {
+    font-size: .72rem;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+/* La fila del dólar es la más angosta de todas (3 burbujas peleando el
+   mismo espacio, y encima compartiendo fila con "Tus chats") — un poco
+   más chica que el resto para que "Oficial/MEP/Blue" entren cómodos en
+   una sola línea sin necesitar el min-width:0 de arriba como último
+   recurso. El white-space:nowrap evita que, si igual llega a faltar un
+   pelo de espacio, el último decimal se corte solo a una segunda línea
+   (se ve mucho peor que si el número entero se achica un poco más). */
+#dolar-card .stat-valor {
+    font-size: .9rem;
+    white-space: nowrap;
+}
+
+/* ---------- Carrusel de saldo de tarjeta (pesos/dólares) ----------
+   Mismo componente que el carrusel de gráficos de Inicio, pero metido
+   adentro de un stat-tile chico — tanto las flechas como los puntitos se
+   achican para entrar en un recuadro angosto (además de poder arrastrar
+   o tocar los puntitos, como antes). */
+.stat-tile-tarjeta {
+    padding-bottom: var(--space-3);
+}
+
+/* ---------- Mini carrusel (scroll nativo, sin componente externo) ----------
+   Reemplaza los <sl-carousel> que se usaban para tarjetas de números y
+   gráficos chicos (Shoelace calcula su alto internamente, en Shadow
+   DOM, a partir del ANCHO disponible — no del contenido — y terminaba
+   recortando lo que no entraba; pasó tanto en celular como en PC, en
+   varias vueltas de ajuste que no llegaron a solucionarlo del todo).
+   Acá cada slide es un <div> normal: el alto lo decide el contenido
+   mismo (con flex + stretch, todos los slides quedan tan altos como el
+   más alto, automático) y no hay ningún cálculo externo que corregir. */
+.mini-carrusel {
+    position: relative;
+}
+
+.mini-carrusel-pista {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* Edge viejo */
+    cursor: grab;
+}
+
+.mini-carrusel-pista:active {
+    cursor: grabbing;
+}
+
+.mini-carrusel-pista::-webkit-scrollbar {
+    display: none; /* Chrome/Safari/Edge nuevo */
+}
+
+.mini-carrusel-slide {
+    flex: 0 0 100%;
+    min-width: 0;
+    scroll-snap-align: start;
+    text-align: center;
+    /* Mismo padding lateral en los tres (cotizaciones, saldo de
+       tarjeta, gráficos) — antes solo lo tenía el de gráficos, y el
+       contenido de los otros dos llegaba pegado al borde de la card
+       mientras que el de gráficos quedaba más adentro: dos cards del
+       mismo ancho por fuera, pero con el contenido de adentro a
+       distinta distancia del borde, lo que se terminaba viendo como
+       si una fuera más "ancha" que la otra. */
+    padding: 0 var(--space-6);
+}
+
+.mini-carrusel-puntos {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-top: var(--space-2);
+}
+
+.mini-carrusel-punto {
+    width: 6px;
+    height: 6px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--color-border);
+    cursor: pointer;
+}
+
+.mini-carrusel-punto.activo {
+    background: var(--color-primary);
+}
+
+/* Flechas — superpuestas a los bordes del carrusel, como las de
+   Shoelace antes. Cómodas en PC (sin dedo para deslizar); en celular
+   el scroll táctil ya funciona solo. */
+.mini-carrusel-anterior, .mini-carrusel-siguiente {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font-size: .85rem;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+}
+
+.mini-carrusel-anterior:hover, .mini-carrusel-siguiente:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+/* La regla global button:active { transform: translateY(1px) } (el
+   "apretado" de todos los botones de la app) le pisaba el
+   translateY(-50%) que centra la flecha verticalmente — un transform
+   reemplaza al otro entero, no se suman solos. Sin esto, al hacer
+   click la flecha perdía el centrado por un instante y "saltaba" hacia
+   abajo, lo que además podía sacarla de debajo del cursor antes de
+   soltar el click y hacer que no se registrara. Se combinan los dos
+   acá: sigue centrada Y se nota el apretado. */
+.mini-carrusel-anterior:active, .mini-carrusel-siguiente:active {
+    transform: translateY(calc(-50% + 1px));
+}
+
+.mini-carrusel-anterior {
+    left: -6px;
+}
+
+.mini-carrusel-siguiente {
+    right: -6px;
+}
+
+/* ---------- Calculadora de cambio ----------
+   El resto de los botones "secundario" de la app son planos a propósito
+   (para no competir con los primarios), pero este es EL botón de la
+   card de cotizaciones — un degradé de varias franjas (en vez de dos
+   puntas nomás) simula el brillo desparejo de una lámina de metal, y
+   las sombras internas (una luz clara arriba, una sombra abajo) le dan
+   relieve, como si estuviera repujado en vez de pintado plano. Todo en
+   los mismos tonos de --color-primary del tema (dorado en oscuro,
+   mostaza en claro), así que se adapta solo si cambiás de tema. */
+#boton-calculadora-cambio {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(120deg,
+        var(--color-primary-dark) 0%,
+        var(--color-primary) 22%,
+        var(--color-primary-dark) 45%,
+        var(--color-primary) 68%,
+        var(--color-primary-dark) 100%);
+    color: var(--color-on-primary);
+    border: 1px solid var(--color-primary-dark);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, .2);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .4),
+        inset 0 -2px 3px rgba(0, 0, 0, .25),
+        0 4px 16px var(--color-primary-soft);
+    transition: box-shadow .15s ease;
+}
+
+#boton-calculadora-cambio:hover {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .5),
+        inset 0 -2px 3px rgba(0, 0, 0, .25),
+        0 6px 22px var(--color-primary-soft);
+}
+
+/* El brillo que "barre" el botón al pasar el mouse — una franja clara
+   angosta, inclinada, que viaja de un extremo al otro. Es el mismo
+   truco que usan las tarjetas de crédito/loading skeletons para
+   simular un reflejo sobre una superficie metálica. Puramente visual:
+   no afecta el click porque queda debajo del texto (z-index no hace
+   falta, el texto del botón ya pinta encima al no tener position). */
+#boton-calculadora-cambio::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -75%;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(120deg, transparent, rgba(255, 255, 255, .55), transparent);
+    transform: skewX(-20deg);
+    transition: left .6s ease;
+}
+
+#boton-calculadora-cambio:hover::before {
+    left: 130%;
+}
+
+/* Tarjeta del resultado, adentro del modal — un degradé bien sutil (se
+   apaga a transparente) para separarla visualmente del formulario de
+   arriba sin ponerle un recuadro plano más. */
+.calculadora-resultado-caja {
+    background: linear-gradient(135deg, var(--color-primary-soft), transparent 70%);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+}
+
+.calculadora-resultado-monto {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--color-primary); /* respaldo si el navegador no soporta el degradé de texto de abajo */
+}
+
+/* Mismo efecto "metal grabado" que el botón, pero en el número: un
+   degradé de varias franjas pintado adentro del texto en vez de atrás
+   (background-clip:text recorta el fondo con la forma de las letras).
+   Envuelto en @supports porque en un navegador sin esto el texto se
+   volvería invisible (color transparent) — ahí se queda con el color
+   sólido de respaldo de arriba. */
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+    .calculadora-resultado-monto {
+        background: linear-gradient(120deg,
+            var(--color-primary-dark) 0%,
+            var(--color-primary) 35%,
+            var(--color-primary-dark) 60%,
+            var(--color-primary) 85%,
+            var(--color-primary-dark) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        -webkit-text-fill-color: transparent;
+    }
+}
+
+.calculadora-resultado-detalle {
+    margin: 6px 0 0;
+}
+
+/* Botón ⇄ de invertir — circular en vez del rectangular "secundario"
+   de siempre, para que se note que es una acción distinta (no es un
+   paso más del formulario, es un atajo). El degradé radial (más claro
+   arriba a la izquierda) más el relieve interno lo hacen ver como un
+   dial o moneda de metal en vez de un botón plano — encaja con que
+   gira 180° al tocarlo, como si de verdad rotara. */
+.calculadora-boton-invertir {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    background: radial-gradient(circle at 32% 28%, var(--color-primary) 0%, var(--color-primary-dark) 75%);
+    color: var(--color-on-primary);
+    border: 1px solid var(--color-primary-dark);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .45),
+        inset 0 -2px 3px rgba(0, 0, 0, .3),
+        0 2px 8px var(--color-primary-soft);
+    transition: transform .25s ease, box-shadow .15s ease;
+}
+
+.calculadora-boton-invertir:hover {
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, .5),
+        inset 0 -2px 3px rgba(0, 0, 0, .3),
+        0 4px 14px var(--color-primary-soft);
+}
+
+.calculadora-boton-invertir.girando {
+    transform: rotate(180deg);
+}
+
+/* ---------- Fila inferior de Inicio: dólar + chats, apiladas ----------
+   Antes iban lado a lado (con un tope de max-width:420px cada una para
+   no estirarse de más); a ese ancho, cada card quedaba angosta cuando
+   había lugar de sobra, y encima el conjunto se veía más ancho o más
+   angosto que el carrusel de gráficos de arriba según la pantalla —
+   nunca terminaba de verse "del mismo tamaño". Apilarlas y sacarles el
+   tope de ancho hace que cada una ocupe el mismo ancho completo que
+   cualquier otra card de la página (gráficos incluido), sin casos
+   especiales. */
+.fila-inicio-inferior {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.fila-inicio-inferior > .card {
+    margin: 0;
+}
+
+.carrusel-chats-inicio {
+    --aspect-ratio: 2.1;
+    max-height: 150px;
+    cursor: grab;
+}
+
+.carrusel-chats-inicio:active {
+    cursor: grabbing;
+}
+
+.carrusel-chats-inicio sl-carousel-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 var(--space-5);
+}
+
+.carrusel-chats-inicio::part(pagination) {
+    margin-top: var(--space-2);
+}
+
+.carrusel-chats-inicio::part(pagination-item) {
+    width: 6px;
+    height: 6px;
+}
+
+.carrusel-chats-inicio::part(navigation-button) {
+    font-size: .9rem;
+    color: var(--color-text-muted);
+}
+
+.carrusel-chats-inicio::part(navigation-button):hover {
+    color: var(--color-primary);
+}
+
+@media (max-width: 640px) {
+    /* En una sola columna, 4 tarjetas apiladas ocupan mucho alto de
+       pantalla; en fila (el diseño de escritorio) quedan apretadas en un
+       celular. 2×2 es el punto medio: cada número se sigue leyendo bien
+       sin scrollear una eternidad. */
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Excepción: adentro del carrusel de cotizaciones esto rompía todo
+       — el slide del dólar tiene 3 burbujas, así que pasaban a 2 filas
+       (2+1) en vez de 1 sola. Se mantiene en una fila siempre acá —
+       cada burbuja ya se sabe achicar sola (min-width:0 en .stat-tile)
+       en vez de necesitar una segunda fila. */
+    #mini-carrusel-cotizaciones .stats-row {
+        display: flex;
+        grid-template-columns: none;
+    }
+
+    /* Mismo motivo, un poco más chico todavía: en celular las 3 burbujas
+       del dólar comparten menos ancho real que en escritorio. */
+    #dolar-card .stat-valor {
+        font-size: .82rem;
+    }
+}
+
+/* ---------- Balances ---------- */
+
+.balance-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.balance-item:last-child {
+    border-bottom: none;
+}
+
+.monto {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.monto.positivo { color: var(--color-success); }
+.monto.negativo { color: var(--color-danger); }
+.monto.neutro { color: var(--color-text-muted); }
+
+.sugerencia-pago {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    background: var(--color-surface-2);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-2);
+}
+
+/* ---------- Hero de bienvenida ---------- */
+
+.hero-bienvenida {
+    text-align: center;
+    padding: var(--space-4) var(--space-3) var(--space-3);
+}
+
+.hero-bienvenida h1 {
+    font-size: 1.6rem;
+    margin-bottom: var(--space-2);
+    background: linear-gradient(120deg, var(--color-primary-dark) 0%, var(--color-primary) 50%, var(--color-primary-dark) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.hero-bienvenida p {
+    color: var(--color-text-muted);
+    font-size: .9rem;
+}
+
+/* ---------- Tarjetas de acción (Crear grupo / Unirme) ---------- */
+
+.grid-acciones {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+}
+
+.grid-acciones.tres-columnas {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+/* Mismo degradé que el resto de las cards de la app (ver .card más
+   arriba) en vez del degradé gris propio que tenía antes — así se
+   sigue viendo consistente con todo lo demás. El box-shadow con luz
+   arriba y sombra abajo es el mismo relieve de los botones (ver la
+   sección de Botones), para que se sientan igual de "tocables". */
+.card-accion {
+    position: relative;
+    background: linear-gradient(135deg, var(--color-primary-soft), transparent 70%), var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4) var(--space-3);
+    text-align: center;
+    cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), inset 0 -3px 5px rgba(0, 0, 0, .2), var(--shadow-sm);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.card-accion:hover, .card-accion.activa {
+    transform: translateY(-3px);
+    border-color: var(--color-primary);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), inset 0 -3px 5px rgba(0, 0, 0, .2), var(--shadow-md);
+}
+
+.card-accion .icono-accion {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--color-primary-soft);
+    font-size: 1.4rem;
+    margin-bottom: var(--space-2);
+}
+
+/* ---------- ComfyApp — humito de café al pasar el mouse ----------
+   Antes eran 2 hilos con ::before/::after (el máximo que da un solo
+   elemento) — para que se note más, ahora son 3 <span class="humo">
+   de verdad adentro de .icono-accion en el HTML (ver sistema.html),
+   más grandes, menos difuminados (se distinguen mejor como hilos en
+   vez de una mancha borrosa) y con más recorrido y opacidad. Solo se
+   animan con el hover/foco de la card — en reposo son invisibles
+   (opacity:0, sin animación corriendo). Escapan por ARRIBA del ícono
+   en vez de quedar encerrados, por eso .card-accion perdió su
+   overflow:hidden más arriba (ya no tenía nada que recortar de todos
+   modos, era para un decorado viejo que se sacó). Solo pasa en el
+   tema cafetería — en el resto de la app (Crear grupo, Unirme a un
+   grupo...) .card-accion se queda como siempre, sin humito. */
+:root[data-tema^="cafeteria"] .card-accion .humo {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 9px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(253, 246, 236, .8);
+    filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+}
+
+:root[data-tema^="cafeteria"] .card-accion .humo-1 { left: 38%; }
+:root[data-tema^="cafeteria"] .card-accion .humo-2 { left: 50%; }
+:root[data-tema^="cafeteria"] .card-accion .humo-3 { left: 64%; }
+
+:root[data-tema^="cafeteria"] .card-accion:hover .humo-1,
+:root[data-tema^="cafeteria"] .card-accion:focus-within .humo-1 {
+    animation: comfyapp-humo 1.9s ease-out infinite;
+}
+
+:root[data-tema^="cafeteria"] .card-accion:hover .humo-2,
+:root[data-tema^="cafeteria"] .card-accion:focus-within .humo-2 {
+    animation: comfyapp-humo 1.9s ease-out .4s infinite;
+}
+
+:root[data-tema^="cafeteria"] .card-accion:hover .humo-3,
+:root[data-tema^="cafeteria"] .card-accion:focus-within .humo-3 {
+    animation: comfyapp-humo 1.9s ease-out .8s infinite;
+}
+
+@keyframes comfyapp-humo {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, 4px) scale(.6) rotate(0deg);
+    }
+    18% {
+        opacity: .9;
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -42px) scale(1.6) rotate(14deg);
+    }
+}
+
+.card-accion h3 {
+    color: var(--color-primary);
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: .95rem;
+    margin-bottom: 4px;
+}
+
+.card-accion p {
+    color: var(--color-text-muted);
+    font-size: .78rem;
+    margin: 0;
+}
+
+/* Variante para la acción secundaria de un par (ej. "Registrar pago" al
+   lado de "Agregar gasto") — misma tarjeta, pero sin el degradé ni el
+   color primario, para no pesar visualmente igual que la acción que se
+   usa muchísimo más seguido. Al pasar el mouse o abrirla igual toma el
+   color primario (ver .card-accion:hover más arriba), así no deja de
+   sentirse clickeable.  */
+.card-accion.secundaria {
+    background: var(--color-surface);
+}
+
+.card-accion.secundaria .icono-accion {
+    background: var(--color-surface-2);
+    font-size: 1.2rem;
+}
+
+.card-accion.secundaria h3 {
+    color: var(--color-text);
+}
+
+.panel-expandible {
+    grid-column: 1 / -1;
+}
+
+/* Cada grupo en "Tus grupos" (grupos.js) — es un <button>, pero por
+   estar excluido a propósito del brillo dorado de los botones "de
+   acción" (ver la lista de exclusiones en la sección de Botones), se
+   había quedado con el dorado plano de siempre en vez de sumarse al
+   resto de los cambios de hoy. Mismo degradé que las demás cards/
+   recuadros de la app, en vez de ninguno de los dos extremos. */
+.boton-grupo {
+    background: linear-gradient(135deg, var(--color-primary-soft), transparent 70%), var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), inset 0 -3px 5px rgba(0, 0, 0, .2), var(--shadow-sm);
+}
+
+.boton-grupo:hover {
+    background: linear-gradient(135deg, var(--color-primary-soft), transparent 60%), var(--color-surface);
+    border-color: var(--color-primary);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), inset 0 -3px 5px rgba(0, 0, 0, .2), var(--shadow-sm);
+}
+
+/* Contador de mensajes sin leer sobre la tarjeta "💬 Chat" — mismo
+   círculo rojo de siempre, con position:relative ya heredado de
+   .card-accion. */
+.badge-no-leidos {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--color-danger);
+    color: #fff;
+    font-size: .68rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+}
+
+/* ---------- Chat de grupo ---------- */
+
+.chat-mensajes {
+    max-height: 320px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
+}
+
+.chat-burbuja {
+    max-width: 80%;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    align-self: flex-start;
+}
+
+.chat-burbuja.propia {
+    background: var(--color-primary-soft);
+    align-self: flex-end;
+}
+
+.chat-burbuja-autor {
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    margin-bottom: 2px;
+}
+
+.chat-burbuja-texto {
+    font-size: .88rem;
+    color: var(--color-text);
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.chat-burbuja-hora {
+    font-size: .65rem;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+    text-align: right;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.chat-borrar {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: .8rem;
+    padding: 0;
+    line-height: 1;
+    opacity: .6;
+}
+
+.chat-borrar:hover {
+    opacity: 1;
+}
+
+.chat-form {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+}
+
+.chat-form input {
+    flex: 1;
+}
+
+.chat-form button {
+    width: auto;
+}
+
+/* ---------- Barra de progreso (presupuesto) ---------- */
+
+.barra-progreso-fondo {
+    background: var(--color-surface-2);
+    border-radius: 999px;
+    height: 10px;
+    overflow: hidden;
+    margin: var(--space-2) 0;
+}
+
+.barra-progreso {
+    height: 100%;
+    border-radius: 999px;
+    transition: width .3s ease;
+}
+
+.barra-progreso.ok { background: var(--color-success); }
+.barra-progreso.alerta { background: var(--color-warning); }
+.barra-progreso.excedido { background: var(--color-danger); }
+
+/* ---------- Código de invitación ---------- */
+
+.codigo-invitacion {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: var(--color-primary-soft);
+    color: var(--color-primary);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    font-family: "Courier New", monospace;
+    font-weight: 700;
+    letter-spacing: .08em;
+}
+
+/* ---------- Fila de método vinculado (pantalla de Cuenta) ---------- */
+
+.metodo-vinculado {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.metodo-vinculado:last-child { border-bottom: none; }
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.badge.on { background: var(--color-success-soft); color: var(--color-success); }
+.badge.off { background: var(--color-surface-2); color: var(--color-text-muted); }
+
+/* ---------- Gráficos (Chart.js — el tamaño real lo fija graficos.js
+   con la altura del div que envuelve el <canvas>; acá solo se limita el
+   ancho para que no se estire de más en pantallas grandes) ---------- */
+
+.grafico-contenedor {
+    max-width: 420px;
+    margin: 0 auto;
+}
+
+.grafico-pie {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-2);
+}
+
+.grafico-pie button {
+    font-size: .75rem;
+    padding: 3px 8px;
+}
+
+/* ---------- Carrusel de gráficos (Inicio) ----------
+   Mismo .mini-carrusel de más arriba (el padding lateral ya es común a
+   los tres, ver .mini-carrusel-slide) — acá solo un poco más de
+   espacio abajo, antes de los puntitos, porque un gráfico se siente
+   más apretado que un número suelto si no lo tiene. Cada slide mide lo
+   que su propio contenido necesite (un gráfico de barras horizontales
+   varía de alto según cuántas categorías haya) — con flex + stretch en
+   la pista, todos los slides quedan altos como el más alto, sin que
+   haga falta fijar un número a mano. */
+#mini-carrusel-graficos .mini-carrusel-slide {
+    padding-bottom: var(--space-4);
+}
+
+.carrusel-titulo {
+    text-align: center;
+}
+
+/* ---------- Modal ---------- */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    z-index: 200;
+    animation: entrada-modal .15s ease-out;
+}
+
+.modal-caja {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    max-width: 480px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-md);
+}
+
+/* Variante ancha — para el armador visual de composiciones de TFT
+   (tablero de hexágonos + panel de campeones lado a lado), que no
+   entra en los 480px de un modal normal. Se agrega la clase a mano
+   sobre el .modal-caja después de abrirModal(), no cambia el default. */
+.modal-caja-ancha {
+    max-width: 880px;
+}
+
+@keyframes entrada-modal {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ---------- Toasts ---------- */
+
+#toast-contenedor {
+    position: fixed;
+    bottom: var(--space-4);
+    right: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    z-index: 100;
+}
+
+.toast {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    color: #fff;
+    font-size: .9rem;
+    font-weight: 600;
+    max-width: 320px;
+    animation: entrada-toast .15s ease-out;
+}
+
+.toast.info { background: #43403a; }
+.toast.exito { background: var(--color-success); color: #0d1f14; }
+.toast.error { background: var(--color-danger); color: #2a0e0b; }
+
+@keyframes entrada-toast {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Asistente flotante (burbuja + panel guiado) ----------
+   Ver asistente.js. La burbuja queda fija abajo a la derecha en todas
+   las páginas; el panel aparece justo arriba de ella. z-index 150: por
+   encima de la navbar y los toasts, por debajo del modal de edición y
+   de la pantalla de carga (para que ninguno de esos dos quede tapado
+   si llegaran a coincidir). */
+/* El contenedor es lo que queda fijo abajo a la derecha (antes era la
+   burbuja misma) — así adentro puede convivir con el botón chico de
+   minimizar sin que sean el mismo elemento clickeable (un <button> no
+   puede tener otro botón adentro). Nunca se oculta del todo: minimizada
+   (clase .minimizada, ver asistente.js) se achica a un círculo con solo
+   el emoji, así el propio botón sigue siendo el "visible en todas las
+   secciones" para volver a abrirla o agrandarla — sin switch aparte en
+   ningún menú. */
+.burbuja-asistente-contenedor {
+    position: fixed;
+    bottom: calc(var(--space-5) + var(--altura-nav-inferior));
+    right: var(--space-5);
+    z-index: 150;
+}
+
+.burbuja-asistente {
+    position: static;
+    height: 52px;
+    padding: 0 var(--space-4) 0 var(--space-3);
+    border-radius: 999px;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border: none;
+    font-size: .95rem;
+    font-weight: 700;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.burbuja-asistente-emoji {
+    font-size: 1.4rem;
+}
+
+.burbuja-asistente:hover {
+    background: var(--color-primary-dark);
+}
+
+/* Minimizada: mismo botón, pero angosto a un círculo con solo el emoji
+   — el texto "Gastón" se esconde y se saca el padding lateral que le
+   daba lugar. Sigue abriendo el chat igual que en tamaño completo. */
+.burbuja-asistente-contenedor.minimizada .burbuja-asistente {
+    width: 52px;
+    padding: 0;
+    justify-content: center;
+}
+
+.burbuja-asistente-contenedor.minimizada .burbuja-asistente-texto {
+    display: none;
+}
+
+.minimizar-asistente-burbuja {
+    position: absolute;
+    top: -8px;
+    right: -6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: .8rem;
+    font-weight: 700;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+}
+
+.minimizar-asistente-burbuja:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+/* El cartelito estilo historieta que invita a hablar con Gastón —
+   mismo bottom/right que .panel-asistente (aparece en el mismo lugar,
+   justo arriba de la burbuja) para que la "colita" apunte bien hacia
+   ella. Empieza invisible y desplazado un toque hacia abajo; JS le
+   agrega/saca la clase .visible. */
+.callout-asistente {
+    position: fixed;
+    bottom: calc(52px + var(--space-5) + var(--space-3) + var(--altura-nav-inferior));
+    right: var(--space-5);
+    max-width: 230px;
+    background: var(--color-surface);
+    border: 2px solid var(--color-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-3) var(--space-4);
+    box-shadow: var(--shadow-md);
+    z-index: 149;
+    opacity: 0;
+    transform: translateY(6px) scale(.96);
+    pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease;
+    cursor: pointer;
+}
+
+.callout-asistente.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.callout-asistente p {
+    margin: 0;
+    padding-right: var(--space-4);
+    font-size: .85rem;
+}
+
+.callout-cerrar {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: .75rem;
+    padding: 4px;
+    line-height: 1;
+}
+
+.callout-cerrar:hover {
+    color: var(--color-primary);
+}
+
+/* La "colita" del globo de diálogo: dos triángulos apilados (uno más
+   grande del color del borde, uno más chico del color de fondo encima)
+   para que se vea con el mismo borde de 2px que el resto del cartel. */
+.callout-asistente::before {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    right: 26px;
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-top: 10px solid var(--color-primary);
+}
+
+.callout-asistente::after {
+    content: '';
+    position: absolute;
+    bottom: -7px;
+    right: 28px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid var(--color-surface);
+}
+
+.panel-asistente {
+    position: fixed;
+    bottom: calc(52px + var(--space-5) + var(--space-3) + var(--altura-nav-inferior));
+    right: var(--space-5);
+    width: 320px;
+    max-width: calc(100vw - var(--space-5) * 2);
+    max-height: 70vh;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    flex-direction: column;
+    z-index: 150;
+    overflow: hidden;
+    animation: entrada-modal .15s ease-out;
+}
+
+.panel-asistente-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.panel-asistente-cuerpo {
+    padding: var(--space-3);
+    overflow-y: auto;
+}
+
+.asistente-opcion {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: var(--space-3);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    margin-bottom: var(--space-2);
+    font-size: .85rem;
+}
+
+.asistente-opcion:hover {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+}
+
+.asistente-saludo {
+    font-size: .88rem;
+    color: var(--color-text-muted);
+    margin: 0 0 var(--space-3);
+}
+
+.asistente-respuesta {
+    font-size: .88rem;
+}
+
+.asistente-respuesta + a {
+    display: inline-block;
+    margin-top: var(--space-1);
+}
+
+.asistente-textarea {
+    width: 100%;
+    resize: vertical;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: inherit;
+    margin-bottom: var(--space-3);
+}
+
+/* ---------- Responsive ----------
+   Tres tamaños: celular (todo en una columna), tablet/pantalla chica
+   (la grilla de 3 columnas pasa a 2, para no quedar apretada), y
+   escritorio (los valores de arriba, sin media query). */
+
+@media (max-width: 900px) {
+    .grid-acciones.tres-columnas {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .navbar-links {
+        display: none;
+    }
+
+    /* La navbar de escritorio esconde los links acá mismo — así que la
+       barra inferior arranca justo donde termina, sin ningún tramo de
+       pantalla sin forma de navegar entre secciones. */
+    :root {
+        --altura-nav-inferior: 60px;
+    }
+
+    .bottom-nav {
+        display: flex;
+    }
+
+    .page {
+        padding-bottom: calc(var(--space-6) + var(--altura-nav-inferior));
+    }
+
+    /* Los botones de ícono (editar/eliminar en listas y tablas) medían
+       apenas ~24px de lado — cómodo con mouse, pero un objetivo chico
+       para tocar con el dedo. Se agranda el área táctil sin agrandar
+       demasiado el emoji, para no desarmar el layout de las filas. */
+    button.icono {
+        min-width: 40px;
+        min-height: 40px;
+        font-size: 1.1rem;
+    }
+
+    /* Mismo criterio para los botones normales: un poco más de alto
+       para que el dedo no falle en pantallas táctiles. Se excluyen los
+       botones-insignia chicos a propósito (✕ de cerrar, −/+ de
+       minimizar Gastón, el toggle del gráfico de torta, los puntitos
+       de paginación de los mini carruseles) — forzarlos a 40px los
+       desarmaría (los puntitos, redondos de 6px, quedaban ovalados) y
+       ya tienen al lado un área más grande para el mismo gesto (las
+       flechas, el arrastre). */
+    button:not(.icono):not(.callout-cerrar):not(.minimizar-asistente-burbuja):not(.grafico-pie button):not(.mini-carrusel-punto), .btn {
+        min-height: 40px;
+    }
+
+    /* iOS hace zoom automático de toda la página al enfocar un campo
+       con letra menor a 16px — con esto ya no hace falta el zoom, y de
+       paso queda más cómodo de leer mientras se escribe. */
+    input, select, textarea {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 640px) {
+    /* Las tablas de historial (Gastos personales, Grupos, Más datos)
+       suelen tener bastantes columnas — no entran todas en el ancho de
+       un celular, así que .tabla-wrap ya las deja scrollear de costado.
+       Ajustando letra y padding entran una o dos columnas más antes de
+       tener que scrollear — sumado a tener Fecha/Descripción/Monto
+       siempre primero (ver el orden de columnas en cada tabla), así lo
+       más importante ya se ve sin mover un dedo. */
+    table {
+        font-size: .8rem;
+    }
+
+    th, td {
+        padding: 6px 8px;
+    }
+
+    form.form, .subgrupo-campos {
+        grid-template-columns: 1fr;
+    }
+
+    .grid-acciones, .grid-acciones.tres-columnas {
+        grid-template-columns: 1fr;
+    }
+
+    .navbar {
+        padding: var(--space-2) var(--space-3);
+    }
+
+    .page {
+        padding: var(--space-3) var(--space-3) var(--space-5);
+    }
+
+    .hero-bienvenida h1 {
+        font-size: 1.35rem;
+    }
+
+    /* El padding lateral pensado para escritorio, sumado al de .page y
+       .card, le dejaba muy poco ancho real al contenido en un celular
+       angosto — se achica en los tres mini carruseles por igual (ver
+       .mini-carrusel-slide), no solo en el de gráficos. */
+    .mini-carrusel-slide {
+        padding-left: var(--space-2);
+        padding-right: var(--space-2);
+    }
+
+    #mini-carrusel-graficos .mini-carrusel-slide {
+        padding-bottom: var(--space-3);
+    }
+
+    /* En celular, .stats-row pasa a 2 columnas (ver más arriba) — cada
+       tile queda bastante más angosto, así que el número se achica un
+       poco para que entre cómodo. */
+    #mini-carrusel-periodo .stat-valor, #mini-carrusel-tarjeta .stat-valor {
+        font-size: 1rem;
+    }
+
+    .avatar-grande {
+        width: 64px;
+        height: 64px;
+        font-size: 1.7rem;
+    }
+
+    /* La burbuja flotante quedaba del mismo tamaño que en escritorio —
+       en un celular chico eso es una porción real de pantalla tapada
+       todo el tiempo. Achicada acá, y el cartelito/panel que se
+       calculaban "a partir de los 52px de alto" se ajustan con ella. */
+    .burbuja-asistente-contenedor {
+        right: var(--space-3);
+        bottom: calc(var(--space-3) + var(--altura-nav-inferior));
+    }
+
+    .burbuja-asistente {
+        height: 44px;
+        padding: 0 var(--space-3) 0 10px;
+        font-size: .82rem;
+    }
+
+    .burbuja-asistente-emoji {
+        font-size: 1.15rem;
+    }
+
+    .burbuja-asistente-contenedor.minimizada .burbuja-asistente {
+        width: 44px;
+    }
+
+    .minimizar-asistente-burbuja {
+        top: -6px;
+        right: -4px;
+        width: 20px;
+        height: 20px;
+    }
+
+    .callout-asistente {
+        bottom: calc(44px + var(--space-3) + var(--space-3) + var(--altura-nav-inferior));
+        right: var(--space-3);
+        max-width: calc(100vw - var(--space-3) * 2 - 20px);
+    }
+
+    .panel-asistente {
+        right: var(--space-3);
+        bottom: calc(44px + var(--space-3) + var(--space-3) + var(--altura-nav-inferior));
+        width: calc(100vw - var(--space-3) * 2);
+    }
+}
+
+/* ---------- AgendaApp — vista mensual ----------
+   Grilla de 7 columnas (días de la semana) x hasta 6 filas (semanas del
+   mes) — el "gap" de 1px + fondo del contenedor en --color-border arma
+   las líneas divisorias entre celdas sin tener que ponerle borde a cada
+   una por separado. */
+.calendario-grilla {
+    display: grid;
+    /* minmax(0, 1fr) y no un simple "1fr" — por defecto, una columna de
+       grid nunca se achica más allá del contenido que tenga adentro (su
+       "min-content"), aunque esté declarada como fracción flexible. Con
+       un evento de título largo en una sola celda, esa columna se
+       ensanchaba más que las demás siete (se veían todas de ancho
+       distinto) porque el texto empujaba su columna. minmax(0, 1fr)
+       permite que la columna se achique hasta 0 si hace falta, dejando
+       que ellipsis (ver .calendario-evento) recorte el texto en vez de
+       ensanchar la celda. */
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.calendario-dia-nombre {
+    background: var(--color-surface-2);
+    padding: var(--space-2) 0;
+    text-align: center;
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    color: var(--color-text-muted);
+}
+
+.calendario-celda {
+    background: var(--color-surface);
+    min-height: 90px;
+    /* min-width:0 — la celda es a la vez ítem de grid (la columna de
+       arriba) e ítem flex (column) para lo que tiene adentro; sin esto,
+       un evento de título largo también podía ensanchar la celda desde
+       ADENTRO, incluso con la columna ya arreglada arriba. */
+    min-width: 0;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: pointer;
+}
+
+.calendario-celda:hover {
+    background: var(--color-primary-soft);
+}
+
+/* Días del mes anterior/siguiente que se ven de relleno para completar
+   la grilla — atenuados para que se note que no son "del mes" sin
+   dejar de mostrar sus eventos (Google Calendar puede tener eventos ahí
+   igual, y ocultarlos sería confuso). */
+.calendario-celda.fuera-de-mes {
+    background: var(--color-bg);
+    opacity: .55;
+}
+
+.calendario-celda.hoy {
+    background: var(--color-primary-soft);
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+.calendario-celda-numero {
+    font-size: .75rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+}
+
+.calendario-evento {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-size: .66rem;
+    font-weight: 600;
+    padding: 1px 4px;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calendario-evento-mas {
+    font-size: .64rem;
+    color: var(--color-text-muted);
+    padding: 0 4px;
+}
+
+@media (max-width: 640px) {
+    /* En celular no entra ni el nombre del evento — se cambia por un
+       puntito de color, y el número de día se achica un poco para no
+       ocupar tanto de una celda ya chica. */
+    .calendario-celda {
+        min-height: 56px;
+        padding: 3px;
+    }
+
+    .calendario-evento {
+        width: 6px;
+        height: 6px;
+        padding: 0;
+        border-radius: 50%;
+    }
+
+    .calendario-dia-nombre {
+        font-size: .6rem;
+    }
+}
+
+/* ---------- AgendaApp — vista semanal ----------
+   7 columnas (una por día), pero a diferencia de la vista mensual acá
+   entra el título completo de cada evento con su hora — una semana tiene
+   mucho menos que mostrar por columna que un mes. */
+.calendario-semana-grilla {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr)); /* minmax(0, ...) — mismo motivo que .calendario-grilla más arriba */
+    gap: 1px;
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.calendario-semana-dia {
+    background: var(--color-surface);
+    min-height: 220px;
+    min-width: 0;
+    padding: var(--space-2);
+    cursor: pointer;
+}
+
+.calendario-semana-dia.hoy {
+    background: var(--color-primary-soft);
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+.calendario-semana-dia-encabezado {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-2);
+}
+
+.calendario-semana-evento {
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-size: .72rem;
+    padding: 3px 6px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+@media (max-width: 900px) {
+    /* 7 columnas ya no entran cómodas debajo de 900px — un día abajo del
+       otro en vez de apretarlos, mismo criterio que .grid-acciones. */
+    .calendario-semana-grilla {
+        grid-template-columns: 1fr;
+    }
+
+    .calendario-semana-dia {
+        min-height: auto;
+    }
+}
+
+/* ---------- AgendaApp — vista anual ----------
+   12 minicalendarios — a este tamaño no entra texto de evento, así que
+   cada día con algo cargado se marca con un puntito abajo (ver
+   .con-eventos) en vez de listar títulos. Tocar cualquier parte de un
+   mes saltea a la vista Mes de ese mes (ver el click delegado en
+   agenda/index.html). */
+.calendario-año-grilla {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-3);
+}
+
+.mini-mes {
+    background: var(--color-surface-2);
+    border-radius: var(--radius-sm);
+    padding: var(--space-2);
+    cursor: pointer;
+}
+
+.mini-mes:hover {
+    background: var(--color-primary-soft);
+}
+
+.mini-mes-titulo {
+    margin: 0 0 var(--space-2);
+    font-size: .78rem;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.mini-mes-grilla {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 1px;
+}
+
+.mini-mes-celda {
+    font-size: .62rem;
+    text-align: center;
+    color: var(--color-text);
+    padding: 2px 0;
+    position: relative;
+}
+
+.mini-mes-celda.hoy {
+    color: var(--color-primary);
+    font-weight: 700;
+}
+
+/* El puntito de "este día tiene algo cargado" — ::after en vez de un
+   span aparte, para no sumar otro elemento por cada uno de los ~365 días
+   del año que se dibujan de una sola vez. */
+.mini-mes-celda.con-eventos::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--color-primary);
+}
+
+@media (max-width: 640px) {
+    .calendario-año-grilla {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* ---------- ComfyApp — franja de pronóstico (7 días) ----------
+   Cada tarjetita tiene ancho fijo (flex-shrink:0) a propósito — así
+   nunca se achican para "entrar todas", sino que la franja entera
+   scrollea de costado (ver overflow-x:auto en el contenedor, puesto
+   inline en sistema.html) cuando no entran las 7 en el ancho de la card. */
+.clima-dia-pronostico {
+    flex: 0 0 auto;
+    width: 58px;
+    text-align: center;
+    background: var(--color-surface-2);
+    border-radius: var(--radius-sm);
+    padding: var(--space-2) 4px;
+}
+
+.clima-dia-pronostico-nombre {
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.clima-dia-pronostico-icono {
+    font-size: 1.1rem;
+    margin: 2px 0;
+}
+
+.clima-dia-pronostico-temps {
+    font-size: .7rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.clima-dia-pronostico-temps .max {
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.clima-dia-pronostico-temps .min {
+    color: var(--color-text-muted);
+}
+
+/* ---------- AgendaApp — selector de color de evento ("categoría") ----------
+   Círculos de color (los 11 de Google + uno de "sin color propio", con
+   una X adentro) en el formulario de crear/editar evento. El color en sí
+   siempre es dinámico (viene de la API, no hay paleta fija acá) — se
+   pone por style="" al armar cada botón, ver agenda/index.html. */
+.selector-color-evento {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid var(--color-border);
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .7rem;
+    color: var(--color-text-muted);
+}
+
+.selector-color-evento.seleccionado {
+    border-color: var(--color-text);
+    box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
+}
+
+/* Puntito de color junto a un resultado de búsqueda — mismo dato
+   (evento.colorId o el color del calendario) que los chips de las otras
+   vistas, pero acá como indicador chico en vez de recolorear toda la
+   fila (que ya usa el estilo compartido .balance-item). */
+.punto-color-evento {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex: none;
+}
+
+/* ---------- Centro de notificaciones (campanita 🔔) ----------
+   Compartido por las 4 apps — ver notificacionesCentro.js, que arma este
+   HTML e inyecta estas clases desde cada navbar. Panel propio (no
+   sl-drawer de Shoelace): es angosto y liviano, no justifica todo el
+   mecanismo de un drawer lateral completo — se cierra a mano al tocar
+   afuera (ver el listener de "click" en el documento, en el módulo). */
+.campanita-contador {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
+    border-radius: 8px;
+    background: var(--color-danger);
+    color: #fff;
+    font-size: .65rem;
+    font-weight: 700;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.campanita-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 320px;
+    max-width: calc(100vw - var(--space-4) * 2);
+    max-height: 400px;
+    overflow-y: auto;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    z-index: 160; /* por debajo de .modal-overlay (200), por encima del resto (navbar/bottom-nav/callouts, 10-150) */
+}
+
+.campanita-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+    font-size: .88rem;
+}
+
+.campanita-item {
+    position: relative; /* ancla el puntito de "no leída" de acá abajo */
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    text-align: left;
+    padding: var(--space-3);
+    border: none;
+    border-left: 3px solid transparent;
+    border-bottom: 1px solid var(--color-border);
+    /* Ya leída (el estado de "reposo" — .no-leida de acá abajo la pisa
+       mientras siga sin leer): el MISMO color que el panel que la
+       contiene (.campanita-panel usa --color-surface) — a propósito,
+       para que quede lo más "apagada" posible, sin ningún peso visual
+       propio. BUG REAL encontrado y corregido: antes acá había
+       --color-surface-2, casi idéntico a --color-surface (la diferencia
+       entre los dos es de un puñado de unidades de color) — la clase
+       .no-leida se sacaba/ponía bien (por eso el puntito de acá abajo
+       sí cambiaba), pero a simple vista el fondo no se notaba distinto. */
+    background: var(--color-surface);
+    color: inherit;
+    cursor: pointer;
+}
+
+.campanita-item:last-child {
+    border-bottom: none;
+}
+
+/* BUG REAL encontrado y corregido: esto pisaba CUALQUIER fondo (el gris
+   de "leída" y el neutro de "no leída") con el mismo dorado brillante de
+   siempre apenas el mouse pasaba por encima — una notificación ya leída
+   se veía idéntica a como se veía "sin leer" con el diseño viejo en
+   cuanto se la miraba de cerca (justo lo que reportó Roy). Ahora el
+   hover usa --color-border (el mismo tono que ya se usa para las líneas
+   divisorias del panel, así que combina) — se sigue notando que es
+   interactivo, pero no tapa la diferencia leída/no leída: esa la sigue
+   marcando la franja de la izquierda (border-left, ver .no-leida más
+   abajo), que el hover no toca. */
+.campanita-item:hover {
+    background: var(--color-border);
+}
+
+/* No leída: fondo mezclado al 30% con el color de marca — bastante más
+   fuerte que --color-primary-soft (que es solo una transparencia del
+   16-18%, pensada para quedar sutil de fondo en OTROS lugares de la
+   app, ej. .drawer-link:hover) para que acá no quede ninguna duda de
+   cuál está sin leer, ni siquiera de reojo. color-mix() mezcla de
+   verdad los dos colores (no una transparencia por encima), así que da
+   un resultado más sólido/opaco en vez de "traslúcido". + franja de la
+   izquierda a juego. Se nota clarísimo contra el fondo NEUTRO de
+   "leída" de arriba (que directamente no tiene color de marca). */
+.campanita-item.no-leida {
+    background: color-mix(in srgb, var(--color-primary) 30%, var(--color-surface));
+    border-left-color: var(--color-primary);
+}
+
+/* Puntito arriba a la derecha, a pedido de Roy — para poder confirmar de
+   un vistazo (sin depender de comparar el fondo/la franja contra otras
+   notitas) que "no leída" de verdad desaparece al marcarla leída. Rojo
+   fijo (--color-danger) a propósito, no --color-primary — así queda
+   clarísimo que es un indicador de estado, no "parte del diseño" de la
+   notita en sí, que ya usa el dorado para la franja. */
+.campanita-item.no-leida::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-danger);
+}
+
+.campanita-item-titulo {
+    font-weight: 600;
+    font-size: .85rem;
+    color: var(--color-text);
+}
+
+/* --color-text (el mismo tono que el título) en vez de
+   --color-text-muted — a pedido de Roy, el gris apagado quedaba muy
+   bajo de contraste y costaba leerlo. El tamaño más chico (.78rem/
+   .68rem) y la posición ya alcanzan para que se note que es texto
+   secundario, sin necesitar además un color de menor contraste. */
+.campanita-item-cuerpo {
+    font-size: .78rem;
+    color: var(--color-text);
+}
+
+.campanita-item-fecha {
+    font-size: .68rem;
+    color: var(--color-text);
+    align-self: flex-end;
+}
+
+/* --- TareasApp: lista de tareas (personales y de grupo) --- */
+
+.tarea-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.tarea-item:last-child {
+    border-bottom: none;
+}
+
+.tarea-item-check {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    margin-top: 2px;
+    cursor: pointer;
+    accent-color: var(--color-primary);
+}
+
+.tarea-item-cuerpo {
+    flex: 1;
+    min-width: 0;
+}
+
+.tarea-item-titulo {
+    font-weight: 600;
+    word-break: break-word;
+}
+
+/* Completada: título tachado y apagado — misma idea que un ítem leído/
+   resuelto en cualquier otra lista de la app, sin necesitar un ícono
+   aparte para "ya está". */
+.tarea-item.completada .tarea-item-titulo {
+    text-decoration: line-through;
+    color: var(--color-text-muted);
+}
+
+.tarea-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 4px;
+    font-size: .78rem;
+    color: var(--color-text-muted);
+}
+
+/* "vencida"/"proxima" (vence hoy o en los próximos 2 días) se destacan
+   con los mismos colores de estado que el resto de la app (danger/
+   warning) — una tarea ya completada nunca lleva esta clase (ver arriba,
+   no tiene sentido resaltar el vencimiento de algo que ya se hizo). */
+.tarea-item-vencimiento.vencida {
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+.tarea-item-vencimiento.proxima {
+    color: var(--color-warning);
+    font-weight: 600;
+}
+
+.tarea-item-acciones {
+    display: flex;
+    gap: 4px;
+    flex: none;
+}
+
+/* --- Widget de "notitas" (ComfyApp) ---
+   Carrusel de post-its con las tareas pendientes de la persona (ver
+   obtenerTareasPendientes en tareas/tareas.js) — una notita a la vez,
+   con flechas para pasar a la siguiente/anterior. El tono "post-it"
+   viene de reusar el color de warning (cálido, tipo papel amarillo) en
+   vez de inventar un color fijo nuevo — así se sigue viendo bien en los
+   5 temas de la app sin tener que darle su propia paleta. */
+.postits-widget {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.postits-flecha {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.postits-flecha:hover {
+    background: var(--color-primary-soft);
+}
+
+.postits-flecha:disabled {
+    opacity: .35;
+    cursor: default;
+    background: var(--color-surface);
+}
+
+.postit-card {
+    flex: 1;
+    min-width: 0;
+    min-height: 92px;
+    background: var(--color-warning-soft);
+    border: 1px solid var(--color-warning);
+    border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    cursor: pointer;
+    /* Un poquito de inclinación (alterna según la posición, ver el
+       estilo inline armado en JS) — de ahí sale el aire "post-it de
+       verdad" sin necesitar ninguna imagen. */
+}
+
+.postit-card:hover {
+    transform: rotate(0deg) scale(1.01);
+}
+
+.postit-card-origen {
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--color-text-muted);
+}
+
+.postit-card-titulo {
+    font-weight: 700;
+    font-size: .92rem;
+    color: var(--color-text);
+    word-break: break-word;
+}
+
+.postit-card-vencimiento {
+    font-size: .78rem;
+    color: var(--color-text-muted);
+}
+
+.postit-card-vencimiento.vencida {
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+.postit-card-vencimiento.proxima {
+    color: var(--color-warning);
+    font-weight: 600;
+}
+
+.postits-puntos {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin-top: var(--space-3);
+}
+
+.postits-punto {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-border);
+}
+
+.postits-punto.activo {
+    background: var(--color-primary);
+}

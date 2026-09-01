@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GastosApp</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <meta name="theme-color" content="#0f0e0c">
+    <script>
+        // Ver comentario en tema.js: esto va inline y antes que el CSS
+        // para que no haya flash del tema equivocado (ni de Shoelace) al
+        // cargar. La clase sl-theme-dark es la que usan los componentes
+        // de Shoelace (el menú lateral, el switch de tema) para su modo
+        // oscuro — se mantiene sincronizada con data-tema.
+        var tema = localStorage.getItem('tema') || 'oscuro';
+        document.documentElement.setAttribute('data-tema', tema);
+        if (tema === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@twemoji/api@17.0.3/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div id="pantalla-carga" class="pantalla-carga"><div class="spinner"></div></div>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page">
+        <div class="hero-bienvenida" id="hero">
+            <h1 id="hero-titulo"><span class="avatar-hero" id="hero-avatar">😊</span> <span id="hero-texto">Bienvenido</span></h1>
+            <p id="mensaje-bienvenida">Iniciá sesión para crear o unirte a un grupo y empezar a dividir gastos.</p>
+        </div>
+
+        <div class="card" id="recordatorios-card" style="display:none; max-width: 420px; margin-left:auto; margin-right:auto;">
+            <div class="card-header"><h3 style="margin:0;">🔔 Recordatorios</h3></div>
+            <div id="recordatorios-contenido"></div>
+        </div>
+
+        <div class="card" id="deuda-grupos-card" style="display:none; max-width: 420px; margin-left:auto; margin-right:auto;">
+            <div class="card-header"><h3 style="margin:0;">👥 Tus grupos, en total</h3></div>
+            <div class="stats-row">
+                <div class="stat-tile">
+                    <div class="stat-valor monto positivo" id="deuda-te-deben">$0.00</div>
+                    <div class="stat-etiqueta">Te deben</div>
+                </div>
+                <div class="stat-tile">
+                    <div class="stat-valor monto negativo" id="deuda-debes">$0.00</div>
+                    <div class="stat-etiqueta">Debés</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="bienvenida-card" style="max-width: 420px; margin-left:auto; margin-right:auto;">
+            <button type="button" id="boton-google" style="width: 100%;">Iniciar sesión con Google</button>
+
+            <p id="separador-email" style="text-align:center; margin: var(--space-4) 0; color: var(--color-text-muted);">— o con tu email —</p>
+
+            <div class="tabs">
+                <button type="button" class="tab activa" data-tab="entrar">Entrar</button>
+                <button type="button" class="tab" data-tab="crear">Crear cuenta</button>
+            </div>
+
+            <form id="form-entrar" class="form">
+                <div class="campo-ancho">
+                    <label for="entrar-email">Email</label>
+                    <input type="email" id="entrar-email" required>
+                </div>
+                <div class="campo-ancho">
+                    <label for="entrar-password">Contraseña</label>
+                    <input type="password" id="entrar-password" required>
+                </div>
+                <button type="submit" class="campo-ancho secundario">Entrar</button>
+                <a href="#" id="link-olvide" class="campo-ancho" style="text-align:center; font-size:.85rem;">¿Olvidaste tu contraseña?</a>
+            </form>
+
+            <form id="form-crear" class="form" style="display:none;">
+                <div class="campo-ancho">
+                    <label for="crear-email">Email</label>
+                    <input type="email" id="crear-email" required>
+                </div>
+                <div class="campo-ancho">
+                    <label for="crear-password">Contraseña</label>
+                    <input type="password" id="crear-password" minlength="6" required>
+                </div>
+                <button type="submit" class="campo-ancho secundario">Crear cuenta</button>
+            </form>
+        </div>
+
+        <div class="card" id="panel-2fa" style="display:none; max-width: 420px; margin-left:auto; margin-right:auto;">
+            <div class="card-header"><h2 style="margin:0;">🔐 Verificación en dos pasos</h2></div>
+            <p>Abrí tu app autenticadora y escribí el código de 6 dígitos.</p>
+            <form id="form-2fa" class="form">
+                <div class="campo-ancho">
+                    <label for="codigo-2fa">Código</label>
+                    <input type="text" id="codigo-2fa" inputmode="numeric" pattern="[0-9]*" maxlength="6" required autofocus>
+                </div>
+                <button type="submit" class="campo-ancho">Confirmar</button>
+                <button type="button" id="boton-cancelar-2fa" class="campo-ancho secundario">Cancelar</button>
+            </form>
+        </div>
+
+        <div id="grupos-placeholder"></div>
+
+        <div class="card" id="carrusel-graficos-card" style="display:none;">
+            <div class="card-header">
+                <h3 style="margin:0;">📊 Tus gráficos</h3>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <select id="filtro-moneda-inicio" style="width:auto; font-size:.8rem; padding:4px 8px;"><option value="todas">Todas las monedas</option></select>
+                    <a href="estadisticas.html" style="font-size:.82rem;">Ver más →</a>
+                </div>
+            </div>
+            <div class="mini-carrusel" id="mini-carrusel-graficos">
+                <button type="button" class="mini-carrusel-anterior" aria-label="Gráfico anterior">‹</button>
+                <button type="button" class="mini-carrusel-siguiente" aria-label="Gráfico siguiente">›</button>
+                <div class="mini-carrusel-pista">
+                    <div class="mini-carrusel-slide">
+                        <h3 class="carrusel-titulo">Por categoría — últimos 30 días</h3>
+                        <div class="grafico-contenedor" id="inicio-grafico-categorias"></div>
+                    </div>
+                    <div class="mini-carrusel-slide">
+                        <h3 class="carrusel-titulo">Por mes — últimos 6 meses</h3>
+                        <div class="grafico-contenedor" id="inicio-grafico-meses"></div>
+                    </div>
+                    <div class="mini-carrusel-slide">
+                        <h3 class="carrusel-titulo">¿Qué día de la semana gastás más? — últimos 30 días</h3>
+                        <div class="grafico-contenedor" id="inicio-grafico-dias"></div>
+                    </div>
+                </div>
+                <div class="mini-carrusel-puntos"></div>
+            </div>
+        </div>
+
+        <div class="fila-inicio-inferior">
+            <div class="card" id="dolar-card" style="display:none;">
+                <div class="card-header"><h3 style="margin:0;">💱 Cotizaciones</h3></div>
+                <div class="mini-carrusel" id="mini-carrusel-cotizaciones">
+                    <button type="button" class="mini-carrusel-anterior" aria-label="Anterior">‹</button>
+                    <button type="button" class="mini-carrusel-siguiente" aria-label="Siguiente">›</button>
+                    <div class="mini-carrusel-pista">
+                        <div class="mini-carrusel-slide">
+                            <h3 class="carrusel-titulo">Dólar</h3>
+                            <div class="stats-row">
+                                <div class="stat-tile">
+                                    <div class="stat-valor" id="dolar-oficial">—</div>
+                                    <div class="stat-etiqueta">Oficial</div>
+                                </div>
+                                <div class="stat-tile">
+                                    <div class="stat-valor" id="dolar-mep">—</div>
+                                    <div class="stat-etiqueta">MEP</div>
+                                </div>
+                                <div class="stat-tile">
+                                    <div class="stat-valor" id="dolar-blue">—</div>
+                                    <div class="stat-etiqueta">Blue</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mini-carrusel-slide">
+                            <h3 class="carrusel-titulo">Euro</h3>
+                            <div class="stats-row">
+                                <div class="stat-tile">
+                                    <div class="stat-valor" id="euro-compra">—</div>
+                                    <div class="stat-etiqueta">Compra</div>
+                                </div>
+                                <div class="stat-tile">
+                                    <div class="stat-valor" id="euro-venta">—</div>
+                                    <div class="stat-etiqueta">Venta</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mini-carrusel-puntos"></div>
+                </div>
+                <button type="button" class="secundario" id="boton-calculadora-cambio" style="width:100%; margin-top: var(--space-3);">🧮 Calcula el cambio</button>
+                <p class="texto-muted" style="font-size:.78rem; margin: var(--space-3) 0 0;" id="dolar-actualizado"></p>
+            </div>
+
+            <div class="card" id="chats-grupos-card" style="display:none;">
+                <div class="card-header"><h3 style="margin:0;">💬 Tus chats</h3></div>
+                <sl-carousel class="carrusel-chats-inicio" id="carrusel-chats-inicio" navigation pagination mouse-dragging></sl-carousel>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 GastosApp</p>
+    </footer>
+
+    <script type="module">
+        import { iniciarNavbar } from './nav.js';
+        import {
+            iniciarWidgetDeSesion, alCambiarSesion, iniciarSesionConGoogle,
+            iniciarSesionConEmail, crearCuentaConEmail, enviarEmailDeReseteo,
+            enviarVerificacionEmail, mensajeDeError,
+            requiere2FA, obtenerResolver2FA, completarSesionCon2FA,
+        } from './auth.js';
+        import { iniciarSelectorDeGrupos, obtenerMisGrupos, escucharGrupo, guardarGrupoActivo } from './grupos.js';
+        import { avisar, esc, abrirModal, cerrarModal } from './ui.js';
+        import { escucharPagos } from './storage.js';
+        import { escucharGastos, escucharPagosDeuda } from './expenses.js';
+        import { escucharUltimoMensaje } from './mensajes.js';
+        import { graficoBarrasHorizontal, graficoBarrasVertical, redimensionarGraficos } from './graficos.js';
+        import { iniciarMiniCarrusel, iniciarAutoplay } from './miniCarrusel.js';
+        import { etiquetaDeCategoria } from './categorias.js';
+        import { construirMovimientosUnificados, balancePropioEnGrupo } from './movimientos.js';
+        import { MONEDAS, simboloDeMoneda, obtenerCotizaciones, obtenerDolaresArgentina, obtenerEuroArgentina } from './monedas.js';
+        import { obtenerDiaCierreTarjeta, calcularCicloDeTarjeta, obtenerFotoPerfil } from './perfil.js';
+        import { escucharRecurrentes, recurrentesPendientes } from './recurrentes.js';
+        import { obtenerAlquiler, calcularAjuste } from './alquiler.js';
+        import { escucharIngresos } from './finanzas.js';
+
+        iniciarNavbar('index.html');
+        iniciarWidgetDeSesion('index.html');
+
+        // El HTML de los dos carruseles es estático (siempre tienen los
+        // mismos slides) — no hace falta esperar a ningún dato para
+        // armar los puntitos y las flechas.
+        iniciarMiniCarrusel(document.getElementById('mini-carrusel-cotizaciones'));
+        iniciarMiniCarrusel(document.getElementById('mini-carrusel-graficos'));
+        iniciarAutoplay(document.getElementById('mini-carrusel-graficos'), 7000);
+
+        // --- Cotizaciones (dólar oficial/MEP/blue, euro) — es solo
+        // informativo, así que se muestra siempre, haya o no sesión
+        // iniciada, y no depende de nada de Firestore. Dólar y euro se
+        // piden en paralelo y se muestran como dos slides de un mismo
+        // carrusel — si uno de los dos falla, el otro igual se muestra
+        // (la card solo se esconde del todo si fallan los dos).
+        function formatearDolar(info) {
+            return info ? `$${parseFloat(info.venta).toFixed(2)}` : '—';
+        }
+
+        // --- Calculadora de cambio (botón dentro de la card de cotizaciones)
+        // Usa la misma cotización "venta" que ya se muestra arriba en cada
+        // burbuja (oficial/MEP/blue/euro) — así el número que la persona ve
+        // en el carrusel es exactamente el que se usa para calcular, sin
+        // sorpresas. `tasasCambio` se llena una sola vez que terminan de
+        // cargar las cotizaciones (más abajo); si el botón se aprieta antes,
+        // se avisa en vez de calcular con datos a medio cargar.
+        const OPCIONES_CAMBIO = [
+            { clave: 'ARS', etiqueta: 'Peso argentino' },
+            { clave: 'USD_OFICIAL', etiqueta: 'Dólar oficial' },
+            { clave: 'USD_MEP', etiqueta: 'Dólar MEP' },
+            { clave: 'USD_BLUE', etiqueta: 'Dólar blue' },
+            { clave: 'EUR', etiqueta: 'Euro' },
+        ];
+        let tasasCambio = null;
+
+        function formatearMontoCambio(monto) {
+            return monto.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function abrirCalculadoraDeCambio() {
+            if (!tasasCambio) {
+                avisar('Todavía se están cargando las cotizaciones, esperá un segundo y probá de nuevo.', 'info');
+                return;
+            }
+            // Solo se ofrecen las monedas que de verdad tienen cotización
+            // cargada (ej. si falló pedir el euro, no debería aparecer como
+            // opción y romper el cálculo con un NaN).
+            const disponibles = OPCIONES_CAMBIO.filter(o => tasasCambio[o.clave] > 0);
+            if (disponibles.length < 2) {
+                avisar('No hay suficientes cotizaciones cargadas para calcular un cambio.', 'error');
+                return;
+            }
+            const armarOpciones = (seleccionada) => disponibles
+                .map(o => `<option value="${o.clave}" ${o.clave === seleccionada ? 'selected' : ''}>${o.etiqueta}</option>`)
+                .join('');
+            const destinoInicial = disponibles.find(o => o.clave !== disponibles[0].clave) || disponibles[1];
+
+            abrirModal(`
+                <h3 style="margin-top:0;">🧮 Calcula el cambio</h3>
+                <p class="texto-muted" style="font-size:.82rem; margin-top:-8px;">Con la cotización venta de cada tipo de cambio.</p>
+                <form id="form-calculadora-cambio" class="form">
+                    <div class="campo-ancho">
+                        <label for="cambio-monto">Monto</label>
+                        <input type="number" id="cambio-monto" min="0" step="any" value="1" inputmode="decimal">
+                    </div>
+                    <div>
+                        <label for="cambio-moneda-origen">De</label>
+                        <select id="cambio-moneda-origen">${armarOpciones(disponibles[0].clave)}</select>
+                    </div>
+                    <div>
+                        <label for="cambio-moneda-destino">A</label>
+                        <select id="cambio-moneda-destino">${armarOpciones(destinoInicial.clave)}</select>
+                    </div>
+                    <div class="campo-ancho" style="display:flex; justify-content:center;">
+                        <button type="button" class="calculadora-boton-invertir" id="cambio-boton-invertir" aria-label="Invertir monedas" title="Invertir monedas">⇄</button>
+                    </div>
+                </form>
+                <div id="cambio-resultado" style="margin-top: var(--space-3); min-height: 44px;"></div>
+                <button type="button" class="secundario" id="cambio-boton-cerrar" style="width:100%; margin-top: var(--space-3);">Cerrar</button>
+            `);
+
+            const inputMonto = document.getElementById('cambio-monto');
+            const selectOrigen = document.getElementById('cambio-moneda-origen');
+            const selectDestino = document.getElementById('cambio-moneda-destino');
+            const resultado = document.getElementById('cambio-resultado');
+
+            function recalcular() {
+                const monto = parseFloat(inputMonto.value);
+                const origen = selectOrigen.value;
+                const destino = selectDestino.value;
+                if (!monto || monto <= 0) {
+                    resultado.innerHTML = '';
+                    return;
+                }
+                const montoEnARS = monto * tasasCambio[origen];
+                const final = montoEnARS / tasasCambio[destino];
+                const etiquetaOrigen = OPCIONES_CAMBIO.find(o => o.clave === origen).etiqueta;
+                const etiquetaDestino = OPCIONES_CAMBIO.find(o => o.clave === destino).etiqueta;
+                resultado.innerHTML = origen === destino
+                    ? `<p class="texto-muted" style="font-size:.85rem; text-align:center;">Elegí dos monedas distintas para comparar.</p>`
+                    : `
+                        <div class="calculadora-resultado-caja" style="text-align:center;">
+                            <p class="calculadora-resultado-monto">${formatearMontoCambio(final)}</p>
+                            <p class="texto-muted calculadora-resultado-detalle" style="font-size:.8rem;">${formatearMontoCambio(monto)} (${esc(etiquetaOrigen)}) = ${formatearMontoCambio(final)} (${esc(etiquetaDestino)})</p>
+                        </div>
+                    `;
+            }
+
+            const botonInvertir = document.getElementById('cambio-boton-invertir');
+            document.getElementById('form-calculadora-cambio').addEventListener('submit', (evento) => evento.preventDefault());
+            inputMonto.addEventListener('input', recalcular);
+            selectOrigen.addEventListener('change', recalcular);
+            selectDestino.addEventListener('change', recalcular);
+            // La clase "girando" solo gira el ícono (ver .calculadora-boton-invertir
+            // en el CSS) — es puramente decorativo, no afecta el cálculo.
+            botonInvertir.addEventListener('click', () => {
+                const anterior = selectOrigen.value;
+                selectOrigen.value = selectDestino.value;
+                selectDestino.value = anterior;
+                recalcular();
+                botonInvertir.classList.toggle('girando');
+            });
+            document.getElementById('cambio-boton-cerrar').addEventListener('click', cerrarModal);
+
+            recalcular();
+        }
+
+        document.getElementById('boton-calculadora-cambio').addEventListener('click', abrirCalculadoraDeCambio);
+
+        Promise.all([obtenerDolaresArgentina(), obtenerEuroArgentina()]).then(([dolares, euro]) => {
+            const card = document.getElementById('dolar-card');
+            const hayDolar = dolares.oficial || dolares.blue || dolares.mep;
+            const hayEuro = euro.compra || euro.venta;
+            if (!hayDolar && !hayEuro) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+            document.getElementById('dolar-oficial').textContent = formatearDolar(dolares.oficial);
+            document.getElementById('dolar-mep').textContent = formatearDolar(dolares.mep);
+            document.getElementById('dolar-blue').textContent = formatearDolar(dolares.blue);
+            document.getElementById('euro-compra').textContent = euro.compra ? `$${parseFloat(euro.compra).toFixed(2)}` : '—';
+            document.getElementById('euro-venta').textContent = euro.venta ? `$${parseFloat(euro.venta).toFixed(2)}` : '—';
+
+            const fechaTexto = (dolares.blue || dolares.oficial || dolares.mep)?.fechaActualizacion || euro.fechaActualizacion;
+            const fecha = fechaTexto ? new Date(fechaTexto).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
+            document.getElementById('dolar-actualizado').textContent = [
+                fecha ? `Actualizado ${fecha}` : null,
+                (dolares.desactualizado || euro.desactualizado) ? '(puede estar desactualizado)' : null,
+            ].filter(Boolean).join(' ');
+
+            // La calculadora usa la misma cotización venta que ya se ve
+            // arriba — se guarda acá una sola vez, lista para cuando se
+            // abra el modal (puede pasar mucho después de esta carga).
+            tasasCambio = {
+                ARS: 1,
+                USD_OFICIAL: parseFloat(dolares.oficial?.venta) || null,
+                USD_MEP: parseFloat(dolares.mep?.venta) || null,
+                USD_BLUE: parseFloat(dolares.blue?.venta) || null,
+                EUR: parseFloat(euro.venta) || null,
+            };
+        });
+
+        const bienvenidaCard = document.getElementById('bienvenida-card');
+        const panel2fa = document.getElementById('panel-2fa');
+        let resolverPendiente = null;
+
+        function manejarErrorDeLogin(error) {
+            if (requiere2FA(error)) {
+                resolverPendiente = obtenerResolver2FA(error);
+                bienvenidaCard.style.display = 'none';
+                panel2fa.style.display = 'block';
+                document.getElementById('codigo-2fa').focus();
+                return;
+            }
+            avisar(mensajeDeError(error), 'error');
+        }
+
+        // Cada uno de los 3 caminos para terminar logueado (Google, email
+        // ya registrado, y completar el código de 2FA más abajo) manda a
+        // ComfyApp apenas termina — es el punto de entrada del mega
+        // sistema, así que desde ahí se elige qué app usar en vez de
+        // caer directo en el dashboard de GastosApp. Ojo: esto es solo
+        // para el MOMENTO del login — alCambiarSesion (más abajo, arma
+        // el resto de esta pantalla) también se dispara si ya había una
+        // sesión guardada al abrir la página, y ESE caso no debe
+        // redirigir (si no, entrar a index.html ya logueado — ej.
+        // tocando "GastosApp" desde ComfyApp — te mandaría de vuelta ahí
+        // en un loop).
+        document.getElementById('boton-google').addEventListener('click', () => {
+            iniciarSesionConGoogle()
+                .then(() => { window.location.href = 'sistema.html'; })
+                .catch(manejarErrorDeLogin);
+        });
+
+        // Pestañas Entrar / Crear cuenta
+        const tabs = document.querySelectorAll('.tab');
+        const formEntrar = document.getElementById('form-entrar');
+        const formCrear = document.getElementById('form-crear');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('activa'));
+                tab.classList.add('activa');
+                const esEntrar = tab.dataset.tab === 'entrar';
+                formEntrar.style.display = esEntrar ? 'grid' : 'none';
+                formCrear.style.display = esEntrar ? 'none' : 'grid';
+            });
+        });
+
+        formEntrar.addEventListener('submit', (evento) => {
+            evento.preventDefault();
+            const email = document.getElementById('entrar-email').value;
+            const password = document.getElementById('entrar-password').value;
+            iniciarSesionConEmail(email, password)
+                .then(() => { window.location.href = 'sistema.html'; })
+                .catch(manejarErrorDeLogin);
+        });
+
+        formCrear.addEventListener('submit', (evento) => {
+            evento.preventDefault();
+            const email = document.getElementById('crear-email').value;
+            const password = document.getElementById('crear-password').value;
+            crearCuentaConEmail(email, password)
+                .then(() => enviarVerificacionEmail())
+                .then(() => { window.location.href = 'sistema.html'; })
+                .catch(error => avisar(mensajeDeError(error), 'error'));
+        });
+
+        document.getElementById('link-olvide').addEventListener('click', (evento) => {
+            evento.preventDefault();
+            const email = document.getElementById('entrar-email').value;
+            if (!email) {
+                avisar('Escribí tu email arriba y volvé a tocar el link.', 'info');
+                return;
+            }
+            enviarEmailDeReseteo(email)
+                .then(() => avisar('Te mandamos un mail para elegir una nueva contraseña.', 'exito'))
+                .catch(error => avisar(mensajeDeError(error), 'error'));
+        });
+
+        // --- Verificación en dos pasos al iniciar sesión ---
+        document.getElementById('form-2fa').addEventListener('submit', (evento) => {
+            evento.preventDefault();
+            const codigo = document.getElementById('codigo-2fa').value.trim();
+            completarSesionCon2FA(resolverPendiente, codigo)
+                .then(() => { window.location.href = 'sistema.html'; })
+                .catch(error => avisar(mensajeDeError(error), 'error'));
+        });
+
+        document.getElementById('boton-cancelar-2fa').addEventListener('click', () => {
+            resolverPendiente = null;
+            panel2fa.style.display = 'none';
+            bienvenidaCard.style.display = 'block';
+            document.getElementById('form-2fa').reset();
+        });
+
+        // --- Carrusel de gráficos: un resumen visual de los mismos datos
+        // que hay en 📊 Más datos (categoría / mes / día de la semana),
+        // como adelanto en Inicio. Se recalculan igual que ahí, pero fijos
+        // a "últimos 30 días" (y "últimos 6 meses" para la tendencia) en
+        // vez de tener sus propios filtros — para eso ya está la página
+        // completa, a un clic con el link "Ver más".
+        const carruselCard = document.getElementById('carrusel-graficos-card');
+        document.getElementById('filtro-moneda-inicio').innerHTML += MONEDAS.map(m => `<option value="${m.valor}">${m.simbolo} ${m.texto}</option>`).join('');
+        document.getElementById('filtro-moneda-inicio').addEventListener('change', () => actualizarGraficosInicio());
+        let uidInicio = null;
+        let gastosPersonalesInicio = [];
+        let misGruposInicio = [];
+        let gastosGrupalesInicio = {};
+        let pagosGrupalesInicio = {};
+        let datosGruposInicio = {}; // grupoId -> { nombre, nombresPorUid }
+        let ultimosMensajesInicio = {}; // grupoId -> mensaje | null
+        let dejarDeEscucharInicio = [];
+        let cotizacionesInicio = null;
+        let diaCierreTarjetaInicio = null;
+        let recurrentesInicio = [];
+        let ingresosInicio = [];
+        let ajusteAlquilerInicio = null; // resultado de calcularAjuste(), o null si no aplica
+        obtenerCotizaciones().then(datos => { cotizacionesInicio = datos; actualizarInicio(); });
+
+        // Todo lo que depende de los datos de arriba se recalcula junto,
+        // desde un solo lugar — cada listener de más abajo llama a esto en
+        // vez de a las funciones de render sueltas, para no tener que
+        // acordarse de cuáles hace falta refrescar en cada caso.
+        function actualizarInicio() {
+            actualizarGraficosInicio();
+            renderRecordatorios();
+            renderDeudaGrupos();
+            renderChatsInicio();
+        }
+
+        // Recorta mensajes largos para que quepan bien en el carrusel —
+        // el chat completo está a un clic ("Abrir chat →").
+        function recortarTexto(texto, maximo) {
+            return texto.length > maximo ? `${texto.slice(0, maximo)}…` : texto;
+        }
+
+        // --- Carrusel "Tus chats": el último mensaje de cada grupo que
+        // tenga conversación — no todos los grupos, solo los que ya
+        // tienen al menos un mensaje. Si ninguno tiene, la card se queda
+        // ahí igual (a propósito, no se oculta como el resto) mostrando
+        // que no hay conversaciones activas.
+        function renderChatsInicio() {
+            const card = document.getElementById('chats-grupos-card');
+            if (!uidInicio) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+
+            const carrusel = document.getElementById('carrusel-chats-inicio');
+            const gruposConMensaje = misGruposInicio
+                .map(g => ({ grupo: g, mensaje: ultimosMensajesInicio[g.id] }))
+                .filter(x => x.mensaje);
+
+            if (gruposConMensaje.length === 0) {
+                carrusel.innerHTML = `
+                    <sl-carousel-item>
+                        <div class="estado-vacio" style="padding:0;">
+                            <span class="icono-grande">💬</span>
+                            No tenés conversaciones activas.
+                        </div>
+                    </sl-carousel-item>
+                `;
+                return;
+            }
+
+            // Más reciente primero.
+            gruposConMensaje.sort((a, b) => {
+                const fechaA = a.mensaje.creadoEn?.toDate ? a.mensaje.creadoEn.toDate().getTime() : 0;
+                const fechaB = b.mensaje.creadoEn?.toDate ? b.mensaje.creadoEn.toDate().getTime() : 0;
+                return fechaB - fechaA;
+            });
+
+            carrusel.innerHTML = gruposConMensaje.map(({ grupo, mensaje }) => {
+                const datos = datosGruposInicio[grupo.id];
+                const nombresDelGrupo = (datos && datos.nombresPorUid) || {};
+                const nombreGrupo = (datos && datos.nombre) || grupo.nombre;
+                const autor = mensaje.autorUid === uidInicio ? 'Vos' : (nombresDelGrupo[mensaje.autorUid] || 'Alguien');
+                const fecha = mensaje.creadoEn?.toDate
+                    ? mensaje.creadoEn.toDate().toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                    : 'enviando...';
+
+                return `
+                    <sl-carousel-item>
+                        <div style="font-weight:700; margin-bottom:4px;">👥 ${esc(nombreGrupo)}</div>
+                        <div class="texto-muted" style="font-size:.85rem; margin-bottom:4px;">${esc(autor)}: "${esc(recortarTexto(mensaje.texto, 80))}"</div>
+                        <div class="texto-muted" style="font-size:.72rem; margin-bottom:6px;">${fecha}</div>
+                        <a href="division-de-gastos.html" data-grupo-id="${grupo.id}" data-grupo-nombre="${esc(nombreGrupo)}" class="ir-a-chat-grupo" style="font-size:.82rem;">Abrir chat →</a>
+                    </sl-carousel-item>
+                `;
+            }).join('');
+
+            // Deja el grupo activo antes de navegar, para caer directo a
+            // ese grupo en División de gastos en vez del selector.
+            carrusel.querySelectorAll('.ir-a-chat-grupo').forEach(link => {
+                link.addEventListener('click', (evento) => {
+                    evento.preventDefault();
+                    guardarGrupoActivo(link.dataset.grupoId, link.dataset.grupoNombre);
+                    window.location.href = 'division-de-gastos.html';
+                });
+            });
+        }
+
+        // --- Recordatorios: tarjeta por cerrar + gastos recurrentes sin
+        // cargar este mes — lo mismo que ya se avisa dentro de Gastos
+        // personales (como notificación del sistema si está activada),
+        // pero visible acá arriba de todo apenas se entra a la app.
+        function renderRecordatorios() {
+            const card = document.getElementById('recordatorios-card');
+            const contenido = document.getElementById('recordatorios-contenido');
+            const items = [];
+
+            if (diaCierreTarjetaInicio) {
+                const { cierre } = calcularCicloDeTarjeta(diaCierreTarjetaInicio);
+                const dias = Math.ceil((cierre - new Date()) / 86400000);
+                if (dias >= 0 && dias <= 3) {
+                    items.push(`💳 Tu tarjeta cierra ${dias === 0 ? 'hoy' : `en ${dias} día${dias === 1 ? '' : 's'}`}.`);
+                }
+            }
+
+            // Las descripciones vienen de Firestore (las escribe cada
+            // quien crea el recurrente) — hay que escaparlas antes de
+            // meterlas en el innerHTML de más abajo.
+            const pendientes = recurrentesPendientes(recurrentesInicio, gastosPersonalesInicio, ingresosInicio);
+            if (pendientes.length === 1) {
+                items.push(`🔁 Todavía no cargaste "${esc(pendientes[0].descripcion)}" este mes.`);
+            } else if (pendientes.length > 1) {
+                items.push(`🔁 Tenés ${pendientes.length} recurrentes sin cargar este mes.`);
+            }
+
+            // Con una semana de anticipación alcanza — no hace falta
+            // avisar con meses de anterioridad para algo que se ajusta
+            // cada 3 a 12 meses.
+            if (ajusteAlquilerInicio && ajusteAlquilerInicio.diasParaAjuste <= 7) {
+                const dias = ajusteAlquilerInicio.diasParaAjuste;
+                const cuando = dias <= 0 ? 'ya tocaría ajustarlo' : `en ${dias} día${dias === 1 ? '' : 's'}`;
+                const sugerido = ajusteAlquilerInicio.montoSugerido
+                    ? ` — sugerido: $${ajusteAlquilerInicio.montoSugerido.toFixed(2)}` : '';
+                items.push(`🔑 Tu alquiler se ajusta ${cuando}${sugerido}.`);
+            }
+
+            if (items.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+            contenido.innerHTML = items.map(texto => `
+                <div class="balance-item">
+                    <span>${texto}</span>
+                    <a href="payments.html" style="font-size:.85rem; white-space:nowrap;">Ir →</a>
+                </div>
+            `).join('');
+        }
+
+        // --- Deuda total entre TODOS los grupos — no el balance de un
+        // grupo puntual (eso ya se ve completo en División de Gastos),
+        // sino la suma de "cuánto te deben" y "cuánto debés" a través de
+        // todos, para tener el resumen sin entrar grupo por grupo.
+        function renderDeudaGrupos() {
+            const card = document.getElementById('deuda-grupos-card');
+            const UMBRAL = 0.01;
+
+            let teDeben = 0;
+            let debo = 0;
+            misGruposInicio.forEach(g => {
+                const balance = balancePropioEnGrupo(
+                    uidInicio, gastosGrupalesInicio[g.id] || [], pagosGrupalesInicio[g.id] || [], cotizacionesInicio
+                );
+                if (balance > UMBRAL) teDeben += balance;
+                else if (balance < -UMBRAL) debo += -balance;
+            });
+
+            if (teDeben < UMBRAL && debo < UMBRAL) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+            document.getElementById('deuda-te-deben').textContent = `$${teDeben.toFixed(2)}`;
+            document.getElementById('deuda-debes').textContent = `$${debo.toFixed(2)}`;
+        }
+
+        // Con el carrusel viejo (Shoelace) las slides que no estaban "en
+        // vista" podían quedar con ancho 0 al dibujarse (ver el
+        // comentario de redimensionarGraficos en graficos.js) — acá, al
+        // ser divs normales con scroll nativo (sin Shadow DOM de por
+        // medio), cada slide mide su ancho real desde el principio,
+        // esté o no visible. Este resize queda igual como red de
+        // seguridad — no debería hacer falta, pero por las dudas.
+        let temporizadorResizeGraficos = null;
+        document.querySelector('#mini-carrusel-graficos .mini-carrusel-pista')?.addEventListener('scroll', () => {
+            clearTimeout(temporizadorResizeGraficos);
+            temporizadorResizeGraficos = setTimeout(redimensionarGraficos, 150);
+        });
+
+        // Solo lo que pagué yo (personal o en mis grupos), igual criterio
+        // que en Más datos (ver movimientos.js, compartido) — no hace
+        // falta pasarle datosGrupos porque estos 3 gráficos no muestran
+        // el nombre del grupo en ningún lado.
+        function construirGastosUnificadosInicio() {
+            return construirMovimientosUnificados({
+                uid: uidInicio, gastosPersonales: gastosPersonalesInicio,
+                misGrupos: misGruposInicio, gastosGrupales: gastosGrupalesInicio,
+                cotizaciones: cotizacionesInicio,
+            });
+        }
+
+        // Con el filtro de moneda en una puntual, se muestra solo lo
+        // cargado en esa moneda (nativo, sin convertir); con "Todas" se
+        // sigue sumando en pesos (amountARS) como siempre, porque ahí sí
+        // hace falta un común denominador para poder graficar todo junto.
+        function campoMontoActivoInicio() {
+            const moneda = document.getElementById('filtro-moneda-inicio').value;
+            return moneda === 'todas' ? 'amountARS' : 'amount';
+        }
+        function formatearMontoInicio(v) {
+            const moneda = document.getElementById('filtro-moneda-inicio').value;
+            const simbolo = moneda === 'todas' ? '$' : simboloDeMoneda(moneda);
+            return `${simbolo}${v.toFixed(2)}`;
+        }
+
+        function actualizarGraficosInicio() {
+            const moneda = document.getElementById('filtro-moneda-inicio').value;
+            const campo = campoMontoActivoInicio();
+            const items = construirGastosUnificadosInicio()
+                .filter(i => moneda === 'todas' || (i.moneda || 'ARS') === moneda);
+            if (items.length === 0) {
+                carruselCard.style.display = 'none';
+                return;
+            }
+            carruselCard.style.display = 'block';
+
+            const hoy = new Date();
+            // "Últimos 30 días" en vez de "desde el 1 de este mes": si
+            // hoy es, por ejemplo, el día 3, un filtro a mes calendario
+            // dejaba casi sin datos a estos dos gráficos (y por eso se
+            // veía el cartel de "Sin datos" en vez de un gráfico) — con
+            // una ventana fija de 30 días siempre hay más para mostrar,
+            // sin importar en qué momento del mes estés.
+            const hace30Dias = new Date(hoy);
+            hace30Dias.setDate(hace30Dias.getDate() - 29);
+            const hace30DiasTexto = hace30Dias.toISOString().slice(0, 10);
+            const itemsRecientes = items.filter(i => i.date >= hace30DiasTexto);
+
+            const porCategoria = {};
+            itemsRecientes.forEach(i => {
+                const clave = i.categoria || 'otros';
+                porCategoria[clave] = (porCategoria[clave] || 0) + i[campo];
+            });
+            const datosCategoria = Object.entries(porCategoria)
+                .map(([categoria, valor]) => ({ etiqueta: etiquetaDeCategoria(categoria), valor }))
+                .sort((a, b) => b.valor - a.valor);
+            graficoBarrasHorizontal('inicio-grafico-categorias', datosCategoria, formatearMontoInicio);
+
+            const meses = [];
+            for (let i = 5; i >= 0; i--) {
+                const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+                const clave = fecha.toISOString().slice(0, 7);
+                const etiqueta = fecha.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '');
+                meses.push({ clave, etiqueta: etiqueta.charAt(0).toUpperCase() + etiqueta.slice(1), valor: 0 });
+            }
+            items.forEach(i => {
+                const mes = meses.find(m => m.clave === i.date.slice(0, 7));
+                if (mes) mes.valor += i[campo];
+            });
+            graficoBarrasVertical('inicio-grafico-meses', meses, (v) => formatearMontoInicio(Math.round(v)));
+
+            const nombresDias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+            const totalesDias = [0, 0, 0, 0, 0, 0, 0]; // índice 0 = lunes
+            itemsRecientes.forEach(i => {
+                const diaJs = new Date(i.date + 'T00:00:00').getDay(); // 0 = domingo
+                const indice = diaJs === 0 ? 6 : diaJs - 1;
+                totalesDias[indice] += i[campo];
+            });
+            const datosDias = nombresDias.map((etiqueta, i) => ({ etiqueta, valor: totalesDias[i] }));
+            graficoBarrasVertical('inicio-grafico-dias', datosDias, (v) => formatearMontoInicio(Math.round(v)));
+
+            // Los gráficos de la 2da y 3ra slide se dibujan mientras
+            // esas slides todavía están recortadas por el carrusel (no
+            // "en vista") — a veces Chart.js se queda con una medida
+            // vieja/incorrecta de ese primer dibujo (una barra terminaba
+            // ocupando todo el ancho, tapando los números) y el resize
+            // de sl-slide-change no alcanza a corregirlo del todo si se
+            // dispara en el mismo instante que el cambio de clase, antes
+            // de que el navegador termine de acomodar el layout nuevo.
+            // Un resize extra, one frame más tarde, lo termina de
+            // asentar bien.
+            requestAnimationFrame(() => requestAnimationFrame(redimensionarGraficos));
+        }
+
+        // --- Estado según sesión ---
+        alCambiarSesion(user => {
+            const mensaje = document.getElementById('mensaje-bienvenida');
+            const heroTexto = document.getElementById('hero-texto');
+            const heroAvatar = document.getElementById('hero-avatar');
+            panel2fa.style.display = 'none';
+
+            // Se limpia lo anterior antes de volver a suscribirse — evita
+            // acumular listeners si alguien cierra sesión y entra con otra
+            // cuenta sin recargar la página.
+            dejarDeEscucharInicio.forEach(fn => fn && fn());
+            dejarDeEscucharInicio = [];
+            gastosPersonalesInicio = [];
+            misGruposInicio = [];
+            gastosGrupalesInicio = {};
+            pagosGrupalesInicio = {};
+            datosGruposInicio = {};
+            ultimosMensajesInicio = {};
+            diaCierreTarjetaInicio = null;
+            recurrentesInicio = [];
+            ingresosInicio = [];
+            ajusteAlquilerInicio = null;
+
+            if (user) {
+                heroTexto.textContent = `Bienvenido, ${user.displayName || user.email}`;
+                mensaje.textContent = 'Elegí un grupo para empezar, o creá uno nuevo:';
+                bienvenidaCard.style.display = 'none';
+                iniciarSelectorDeGrupos(user);
+
+                // Si tiene foto de perfil cargada (ver Cuenta), se
+                // muestra en vez del 😊 de siempre — mismo criterio que
+                // el resto de la app: sin foto, el emoji sigue siendo
+                // el "avatar" de relleno.
+                obtenerFotoPerfil(user.uid).then(foto => {
+                    heroAvatar.innerHTML = foto ? `<img src="${esc(foto)}" alt="">` : '😊';
+                });
+
+                uidInicio = user.uid;
+                dejarDeEscucharInicio.push(escucharPagos(user.uid, (data) => {
+                    gastosPersonalesInicio = data;
+                    actualizarInicio();
+                }));
+                dejarDeEscucharInicio.push(escucharRecurrentes(user.uid, (data) => {
+                    recurrentesInicio = data;
+                    renderRecordatorios();
+                }));
+                dejarDeEscucharInicio.push(escucharIngresos(user.uid, (data) => {
+                    ingresosInicio = data;
+                    renderRecordatorios();
+                }));
+                obtenerDiaCierreTarjeta(user.uid).then(dia => {
+                    diaCierreTarjetaInicio = dia;
+                    renderRecordatorios();
+                });
+                obtenerAlquiler(user.uid).then(async alquiler => {
+                    ajusteAlquilerInicio = alquiler ? await calcularAjuste(alquiler) : null;
+                    renderRecordatorios();
+                });
+                obtenerMisGrupos(user.uid).then((grupos) => {
+                    misGruposInicio = grupos;
+                    grupos.forEach((g) => {
+                        dejarDeEscucharInicio.push(escucharGastos(g.id, (data) => {
+                            gastosGrupalesInicio[g.id] = data;
+                            actualizarInicio();
+                        }));
+                        dejarDeEscucharInicio.push(escucharPagosDeuda(g.id, (data) => {
+                            pagosGrupalesInicio[g.id] = data;
+                            renderDeudaGrupos();
+                        }));
+                        dejarDeEscucharInicio.push(escucharGrupo(g.id, (datos) => {
+                            datosGruposInicio[g.id] = datos;
+                            renderChatsInicio();
+                        }));
+                        dejarDeEscucharInicio.push(escucharUltimoMensaje(g.id, (mensaje) => {
+                            ultimosMensajesInicio[g.id] = mensaje;
+                            renderChatsInicio();
+                        }));
+                    });
+                    // Con los grupos recién cargados hay que volver a
+                    // intentar el resumen de deuda y el carrusel de chats
+                    // — antes de esto, misGruposInicio estaba vacío y las
+                    // cards se quedaban ocultas o vacías aunque ya
+                    // hubiera datos de algún grupo.
+                    renderDeudaGrupos();
+                    renderChatsInicio();
+                });
+            } else {
+                heroTexto.textContent = 'Bienvenido';
+                heroAvatar.innerHTML = '😊';
+                mensaje.textContent = 'Iniciá sesión para crear o unirte a un grupo y empezar a dividir gastos.';
+                bienvenidaCard.style.display = 'block';
+                document.getElementById('grupos-placeholder').innerHTML = '';
+                carruselCard.style.display = 'none';
+                document.getElementById('recordatorios-card').style.display = 'none';
+                document.getElementById('deuda-grupos-card').style.display = 'none';
+                document.getElementById('chats-grupos-card').style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

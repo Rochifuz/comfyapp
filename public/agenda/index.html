@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgendaApp</title>
+    <meta name="theme-color" content="#fbf4f1">
+    <!-- AgendaApp tiene su propia identidad visual ("terracota", ver
+         :root[data-tema="agenda"]/[data-tema="agenda-oscura"] en
+         main.css) con su propio oscuro/claro — a propósito en una clave
+         de localStorage APARTE ("tema-agenda") de la que usan GastosApp/
+         GamingApp ("tema") o ComfyApp ("tema-comfy"): son identidades
+         visuales distintas, no tendría sentido compartir la preferencia.
+         A diferencia de ComfyApp, acá SÍ se sincroniza sl-theme-dark
+         (Shoelace) con el oscuro propio — el menú ☰ de esta app usa
+         sl-drawer/sl-switch de verdad, conviene que su cromado interno
+         también pase a oscuro junto con el resto. -->
+    <script>
+        var temaAgenda = localStorage.getItem('tema-agenda') || 'claro';
+        document.documentElement.setAttribute('data-tema', temaAgenda === 'oscuro' ? 'agenda-oscura' : 'agenda');
+        if (temaAgenda === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+    </script>
+    <!-- Mismo dominio que el resto del mega sistema — la sesión de
+         Firebase Auth queda compartida sola (ver el comentario largo de
+         gaming/index.html sobre esto). AgendaApp SÍ depende de una cosa
+         de afuera que las otras dos apps no necesitan: la cuenta tiene
+         que haber iniciado sesión CON GOOGLE (no con email/contraseña) y
+         conectar el permiso de Calendar aparte — ver calendario.js. -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page" style="max-width: 720px; margin: 0 auto;">
+        <div class="card" id="card-conectar" style="display:none; text-align:center;">
+            <div class="card-header" style="justify-content:center;"><h3 style="margin:0;">🗓️ Conectar Google Calendar</h3></div>
+            <p class="texto-muted">Para usar AgendaApp hace falta conectar tu cuenta de Google Calendar — se te va a pedir permiso una sola vez, en una ventana aparte.</p>
+            <button type="button" id="boton-conectar-calendar">Conectar con Google Calendar</button>
+        </div>
+
+        <div id="zona-calendario" style="display:none;">
+            <!-- Calendarios: filtro (tildar/destildar cuáles se ven, con
+                 el mismo color que usa Google) + crear uno nuevo. Se
+                 arma en JS desde listarCalendarios() (calendario.js) al
+                 conectar — acá abajo solo el contenedor vacío. -->
+            <div class="card" id="card-calendarios">
+                <div class="card-header">
+                    <h3 style="margin:0;">🗂️ Calendarios</h3>
+                    <button type="button" class="secundario" id="boton-nuevo-calendario" style="width:auto; padding: 4px 10px; font-size:.78rem;">+ Nuevo</button>
+                </div>
+                <div id="lista-calendarios"></div>
+            </div>
+
+            <!-- Buscador/filtro — a diferencia de las vistas de abajo (que
+                 siempre muestran un período fijo: la semana/mes/año que
+                 se esté viendo), esto busca eventos sueltos por texto y/o
+                 rango de fechas propio, en toda la agenda. Ninguno de los
+                 tres campos es obligatorio por sí solo, pero hace falta
+                 completar al menos uno para buscar. -->
+            <div class="card" id="card-buscador">
+                <div class="card-header"><h3 style="margin:0;">🔍 Buscar</h3></div>
+                <form id="form-buscador" class="form">
+                    <div class="campo-ancho">
+                        <label for="busqueda-texto">Texto</label>
+                        <input type="text" id="busqueda-texto" placeholder="Título, descripción...">
+                    </div>
+                    <div>
+                        <label for="busqueda-desde">Desde (opcional)</label>
+                        <input type="date" id="busqueda-desde">
+                    </div>
+                    <div>
+                        <label for="busqueda-hasta">Hasta (opcional)</label>
+                        <input type="date" id="busqueda-hasta">
+                    </div>
+                    <div class="campo-ancho" style="display:flex; gap:8px;">
+                        <button type="submit" style="width:auto;">Buscar</button>
+                        <button type="button" class="secundario" id="boton-limpiar-busqueda" style="width:auto; display:none;">✕ Limpiar</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Semana/Mes/Año — se ocultan mientras hay una búsqueda
+                 activa (ver JS): un resultado de búsqueda puede tener
+                 eventos de fechas salteadas, no tiene sentido mostrarlo
+                 dentro de una grilla de período fijo. -->
+            <div class="tabs" id="tabs-vista">
+                <button type="button" class="tab" data-vista="semana">Semana</button>
+                <button type="button" class="tab activa" data-vista="mes">Mes</button>
+                <button type="button" class="tab" data-vista="año">Año</button>
+            </div>
+
+            <div class="card" id="card-calendario">
+                <div class="card-header" style="align-items:center; flex-wrap:wrap; gap: var(--space-2);" id="fila-periodo">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <button type="button" class="secundario" id="periodo-anterior" style="width:auto; padding:4px 10px;" aria-label="Período anterior">‹</button>
+                        <h3 style="margin:0; min-width:150px; text-align:center;" id="periodo-titulo"></h3>
+                        <button type="button" class="secundario" id="periodo-siguiente" style="width:auto; padding:4px 10px;" aria-label="Período siguiente">›</button>
+                    </div>
+                    <button type="button" id="boton-nuevo-evento" style="width:auto;">+ Evento</button>
+                </div>
+
+                <div id="contenido-vista"></div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { iniciarNavbarAgenda, requerirSesionAgenda, avisosDeEventosActivados, minutosAntesDeAviso } from './nav-agenda.js';
+        import { avisar, esc, abrirModal, cerrarModal } from '../ui.js';
+        import {
+            estaConectado, conectarCalendar,
+            listarCalendarios, crearCalendario, FERIADOS_ARGENTINA,
+            listarColoresDeEvento,
+            listarEventos, crearEvento, editarEvento, borrarEvento,
+        } from './calendario.js';
+        import { notificarme } from '../notificacionesCentro.js';
+
+        iniciarNavbarAgenda();
+
+        const cardConectar = document.getElementById('card-conectar');
+        const zonaCalendario = document.getElementById('zona-calendario');
+        const tabsVista = document.getElementById('tabs-vista');
+        const filaPeriodo = document.getElementById('fila-periodo');
+        const periodoTitulo = document.getElementById('periodo-titulo');
+        const contenidoVista = document.getElementById('contenido-vista');
+
+        const NOMBRES_MES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        const NOMBRES_MES_CORTO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        const NOMBRES_DIA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+        // Qué vista está activa (semana/mes/año) — se recuerda entre
+        // visitas (preferencia de pantalla, como el tema), a diferencia
+        // de fechaReferencia de abajo, que sí arranca siempre en "hoy".
+        const CLAVE_VISTA_AGENDA = 'agenda-vista';
+        let vistaActual = localStorage.getItem(CLAVE_VISTA_AGENDA) || 'mes';
+
+        // El día/semana/mes/año que se está mostrando ahora — qué tan
+        // "ancho" es el período que representa depende de vistaActual.
+        // Se avanza con avanzarPeriodo(), siempre construyendo un Date
+        // NUEVO con año/mes/día explícitos (nunca sumando meses a mano
+        // con setMonth()) para no toparse con el clásico bug de "31 de
+        // enero + 1 mes = 3 de marzo" en vez de "28/29 de febrero".
+        let fechaReferencia = new Date();
+
+        // Búsqueda activa (texto y/o rango de fechas propio) — null
+        // cuando no hay ninguna. Reemplaza la vista de semana/mes/año por
+        // una lista de resultados (ver renderizarVista()/renderizarBusqueda()).
+        let busquedaActiva = null;
+
+        const eventosCargados = new Map(); // id de evento -> evento completo (para abrir el modal de edición)
+
+        // --- Calendarios (Fase 3) ---
+        //
+        // Se cargan una vez al conectar (cargarCalendarios(), llamada
+        // desde mostrarSegunConexion() más abajo) — cambia poco durante
+        // una misma visita, no hace falta repedirlo en cada vista.
+        let calendariosDisponibles = [];
+
+        // Qué calendarios están DESTILDADOS en el filtro — se guarda por
+        // id, no por nombre (dos calendarios podrían llamarse igual).
+        // Por defecto, ninguno oculto (se ven todos) — solo tiene algo
+        // adentro si la persona destildó alguno a mano alguna vez.
+        const CLAVE_CALENDARIOS_OCULTOS = 'agenda-calendarios-ocultos';
+        let calendariosOcultos = new Set(JSON.parse(localStorage.getItem(CLAVE_CALENDARIOS_OCULTOS) || '[]'));
+
+        // Calendarios que se pueden VER en el filtro/las vistas — los
+        // editables de la cuenta (calendariosDisponibles) más el de
+        // Feriados de Argentina, que es de solo lectura y no depende de
+        // la cuenta (siempre está, ver FERIADOS_ARGENTINA en
+        // calendario.js). El selector para CREAR un evento, en cambio,
+        // sigue usando calendariosDisponibles solo — no tendría sentido
+        // ofrecer "Feriados de Argentina" como destino.
+        function calendariosParaFiltro() {
+            return [...calendariosDisponibles, FERIADOS_ARGENTINA];
+        }
+
+        function idsCalendariosVisibles() {
+            return calendariosParaFiltro().filter(cal => !calendariosOcultos.has(cal.id)).map(cal => cal.id);
+        }
+
+        async function cargarCalendarios() {
+            try {
+                calendariosDisponibles = await listarCalendarios();
+            } catch (error) {
+                avisar('No se pudieron cargar tus calendarios: ' + error.message, 'error');
+                calendariosDisponibles = [];
+            }
+            renderizarFiltroCalendarios();
+        }
+
+        function renderizarFiltroCalendarios() {
+            // Causa real del bug (confirmado con capturas de un iPhone real,
+            // en Safari Y en Chrome — que en iOS usa el mismo motor que
+            // Safari — y reproducido/verificado acá con Playwright): la
+            // regla global `input, select { width:100%; }` de main.css
+            // (pensada para los campos de texto de los formularios) también
+            // le pega a este checkbox. Sin frenarla, el checkbox pedía el
+            // 100% del ancho de fila como base flexible — eso es lo que le
+            // robaba TODO el espacio al nombre del calendario (quedaba en
+            // 0px), no un problema de truncado/ellipsis como parecía a
+            // simple vista. Achicar el checkbox con `width:auto` (+
+            // `flex:none` para que tampoco crezca) resuelve la causa de
+            // raíz. De paso se aplanó a un solo nivel de flex (antes había
+            // un <span display:flex> anidado adentro de .drawer-item, que
+            // ya no hace falta) — el nombre es el único con `flex:1` (se
+            // lleva el espacio sobrante y ahí sí trunca con "…" si no
+            // entra) y el checkbox se empuja al final con `margin-left:auto`.
+            document.getElementById('lista-calendarios').innerHTML = calendariosParaFiltro().map(cal => `
+                <label class="drawer-item" style="cursor:pointer; gap:8px;">
+                    <span style="width:10px; height:10px; border-radius:50%; background:${esc(cal.color)}; flex:none;"></span>
+                    <span style="flex:1 1 0%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(cal.nombre)}</span>
+                    ${cal.esPrincipal ? '<span class="texto-muted" style="font-size:.7rem; flex:none;">(principal)</span>' : ''}
+                    ${cal.soloLectura ? '<span class="texto-muted" style="font-size:.7rem; flex:none;">(solo lectura)</span>' : ''}
+                    <input type="checkbox" data-calendario-id="${esc(cal.id)}" style="flex:none; width:auto; margin-left:auto;" ${calendariosOcultos.has(cal.id) ? '' : 'checked'}>
+                </label>
+            `).join('');
+        }
+
+        document.getElementById('lista-calendarios').addEventListener('change', (evento) => {
+            const checkbox = evento.target.closest('input[type="checkbox"]');
+            if (!checkbox) return;
+            const id = checkbox.dataset.calendarioId;
+            if (checkbox.checked) calendariosOcultos.delete(id);
+            else calendariosOcultos.add(id);
+            localStorage.setItem(CLAVE_CALENDARIOS_OCULTOS, JSON.stringify([...calendariosOcultos]));
+            renderizarVista();
+        });
+
+        document.getElementById('boton-nuevo-calendario').addEventListener('click', async () => {
+            const nombre = prompt('Nombre del nuevo calendario:');
+            if (!nombre || !nombre.trim()) return;
+            try {
+                await crearCalendario(nombre.trim());
+                avisar('Calendario creado.', 'exito');
+                await cargarCalendarios();
+                renderizarVista();
+            } catch (error) {
+                avisar('No se pudo crear el calendario: ' + error.message, 'error');
+            }
+        });
+
+        // --- Colores de evento ("categorías", a pedido de Roy) ---
+        //
+        // Los 11 colores de Google (Tomate, Arándano, etc. — colorId '1'
+        // a '11') se traen una sola vez, igual que los calendarios (ver
+        // cargarCalendarios) — no cambian entre pedidos. Un evento sin
+        // colorId propio toma el color de SU CALENDARIO (ej. verde para
+        // los feriados) — colorDeEvento() de abajo resuelve esa prioridad.
+        let coloresDeEvento = {}; // { '1': { background, foreground }, ... }
+
+        async function cargarColoresDeEvento() {
+            try {
+                coloresDeEvento = await listarColoresDeEvento();
+            } catch {
+                coloresDeEvento = {}; // sin colores propios, todo cae al color de calendario — no bloquea nada
+            }
+        }
+
+        // Color de fondo a usar para un evento — su propio colorId
+        // (categoría elegida a mano) si tiene, si no el de su calendario
+        // (ver calendariosParaFiltro), si no null (deja el CSS de
+        // siempre, var(--color-primary), para eventos de calendarios que
+        // por algún motivo no se pudieron identificar).
+        function colorDeEvento(evento) {
+            if (evento.colorId && coloresDeEvento[evento.colorId]) {
+                return coloresDeEvento[evento.colorId].background;
+            }
+            return calendariosParaFiltro().find(c => c.id === evento._calendarId)?.color || null;
+        }
+
+        // Blanco o negro según qué tan clara sea la propia — cálculo de
+        // luminancia relativa simple. Los colores de Google/calendarios
+        // van desde gris muy claro hasta rojo bastante oscuro, un solo
+        // color de texto fijo no se leería bien contra todos.
+        function colorDeTextoLegible(colorFondo) {
+            const hex = colorFondo.replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            const luminancia = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            return luminancia > 0.6 ? '#000000' : '#ffffff';
+        }
+
+        // Atributo style="" listo para pegar en un chip de evento — string
+        // vacío si no se pudo determinar ningún color (deja el CSS de
+        // siempre puesto en la clase).
+        function estiloDeEvento(evento) {
+            const color = colorDeEvento(evento);
+            return color ? `style="background:${esc(color)}; color:${esc(colorDeTextoLegible(color))};"` : '';
+        }
+
+        function esFeriado(evento) {
+            return evento._calendarId === FERIADOS_ARGENTINA.id;
+        }
+
+        // "🎉 " adelante del título — para distinguir un feriado de un
+        // evento propio de un vistazo, en las tres vistas y en la
+        // búsqueda, sin tener que sumar una columna/color aparte.
+        function tituloDeEvento(evento) {
+            const titulo = evento.summary || '(sin título)';
+            return esFeriado(evento) ? `🎉 ${titulo}` : titulo;
+        }
+
+        // evento.start/evento.end de Google vienen como { dateTime } para
+        // eventos con hora, o { date } (sin hora, "YYYY-MM-DD" a secas)
+        // para eventos de "todo el día" — los feriados son así. Bug real
+        // encontrado al revisar (2026-08-25): construir el Date directo
+        // con new Date("2026-01-01") lo toma como medianoche UTC, que en
+        // Argentina (UTC-3) cae la tarde/noche del día ANTERIOR — se
+        // mostraba una fecha equivocada. Se fuerza hora local agregando
+        // "T00:00:00" cuando no hay dateTime. Único lugar que arma un
+        // Date a partir de start/end — evita repetir (y volver a romper)
+        // el mismo cálculo en cada vista.
+        function fechaDeParteDeEvento(parte) {
+            return new Date(parte.dateTime || (parte.date + 'T00:00:00'));
+        }
+
+        // toISOString() usa UTC, que puede correr la fecha un día para
+        // atrás/adelante según la zona horaria — esta clave se arma a
+        // mano, en hora LOCAL, para que coincida con lo que la persona ve
+        // en pantalla. La usan todas las vistas (mes/semana/año) para
+        // agrupar eventos por día y para armar el data-fecha de las
+        // celdas clickeables.
+        function claveDia(fecha) {
+            const año = fecha.getFullYear();
+            const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+            const dia = String(fecha.getDate()).padStart(2, '0');
+            return `${año}-${mes}-${dia}`;
+        }
+
+        function sumarDias(fecha, cantidad) {
+            const resultado = new Date(fecha);
+            resultado.setDate(resultado.getDate() + cantidad);
+            return resultado;
+        }
+
+        // Agrupa una lista de eventos por día (misma clave que claveDia)
+        // — se usa en las tres vistas para no recorrer la lista entera
+        // una vez por celda/columna.
+        function agruparPorDia(eventos) {
+            const mapa = new Map();
+            for (const evento of eventos) {
+                const fechaInicio = evento.start.dateTime || evento.start.date; // "date" (sin hora) en eventos de "todo el día"
+                const clave = fechaInicio.slice(0, 10);
+                if (!mapa.has(clave)) mapa.set(clave, []);
+                mapa.get(clave).push(evento);
+            }
+            return mapa;
+        }
+
+        // Guarda los eventos recién traídos en el mapa por id (no solo lo
+        // que se ve en el HTML) para poder abrir el modal de edición con
+        // todos los datos al tocar uno — lo llama cada renderizarX().
+        function guardarEventosCargados(eventos) {
+            eventosCargados.clear();
+            for (const evento of eventos) eventosCargados.set(evento.id, evento);
+        }
+
+        // --- Despachador de vista: decide qué dibujar según el estado
+        // actual (búsqueda activa, o si no, la vista de semana/mes/año
+        // elegida) y muestra/oculta los controles que no aplican a cada
+        // caso (los tabs y el ‹período› no tienen sentido con una lista
+        // de resultados de búsqueda, que puede tener fechas salteadas). ---
+        // tokenRender: cada llamada a renderizarVista() saca un número
+        // nuevo, y cada renderizarX() de abajo se fija (justo antes de
+        // escribir en el DOM) si sigue siendo el pedido más reciente. Sin
+        // esto, tocar dos vistas rápido (ej. Semana y después Mes, antes
+        // de que la primera terminó de traer sus eventos) corría el
+        // riesgo de que la respuesta más lenta pisara a la más nueva,
+        // dejando en pantalla la vista equivocada.
+        let tokenRenderActual = 0;
+
+        function renderizarVista() {
+            const token = ++tokenRenderActual;
+            const buscando = !!busquedaActiva;
+            tabsVista.style.display = buscando ? 'none' : 'flex';
+            filaPeriodo.style.display = buscando ? 'none' : 'flex';
+            document.getElementById('boton-limpiar-busqueda').style.display = buscando ? 'inline-block' : 'none';
+
+            if (buscando) { renderizarBusqueda(token); return; }
+            if (vistaActual === 'semana') renderizarSemana(token);
+            else if (vistaActual === 'año') renderizarAño(token);
+            else renderizarMes(token);
+        }
+
+        function actualizarTabsVista() {
+            document.querySelectorAll('#tabs-vista .tab').forEach(tab => {
+                tab.classList.toggle('activa', tab.dataset.vista === vistaActual);
+            });
+        }
+        actualizarTabsVista();
+
+        document.querySelectorAll('#tabs-vista .tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                vistaActual = tab.dataset.vista;
+                localStorage.setItem(CLAVE_VISTA_AGENDA, vistaActual);
+                actualizarTabsVista();
+                renderizarVista();
+            });
+        });
+
+        // Mueve fechaReferencia un paso hacia adelante/atrás — cuánto es
+        // "un paso" depende de la vista activa (7 días, 1 mes, o 1 año).
+        function avanzarPeriodo(direccion) {
+            if (vistaActual === 'semana') {
+                fechaReferencia = sumarDias(fechaReferencia, 7 * direccion);
+            } else if (vistaActual === 'año') {
+                fechaReferencia = new Date(fechaReferencia.getFullYear() + direccion, 0, 1);
+            } else {
+                fechaReferencia = new Date(fechaReferencia.getFullYear(), fechaReferencia.getMonth() + direccion, 1);
+            }
+            renderizarVista();
+        }
+        document.getElementById('periodo-anterior').addEventListener('click', () => avanzarPeriodo(-1));
+        document.getElementById('periodo-siguiente').addEventListener('click', () => avanzarPeriodo(1));
+
+        // --- Vista mensual — grilla de 7x6 con días de relleno de los
+        // meses vecinos, para que ninguna semana quede a medias. ---
+        async function renderizarMes(token) {
+            const año = fechaReferencia.getFullYear();
+            const mes = fechaReferencia.getMonth();
+            periodoTitulo.textContent = `${NOMBRES_MES[mes]} ${año}`;
+
+            const primerDiaSemana = new Date(año, mes, 1).getDay(); // 0 = domingo
+            const diasEnElMes = new Date(año, mes + 1, 0).getDate();
+
+            // El primer día que se ve en la grilla puede ser de fines del
+            // mes anterior (para completar la primera semana), y el
+            // último de principios del mes siguiente (para completar la
+            // última) — se arma como un solo rango de fechas consecutivas.
+            const primerDiaGrilla = new Date(año, mes, 1 - primerDiaSemana);
+            const cantidadCeldas = Math.ceil((primerDiaSemana + diasEnElMes) / 7) * 7;
+            const ultimoDiaGrilla = sumarDias(primerDiaGrilla, cantidadCeldas);
+
+            let eventos = [];
+            try {
+                eventos = await listarEventos(idsCalendariosVisibles(), primerDiaGrilla, ultimoDiaGrilla);
+            } catch (error) {
+                avisar('No se pudieron cargar los eventos: ' + error.message, 'error');
+            }
+            if (token !== tokenRenderActual) return; // se pidió otra vista mientras esta esperaba la respuesta — no pisar lo que ya se está mostrando
+
+            guardarEventosCargados(eventos);
+            const eventosPorDia = agruparPorDia(eventos);
+
+            const claveHoy = claveDia(new Date());
+
+            let html = NOMBRES_DIA.map(d => `<div class="calendario-dia-nombre">${d}</div>`).join('');
+            for (let i = 0; i < cantidadCeldas; i++) {
+                const dia = sumarDias(primerDiaGrilla, i);
+                const clave = claveDia(dia);
+                const fueraDeMes = dia.getMonth() !== mes;
+                const eventosDelDia = eventosPorDia.get(clave) || [];
+
+                // Como mucho 3 nombres de evento por celda (en celular se
+                // ven como puntos, ver el @media de main.css) — el resto
+                // se resume en un "+N más" para no desarmar la altura de
+                // toda la fila. No hay vista de detalle de un día
+                // completo (para eso está la vista Semana, que sí entra
+                // texto completo) — tocar el "+N más" cae en el mismo
+                // comportamiento que tocar cualquier otro espacio vacío
+                // de la celda: crea un evento nuevo ese día.
+                const MAX_VISIBLES = 3;
+                const eventosHtml = eventosDelDia.slice(0, MAX_VISIBLES)
+                    .map(e => `<div class="calendario-evento" ${estiloDeEvento(e)} data-event-id="${esc(e.id)}" title="${esc(tituloDeEvento(e))}">${esc(tituloDeEvento(e))}</div>`)
+                    .join('');
+                const masHtml = eventosDelDia.length > MAX_VISIBLES
+                    ? `<div class="calendario-evento-mas">+${eventosDelDia.length - MAX_VISIBLES} más</div>`
+                    : '';
+
+                html += `
+                    <div class="calendario-celda${fueraDeMes ? ' fuera-de-mes' : ''}${clave === claveHoy ? ' hoy' : ''}" data-fecha="${clave}">
+                        <span class="calendario-celda-numero">${dia.getDate()}</span>
+                        ${eventosHtml}
+                        ${masHtml}
+                    </div>
+                `;
+            }
+            contenidoVista.innerHTML = `<div class="calendario-grilla">${html}</div>`;
+        }
+
+        // --- Vista semanal — 7 columnas (una por día), con los eventos
+        // listados con hora y título completo (a diferencia de la vista
+        // mensual, acá entra de sobra). ---
+        async function renderizarSemana(token) {
+            const inicioSemana = sumarDias(fechaReferencia, -fechaReferencia.getDay()); // retrocede hasta el domingo
+            const finSemana = sumarDias(inicioSemana, 7);
+            const ultimoDiaVisible = sumarDias(finSemana, -1);
+
+            periodoTitulo.textContent = inicioSemana.getMonth() === ultimoDiaVisible.getMonth()
+                ? `${inicioSemana.getDate()} al ${ultimoDiaVisible.getDate()} de ${NOMBRES_MES[inicioSemana.getMonth()]}`
+                : `${inicioSemana.getDate()} ${NOMBRES_MES_CORTO[inicioSemana.getMonth()]} – ${ultimoDiaVisible.getDate()} ${NOMBRES_MES_CORTO[ultimoDiaVisible.getMonth()]}`;
+
+            let eventos = [];
+            try {
+                eventos = await listarEventos(idsCalendariosVisibles(), inicioSemana, finSemana);
+            } catch (error) {
+                avisar('No se pudieron cargar los eventos: ' + error.message, 'error');
+            }
+            if (token !== tokenRenderActual) return;
+
+            guardarEventosCargados(eventos);
+            const eventosPorDia = agruparPorDia(eventos);
+            const claveHoy = claveDia(new Date());
+
+            let html = '';
+            for (let i = 0; i < 7; i++) {
+                const dia = sumarDias(inicioSemana, i);
+                const clave = claveDia(dia);
+                const eventosDelDia = (eventosPorDia.get(clave) || [])
+                    .slice()
+                    .sort((a, b) => fechaDeParteDeEvento(a.start) - fechaDeParteDeEvento(b.start));
+
+                const eventosHtml = eventosDelDia.map(e => {
+                    const hora = e.start.dateTime
+                        ? new Date(e.start.dateTime).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+                        : 'Todo el día';
+                    return `<div class="calendario-semana-evento" ${estiloDeEvento(e)} data-event-id="${esc(e.id)}"><strong>${esc(hora)}</strong> ${esc(tituloDeEvento(e))}</div>`;
+                }).join('') || '<p class="texto-muted" style="font-size:.78rem; margin:0;">Sin eventos</p>';
+
+                html += `
+                    <div class="calendario-semana-dia${clave === claveHoy ? ' hoy' : ''}" data-fecha="${clave}">
+                        <div class="calendario-semana-dia-encabezado">${NOMBRES_DIA[dia.getDay()]} ${dia.getDate()}</div>
+                        ${eventosHtml}
+                    </div>
+                `;
+            }
+            contenidoVista.innerHTML = `<div class="calendario-semana-grilla">${html}</div>`;
+        }
+
+        // --- Vista anual — 12 minicalendarios, solo con números de día
+        // (no entra texto de evento a ese tamaño) y un puntito abajo del
+        // día si tiene algo cargado. Tocar cualquier parte de un mes
+        // saltea a la vista Mes de ese mes. ---
+        async function renderizarAño(token) {
+            const año = fechaReferencia.getFullYear();
+            periodoTitulo.textContent = String(año);
+
+            let eventos = [];
+            try {
+                eventos = await listarEventos(idsCalendariosVisibles(), new Date(año, 0, 1), new Date(año + 1, 0, 1));
+            } catch (error) {
+                avisar('No se pudieron cargar los eventos: ' + error.message, 'error');
+            }
+            if (token !== tokenRenderActual) return;
+
+            guardarEventosCargados(eventos);
+
+            const diasConEventos = new Set(eventos.map(e => (e.start.dateTime || e.start.date).slice(0, 10)));
+            const claveHoy = claveDia(new Date());
+
+            let html = '';
+            for (let mes = 0; mes < 12; mes++) {
+                html += renderizarMiniMes(año, mes, diasConEventos, claveHoy);
+            }
+            contenidoVista.innerHTML = `<div class="calendario-año-grilla">${html}</div>`;
+        }
+
+        function renderizarMiniMes(año, mes, diasConEventos, claveHoy) {
+            const primerDiaSemana = new Date(año, mes, 1).getDay();
+            const diasEnElMes = new Date(año, mes + 1, 0).getDate();
+
+            let celdas = '';
+            for (let i = 0; i < primerDiaSemana; i++) celdas += '<span class="mini-mes-celda vacia"></span>';
+            for (let d = 1; d <= diasEnElMes; d++) {
+                const clave = claveDia(new Date(año, mes, d));
+                const clases = ['mini-mes-celda'];
+                if (clave === claveHoy) clases.push('hoy');
+                if (diasConEventos.has(clave)) clases.push('con-eventos');
+                celdas += `<span class="${clases.join(' ')}">${d}</span>`;
+            }
+
+            return `
+                <div class="mini-mes" data-mes="${mes}" title="Ver ${NOMBRES_MES[mes]}">
+                    <h4 class="mini-mes-titulo">${NOMBRES_MES_CORTO[mes]}</h4>
+                    <div class="mini-mes-grilla">${celdas}</div>
+                </div>
+            `;
+        }
+
+        // --- Buscador — texto libre (Google busca en título/descripción/
+        // invitados) y/o rango de fechas propio. Ninguno de los tres
+        // campos es obligatorio por sí solo, pero hace falta al menos uno.
+        // Sin fechas puestas, se usa un rango amplio por defecto (6 meses
+        // atrás, 12 adelante) para no perder eventos ni pedirle a Google
+        // el historial completo de la cuenta sin necesidad. ---
+        async function renderizarBusqueda(token) {
+            periodoTitulo.textContent = '';
+
+            const desde = busquedaActiva.desde ? new Date(busquedaActiva.desde + 'T00:00:00') : new Date(new Date().getFullYear(), new Date().getMonth() - 6, 1);
+            const hasta = busquedaActiva.hasta ? new Date(busquedaActiva.hasta + 'T23:59:59') : new Date(new Date().getFullYear(), new Date().getMonth() + 12, 1);
+
+            let eventos = [];
+            try {
+                eventos = await listarEventos(idsCalendariosVisibles(), desde, hasta, busquedaActiva.texto || null);
+            } catch (error) {
+                avisar('No se pudo buscar: ' + error.message, 'error');
+            }
+            if (token !== tokenRenderActual) return;
+
+            guardarEventosCargados(eventos);
+
+            if (eventos.length === 0) {
+                contenidoVista.innerHTML = '<p class="texto-muted" style="text-align:center; padding: var(--space-4) 0;">No se encontraron eventos con esos filtros.</p>';
+                return;
+            }
+
+            contenidoVista.innerHTML = eventos.map(evento => {
+                const inicio = fechaDeParteDeEvento(evento.start);
+                const fechaTexto = evento.start.dateTime
+                    ? inicio.toLocaleString('es-AR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : inicio.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }) + ' — Todo el día';
+                const color = colorDeEvento(evento);
+                return `
+                    <a href="#" class="balance-item" data-event-id="${esc(evento.id)}" style="text-decoration:none; flex-direction:column; align-items:flex-start; gap:2px;">
+                        <span style="display:flex; align-items:center; gap:6px;">
+                            ${color ? `<span class="punto-color-evento" style="background:${esc(color)};"></span>` : ''}
+                            <span style="color:var(--color-text); font-weight:600;">${esc(tituloDeEvento(evento))}</span>
+                        </span>
+                        <span class="texto-muted" style="font-size:.78rem;">${esc(fechaTexto)}</span>
+                    </a>
+                `;
+            }).join('');
+        }
+
+        document.getElementById('form-buscador').addEventListener('submit', (evt) => {
+            evt.preventDefault();
+            const texto = document.getElementById('busqueda-texto').value.trim();
+            const desde = document.getElementById('busqueda-desde').value;
+            const hasta = document.getElementById('busqueda-hasta').value;
+            if (!texto && !desde && !hasta) {
+                avisar('Escribí un texto o elegí al menos una fecha para buscar.', 'info');
+                return;
+            }
+            busquedaActiva = { texto, desde, hasta };
+            renderizarVista();
+        });
+        document.getElementById('boton-limpiar-busqueda').addEventListener('click', () => {
+            document.getElementById('form-buscador').reset();
+            busquedaActiva = null;
+            renderizarVista();
+        });
+
+        // --- Crear/editar evento (mismo modal para los dos casos) ---
+
+        // <input type="datetime-local"> necesita el valor en este formato
+        // exacto ("YYYY-MM-DDTHH:mm"), en hora LOCAL (no UTC) — toISOString()
+        // no sirve acá por el mismo motivo que en claveDia().
+        function paraInputFechaHora(fecha) {
+            const pad = n => String(n).padStart(2, '0');
+            return `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}T${pad(fecha.getHours())}:${pad(fecha.getMinutes())}`;
+        }
+
+        // Cartel simple para un feriado (solo lectura — ver esFeriado()
+        // más arriba) — sin formulario, solo el nombre y la fecha.
+        function mostrarFeriado(feriado) {
+            const fecha = fechaDeParteDeEvento(feriado.start);
+            const fechaTexto = fecha.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            abrirModal(`
+                <h3 style="margin-top:0;">🎉 ${esc(feriado.summary || 'Feriado')}</h3>
+                <p class="texto-muted" style="text-transform:capitalize;">${esc(fechaTexto)}</p>
+                <p class="texto-muted" style="font-size:.82rem;">Feriado nacional de Argentina — no se puede editar desde acá.</p>
+                <button type="button" class="secundario campo-ancho" id="boton-cerrar-feriado">Cerrar</button>
+            `);
+            document.getElementById('boton-cerrar-feriado').addEventListener('click', cerrarModal);
+        }
+
+        function abrirModalEvento(eventoExistente, fechaSugerida) {
+            if (!eventoExistente && calendariosDisponibles.length === 0) {
+                avisar('Todavía no se cargó ningún calendario — esperá un momento e intentá de nuevo.', 'info');
+                return;
+            }
+
+            const esEdicion = !!eventoExistente;
+            const inicio = esEdicion ? fechaDeParteDeEvento(eventoExistente.start) : fechaSugerida;
+            const fin = esEdicion
+                ? fechaDeParteDeEvento(eventoExistente.end)
+                : new Date(fechaSugerida.getTime() + 60 * 60 * 1000); // 1 hora de duración por defecto
+
+            // El formulario solo maneja eventos CON HORA (datetime-local),
+            // nunca "todo el día" — si se edita un evento que Google tiene
+            // como todo-el-día (ej. uno creado a mano en Google Calendar,
+            // sin hora), esto lo precarga a las 00:00 de su fecha real, y
+            // al guardar cuerpoEvento() SIEMPRE manda start/end con hora
+            // (dateTime), así que ese evento pasaría a tener hora en vez
+            // de ocupar el día entero. Los feriados no se ven afectados
+            // (son de solo lectura, van por mostrarFeriado() en vez de
+            // este formulario) — pero un evento propio de "todo el día"
+            // creado desde Google Calendar sí cambiaría de tipo si se
+            // edita desde acá. No es algo que vaya a pasar seguido (todo
+            // lo que se CREA desde AgendaApp ya nace con hora), y agregar
+            // soporte de eventos de todo el día es una función aparte,
+            // más grande — queda afuera de esta revisión.
+
+            // Al editar, el calendario del evento es fijo (moverlo de
+            // calendario es una operación aparte en la API de Google —
+            // "move" — que no está implementada en esta fase: se muestra
+            // de qué calendario es, sin selector). Al crear, se puede
+            // elegir — arranca en el principal.
+            const calendarioDelEvento = esEdicion
+                ? calendariosDisponibles.find(c => c.id === eventoExistente._calendarId)
+                : (calendariosDisponibles.find(c => c.esPrincipal) || calendariosDisponibles[0]);
+            const calendarioHtml = esEdicion
+                ? `<div class="campo-ancho"><label>Calendario</label><p style="margin:0; font-weight:600;">${esc(calendarioDelEvento?.nombre || '(calendario desconocido)')}</p></div>`
+                : `<div class="campo-ancho">
+                       <label for="evento-calendario">Calendario</label>
+                       <select id="evento-calendario">
+                           ${calendariosDisponibles.map(c => `<option value="${esc(c.id)}" ${c.id === calendarioDelEvento?.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}
+                       </select>
+                   </div>`;
+
+            // Google Meet: si el evento YA tiene uno, se muestra el link
+            // para unirse (sacarle un Meet ya creado no es tan simple
+            // como omitir el campo en el PATCH, así que por ahora no se
+            // ofrece esa opción acá — ver la nota en editarEvento(),
+            // calendario.js). Si no tiene, se ofrece el checkbox para
+            // agregarlo (sirve tanto al crear como al editar un evento
+            // que todavía no tiene Meet).
+            const entradaMeet = eventoExistente?.conferenceData?.entryPoints?.find(p => p.entryPointType === 'video');
+            const meetHtml = entradaMeet
+                ? `<div class="campo-ancho"><p style="margin:0;">📹 <a href="${esc(entradaMeet.uri)}" target="_blank" rel="noopener">Unirse a Google Meet</a></p></div>`
+                : `<div class="campo-ancho drawer-item" style="padding:0;">
+                       <label for="evento-meet" style="font-weight:400; cursor:pointer;">📹 Agregar Google Meet</label>
+                       <input type="checkbox" id="evento-meet">
+                   </div>`;
+
+            // Color propio del evento ("categoría") — opcional, un
+            // círculo por cada colorId de Google (1 al 11) más uno de
+            // "sin color propio" (queda con el de su calendario). Se
+            // arranca desde el que ya tenga el evento, si lo tiene.
+            let colorIdSeleccionado = eventoExistente?.colorId || '';
+            const opcionesColor = [{ id: '', bg: null }, ...Object.entries(coloresDeEvento).map(([id, datos]) => ({ id, bg: datos.background }))];
+            const colorPickerHtml = `
+                <div class="campo-ancho">
+                    <label>Color (opcional — "categoría")</label>
+                    <div id="evento-colores" style="display:flex; flex-wrap:wrap; gap:6px;">
+                        ${opcionesColor.map(op => `
+                            <button type="button" class="selector-color-evento${colorIdSeleccionado === op.id ? ' seleccionado' : ''}"
+                                    data-color-id="${op.id}"
+                                    style="background:${op.bg || 'var(--color-surface-2)'};"
+                                    aria-label="${op.id ? 'Color ' + op.id : 'Sin color propio'}"
+                                    title="${op.id ? '' : 'Sin color propio — usa el del calendario'}">${op.id ? '' : '✕'}</button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+            abrirModal(`
+                <h3 style="margin-top:0;">${esEdicion ? 'Editar evento' : 'Nuevo evento'}</h3>
+                <form id="form-evento" class="form">
+                    ${calendarioHtml}
+                    <div class="campo-ancho">
+                        <label for="evento-titulo">Título</label>
+                        <input type="text" id="evento-titulo" maxlength="200" required value="${esEdicion ? esc(eventoExistente.summary || '') : ''}">
+                    </div>
+                    <div class="campo-ancho">
+                        <label for="evento-descripcion">Descripción (opcional)</label>
+                        <textarea id="evento-descripcion" rows="2">${esEdicion ? esc(eventoExistente.description || '') : ''}</textarea>
+                    </div>
+                    <div>
+                        <label for="evento-inicio">Inicio</label>
+                        <input type="datetime-local" id="evento-inicio" required value="${paraInputFechaHora(inicio)}">
+                    </div>
+                    <div>
+                        <label for="evento-fin">Fin</label>
+                        <input type="datetime-local" id="evento-fin" required value="${paraInputFechaHora(fin)}">
+                    </div>
+                    ${meetHtml}
+                    ${colorPickerHtml}
+                    <div class="campo-ancho" style="display:flex; gap:8px; margin-top: var(--space-2);">
+                        <button type="submit">${esEdicion ? 'Guardar' : 'Crear'}</button>
+                        ${esEdicion ? '<button type="button" class="peligro" id="boton-borrar-evento">Borrar</button>' : ''}
+                        <button type="button" class="secundario" id="boton-cancelar-evento">Cancelar</button>
+                    </div>
+                </form>
+            `);
+
+            document.getElementById('boton-cancelar-evento').addEventListener('click', cerrarModal);
+
+            // Delegado (los círculos son botones nuevos cada vez que se
+            // abre el modal, no hace falta un listener por cada uno).
+            document.getElementById('evento-colores').addEventListener('click', (evt) => {
+                const boton = evt.target.closest('.selector-color-evento');
+                if (!boton) return;
+                colorIdSeleccionado = boton.dataset.colorId;
+                document.querySelectorAll('.selector-color-evento').forEach(b => b.classList.toggle('seleccionado', b === boton));
+            });
+
+            document.getElementById('form-evento').addEventListener('submit', async (evt) => {
+                evt.preventDefault();
+                const checkboxMeet = document.getElementById('evento-meet'); // no existe si el evento ya tenía Meet (ver meetHtml arriba)
+                const datos = {
+                    titulo: document.getElementById('evento-titulo').value.trim(),
+                    descripcion: document.getElementById('evento-descripcion').value.trim(),
+                    inicio: new Date(document.getElementById('evento-inicio').value),
+                    fin: new Date(document.getElementById('evento-fin').value),
+                    conMeet: !!checkboxMeet?.checked,
+                    colorId: colorIdSeleccionado,
+                };
+                if (datos.fin <= datos.inicio) {
+                    avisar('El fin tiene que ser después del inicio.', 'error');
+                    return;
+                }
+                try {
+                    if (esEdicion) {
+                        await editarEvento(eventoExistente._calendarId, eventoExistente.id, datos);
+                        avisar('Evento actualizado.', 'exito');
+                    } else {
+                        const calendarioElegido = document.getElementById('evento-calendario').value;
+                        await crearEvento(calendarioElegido, datos);
+                        avisar('Evento creado.', 'exito');
+                    }
+                    cerrarModal();
+                    renderizarVista();
+                } catch (error) {
+                    avisar('No se pudo guardar: ' + error.message, 'error');
+                }
+            });
+
+            if (esEdicion) {
+                document.getElementById('boton-borrar-evento').addEventListener('click', async () => {
+                    if (!confirm(`¿Borrar "${eventoExistente.summary || 'este evento'}"? Esto también lo borra de Google Calendar.`)) return;
+                    try {
+                        await borrarEvento(eventoExistente._calendarId, eventoExistente.id);
+                        avisar('Evento borrado.', 'exito');
+                        cerrarModal();
+                        renderizarVista();
+                    } catch (error) {
+                        avisar('No se pudo borrar: ' + error.message, 'error');
+                    }
+                });
+            }
+        }
+
+        document.getElementById('boton-nuevo-evento').addEventListener('click', () => {
+            const ahora = new Date();
+            ahora.setMinutes(0, 0, 0);
+            ahora.setHours(ahora.getHours() + 1); // sugiere la próxima hora en punto, no "ahora mismo"
+            abrirModalEvento(null, ahora);
+        });
+
+        // Delegado en #contenido-vista (se recrea entero en cada
+        // renderizarX(), así que un solo listener acá cubre las cuatro
+        // vistas sin tener que reengancharlo cada vez):
+        //  - Tocar un evento puntual (mes/semana) o un resultado de
+        //    búsqueda lo abre para editar.
+        //  - Tocar un mes entero de la vista Año saltea a la vista Mes de
+        //    ese mes (no crea nada — a ese nivel de zoom no hay contexto
+        //    de qué día puntual se tocó).
+        //  - Tocar el resto de una celda con fecha (mes/semana) crea un
+        //    evento nuevo con esa fecha ya cargada.
+        contenidoVista.addEventListener('click', (evento) => {
+            const itemEvento = evento.target.closest('.calendario-evento, .calendario-semana-evento, .balance-item[data-event-id]');
+            if (itemEvento) {
+                evento.preventDefault(); // por si es el <a> de un resultado de búsqueda
+                const datos = eventosCargados.get(itemEvento.dataset.eventId);
+                if (!datos) return;
+                // Los feriados son de solo lectura (vienen del calendario
+                // público de Google, ver FERIADOS_ARGENTINA) — no tienen
+                // formulario de edición, solo un cartel informativo.
+                if (esFeriado(datos)) { mostrarFeriado(datos); return; }
+                abrirModalEvento(datos, null);
+                return;
+            }
+
+            const miniMes = evento.target.closest('.mini-mes');
+            if (miniMes) {
+                fechaReferencia = new Date(fechaReferencia.getFullYear(), Number(miniMes.dataset.mes), 1);
+                vistaActual = 'mes';
+                localStorage.setItem(CLAVE_VISTA_AGENDA, vistaActual);
+                actualizarTabsVista();
+                renderizarVista();
+                return;
+            }
+
+            const celda = evento.target.closest('[data-fecha]');
+            if (!celda) return;
+            const [año, mes, dia] = celda.dataset.fecha.split('-').map(Number);
+            const fechaSugerida = new Date(año, mes - 1, dia, new Date().getHours() + 1, 0, 0, 0);
+            abrirModalEvento(null, fechaSugerida);
+        });
+
+        // --- Conectar Calendar ---
+
+        document.getElementById('boton-conectar-calendar').addEventListener('click', async () => {
+            try {
+                await conectarCalendar();
+                avisar('¡Listo! Google Calendar conectado.', 'exito');
+                await mostrarSegunConexion();
+            } catch (error) {
+                avisar(error.message, 'error');
+            }
+        });
+
+        async function mostrarSegunConexion() {
+            const conectado = await estaConectado();
+            cardConectar.style.display = conectado ? 'none' : 'block';
+            zonaCalendario.style.display = conectado ? 'block' : 'none';
+            if (conectado) {
+                // Las dos tienen que terminar ANTES de renderizarVista():
+                // las vistas necesitan saber qué calendarios pedir, y
+                // colorDeEvento() necesita los colores ya cargados para
+                // no pintar todo con el color de respaldo la primera vez.
+                await Promise.all([cargarCalendarios(), cargarColoresDeEvento()]);
+                await renderizarVista();
+                avisarEventosPorComenzar();
+            }
+        }
+
+        // --- Aviso de "evento por comenzar" ---
+        //
+        // Se fija, una vez al entrar a AgendaApp (o al conectar Calendar
+        // recién), si hay algún evento de HOY que esté por arrancar dentro
+        // de los próximos "minutosAntesDeAviso()" minutos — y si es así, lo
+        // manda a la campanita 🔔 (ver notificacionesCentro.js). No es un
+        // chequeo en vivo mientras la pestaña sigue abierta (eso pediría
+        // dejar un timer corriendo todo el rato) — alcanza con fijarse al
+        // entrar, que es como lo pidió Roy. Se puede prender/apagar y
+        // elegir la anticipación desde el desplegable ☰ — ver
+        // avisosDeEventosActivados()/minutosAntesDeAviso() en
+        // nav-agenda.js.
+        //
+        // `agenda-eventos-avisados` guarda en localStorage los ids de los
+        // eventos ya avisados, para no repetir el mismo aviso cada vez que
+        // se recarga la página mientras siga dentro de la ventana.
+        const CLAVE_EVENTOS_AVISADOS = 'agenda-eventos-avisados';
+
+        function eventosYaAvisados() {
+            try {
+                return JSON.parse(localStorage.getItem(CLAVE_EVENTOS_AVISADOS) || '[]');
+            } catch {
+                return [];
+            }
+        }
+
+        function marcarEventoAvisado(id) {
+            // No hace falta guardar más que los últimos ids — evita que
+            // esto crezca sin límite en una cuenta con muchos eventos.
+            const avisados = eventosYaAvisados();
+            avisados.push(id);
+            localStorage.setItem(CLAVE_EVENTOS_AVISADOS, JSON.stringify(avisados.slice(-200)));
+        }
+
+        async function avisarEventosPorComenzar() {
+            if (!avisosDeEventosActivados()) return;
+
+            const ahora = new Date();
+            const finVentana = new Date(ahora.getTime() + minutosAntesDeAviso() * 60000);
+            const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+            const finHoy = sumarDias(inicioHoy, 1);
+
+            let eventosHoy = [];
+            try {
+                eventosHoy = await listarEventos(idsCalendariosVisibles(), inicioHoy, finHoy);
+            } catch {
+                return; // no bloquear el resto de la app por esto — se reintenta la próxima vez que se entre
+            }
+
+            const avisados = eventosYaAvisados();
+            for (const evento of eventosHoy) {
+                // Los eventos de todo el día (y los feriados, que son así)
+                // no tienen dateTime — no hay una "hora de inicio" puntual
+                // que tenga sentido avisar.
+                if (!evento.start || !evento.start.dateTime) continue;
+                if (avisados.includes(evento.id)) continue;
+                const inicio = new Date(evento.start.dateTime);
+                if (inicio < ahora || inicio > finVentana) continue;
+
+                const minutosFaltan = Math.max(1, Math.round((inicio - ahora) / 60000));
+                try {
+                    await notificarme({
+                        tipo: 'evento-por-comenzar',
+                        titulo: '🗓️ Evento por comenzar',
+                        cuerpo: `"${evento.summary || 'Sin título'}" empieza en ${minutosFaltan} minuto${minutosFaltan === 1 ? '' : 's'}.`,
+                        destino: '/agenda/index.html',
+                    });
+                } catch (error) {
+                    console.error('No se pudo guardar la notificación de evento por comenzar:', error);
+                }
+                marcarEventoAvisado(evento.id);
+            }
+        }
+
+        requerirSesionAgenda('index.html', () => {
+            mostrarSegunConexion();
+        });
+    </script>
+</body>
+</html>

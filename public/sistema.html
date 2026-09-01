@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inicio · Mi Sistema</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <meta name="theme-color" content="#ede0cb">
+    <script>
+        // ComfyApp tiene su propia identidad "cafetería" (beige y madera,
+        // ver :root[data-tema="cafeteria"]/[data-tema="cafeteria-oscura"]
+        // en main.css) con su propio oscuro/claro — a propósito en una
+        // clave de localStorage APARTE ("tema-comfy") de la que usan
+        // GastosApp/GamingApp ("tema"): son identidades visuales
+        // distintas, no tendría sentido que compartieran la preferencia
+        // (alguien podría querer GastosApp en oscuro y ComfyApp en claro,
+        // o al revés). Sin la clase sl-theme-dark en ninguno de los dos
+        // casos — es la de Shoelace para SU oscuro, que acá no se usa
+        // (los componentes de Shoelace de esta página son pocos y no
+        // dependen de eso).
+        var temaComfy = localStorage.getItem('tema-comfy') || 'claro';
+        document.documentElement.setAttribute('data-tema', temaComfy === 'oscuro' ? 'cafeteria-oscura' : 'cafeteria');
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@twemoji/api@17.0.3/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div id="pantalla-carga" class="pantalla-carga"><div class="spinner"></div></div>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page" style="max-width: 480px; margin: 0 auto;">
+        <div class="card" id="card-inicio-hero" style="text-align:center; position:relative;">
+            <button type="button" class="secundario" id="boton-tema-comfy" title="Cambiar a modo oscuro" aria-label="Cambiar tema" style="position:absolute; top: var(--space-3); right: var(--space-3); width:auto; padding: 6px 10px;">🌙</button>
+            <h1 style="margin: 0 0 var(--space-4);">Inicio</h1>
+
+            <div id="zona-sin-sesion" style="display:none;">
+                <button type="button" id="boton-google">Iniciar sesión con Google</button>
+            </div>
+        </div>
+
+        <!-- Verificación en dos pasos — mismo panel que index.html
+             (misma estructura/ids de campos, distinto contenedor). Antes
+             esto no existía acá: si la cuenta tenía 2FA, se mandaba a
+             completar el código a index.html, pero el "pedido pendiente"
+             de 2FA de Firebase (resolverPendiente, ver el script) es un
+             objeto en memoria de ESTA página — no sobrevive una
+             navegación — así que en index.html había que tocar de nuevo
+             "Iniciar sesión con Google" para recién ahí conseguir un
+             pedido pendiente nuevo y ver el código. Con el panel acá
+             mismo, el 2FA se completa sin salir de ComfyApp ni repetir
+             el login. -->
+        <div class="card" id="panel-2fa" style="display:none; max-width: 420px; margin-left:auto; margin-right:auto;">
+            <div class="card-header"><h2 style="margin:0;">🔐 Verificación en dos pasos</h2></div>
+            <p>Abrí tu app autenticadora y escribí el código de 6 dígitos.</p>
+            <form id="form-2fa" class="form">
+                <div class="campo-ancho">
+                    <label for="codigo-2fa">Código</label>
+                    <input type="text" id="codigo-2fa" inputmode="numeric" pattern="[0-9]*" maxlength="6" required autofocus>
+                </div>
+                <button type="submit" class="campo-ancho">Confirmar</button>
+                <button type="button" id="boton-cancelar-2fa" class="campo-ancho secundario">Cancelar</button>
+            </form>
+        </div>
+
+        <div id="zona-con-sesion" style="display:none;">
+            <div class="card" id="card-apps">
+                <div class="card-header"><h3 style="margin:0;">📱 Apps</h3></div>
+                <div class="grid-acciones" style="margin-bottom:0;">
+                    <div class="card-accion" id="app-gastosapp" tabindex="0" role="button">
+                        <span class="icono-accion"><span class="humo humo-1"></span><span class="humo humo-2"></span><span class="humo humo-3"></span>💰</span>
+                        <h3>GastosApp</h3>
+                        <p>Control de gastos personales y grupales.</p>
+                        <p style="margin-top: var(--space-2);"><span class="chip estatico">✅ Activa</span></p>
+                    </div>
+                    <div class="card-accion secundaria" id="app-gamingapp" tabindex="0" role="button">
+                        <span class="icono-accion"><span class="humo humo-1"></span><span class="humo humo-2"></span><span class="humo humo-3"></span>🎮</span>
+                        <h3>GamingApp</h3>
+                        <p>Steam, torneos con código y más.</p>
+                        <p style="margin-top: var(--space-2);"><span class="chip estatico">✅ Activa</span></p>
+                    </div>
+                    <div class="card-accion secundaria" id="app-agendaapp" tabindex="0" role="button">
+                        <span class="icono-accion"><span class="humo humo-1"></span><span class="humo humo-2"></span><span class="humo humo-3"></span>🗓️</span>
+                        <h3>AgendaApp</h3>
+                        <p>Calendario conectado a Google Calendar.</p>
+                        <p style="margin-top: var(--space-2);"><span class="chip estatico">✅ Activa</span></p>
+                    </div>
+                    <div class="card-accion secundaria" id="app-tareasapp" tabindex="0" role="button">
+                        <span class="icono-accion"><span class="humo humo-1"></span><span class="humo humo-2"></span><span class="humo humo-3"></span>🗒️</span>
+                        <h3>TareasApp</h3>
+                        <p>Listas de tareas personales y de grupo.</p>
+                        <p style="margin-top: var(--space-2);"><span class="chip estatico">✅ Activa</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notitas — tareas pendientes (personales y de grupo,
+                 asignadas a mí o sin asignar), en formato post-it. Ver
+                 tareas/tareas.js (obtenerTareasPendientes) y el script
+                 más abajo. Arranca oculta (display:none) hasta saber si
+                 hay algo para mostrar — si la persona no tiene ninguna
+                 tarea pendiente, directamente no se ve la card (no tiene
+                 sentido un carrusel vacío). -->
+            <div class="card" id="card-notitas" style="display:none;">
+                <div class="card-header" style="align-items:center;">
+                    <h3 style="margin:0;">🗒️ Pendientes</h3>
+                    <a href="tareas/index.html" class="secundario" style="width:auto; padding: 4px 10px; font-size:.78rem; text-decoration:none; display:inline-block;">Ver todas</a>
+                </div>
+                <div class="postits-widget">
+                    <button type="button" class="postits-flecha" id="postit-anterior" aria-label="Notita anterior">‹</button>
+                    <div class="postit-card" id="postit-actual"></div>
+                    <button type="button" class="postits-flecha" id="postit-siguiente" aria-label="Notita siguiente">›</button>
+                </div>
+                <div class="postits-puntos" id="postits-puntos"></div>
+            </div>
+
+            <!-- Clima y noticias: solo informativas, no dependen de
+                 ninguna app del sistema — van debajo del selector de
+                 apps a propósito, para no competir con eso al entrar. -->
+            <div class="card" id="card-clima" style="display:none;">
+                <div class="card-header" style="align-items:center;">
+                    <h3 style="margin:0;">🌤️ Clima</h3>
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" class="secundario" id="clima-cambiar-ubicacion" style="width:auto; padding: 4px 10px; font-size:.78rem;">📍 Cambiar</button>
+                        <button type="button" class="secundario" id="clima-minimizar" style="width:auto; padding: 4px 8px; font-size:.78rem;" title="Minimizar">▾</button>
+                    </div>
+                </div>
+                <!-- Cuerpo colapsable (ver "clima-minimizar" en el
+                     script) — el estado elegido se guarda por dispositivo,
+                     no por sesión, a diferencia de la ubicación de más
+                     abajo: minimizar es una preferencia de "cómo quiero
+                     ver la pantalla", no algo ligado a esta visita puntual. -->
+                <div id="clima-cuerpo">
+                    <p style="margin: 0 0 var(--space-3); font-weight:600;" id="clima-descripcion"></p>
+                    <div class="stats-row">
+                        <div class="stat-tile">
+                            <div class="stat-valor" id="clima-actual">—</div>
+                            <div class="stat-etiqueta">Ahora</div>
+                        </div>
+                        <div class="stat-tile">
+                            <div class="stat-valor" id="clima-minima">—</div>
+                            <div class="stat-etiqueta">Mínima</div>
+                        </div>
+                        <div class="stat-tile">
+                            <div class="stat-valor" id="clima-maxima">—</div>
+                            <div class="stat-etiqueta">Máxima</div>
+                        </div>
+                    </div>
+
+                    <!-- Próximos 7 días — franja horizontal con scroll
+                         propio (nunca desborda el ancho de la card, ni
+                         siquiera en celular con nombres de día + dos
+                         temperaturas por tarjetita). Se arma en JS desde
+                         clima.pronostico (ver clima.js). -->
+                    <div id="clima-pronostico" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom: var(--space-3);"></div>
+
+                    <!-- Buscador de ciudad — oculto hasta que se toca
+                         "📍 Cambiar" (ver JS más abajo). La elección se
+                         guarda por sesión, no para siempre (ver clima.js). -->
+                    <div id="clima-buscador" style="display:none; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-border);">
+                        <div style="display:flex; gap:6px;">
+                            <input type="text" id="clima-buscar-input" placeholder="Buscar ciudad..." style="flex:1; min-width:0;">
+                            <button type="button" id="clima-buscar-boton" style="width:auto;">Buscar</button>
+                        </div>
+                        <div id="clima-resultados"></div>
+                        <button type="button" class="secundario" id="clima-usar-mi-ubicacion" style="width:100%; margin-top: var(--space-2);">📍 Usar mi ubicación actual</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="card-noticias" style="display:none;">
+                <div class="card-header" style="align-items:center;">
+                    <h3 style="margin:0;">📰 Noticias del día</h3>
+                    <button type="button" class="secundario" id="noticias-minimizar" style="width:auto; padding: 4px 8px; font-size:.78rem;" title="Minimizar">▾</button>
+                </div>
+                <div id="noticias-cuerpo">
+                    <!-- Categorías sugeridas (un clic, sin escribir nada) —
+                         se arman por JS desde CATEGORIAS_NOTICIAS. -->
+                    <p class="texto-muted" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.03em; margin: 0 0 var(--space-1);">Sugeridas</p>
+                    <div id="noticias-chips-categoria" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom: var(--space-3);"></div>
+
+                    <div style="display:flex; gap:6px; margin-bottom: var(--space-2);">
+                        <input type="text" id="noticias-buscar-input" placeholder="O buscá un tema puntual (ej. Boca, Dólar)..." style="flex:1; min-width:0;">
+                        <button type="button" id="noticias-buscar-boton" style="width:auto;">🔍</button>
+                    </div>
+                    <!-- Solo visible cuando hay un tema buscado a mano (ver
+                         JS) — avisa qué se está mostrando y da la vuelta a
+                         las categorías sugeridas. -->
+                    <p class="texto-muted" style="font-size:.78rem; margin: 0 0 var(--space-3); display:none;" id="noticias-filtro-activo"></p>
+                    <div id="noticias-contenido"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { iniciarNavbar } from './nav.js';
+        import {
+            iniciarWidgetDeSesion, alCambiarSesion, iniciarSesionConGoogle, mensajeDeError,
+            requiere2FA, obtenerResolver2FA, completarSesionCon2FA,
+        } from './auth.js';
+        import { avisar, esc } from './ui.js';
+        import {
+            obtenerClima, descripcionClima, buscarCiudades,
+            guardarUbicacionElegida, borrarUbicacionElegida, hayUbicacionElegida,
+        } from './clima.js';
+        import { obtenerTareasPendientes, avisarTareasPorVencer } from './tareas/tareas.js';
+        import { APPS, obtenerAppsPermitidas, tienePermiso, marcarLoginYPermisos } from './permisos.js';
+
+        // ocultarSecciones: true — esta va a ser la puerta de entrada del
+        // sistema completo (GastosApp + GamingApp), así que el
+        // desplegable y la burbuja de Gastón se mantienen (mismo look que
+        // el resto de la app), pero SIN los links a Gastos personales/
+        // Grupos/Más datos — esas son secciones DE GastosApp, no de acá.
+        iniciarNavbar('sistema.html', {
+            ocultarSecciones: true,
+            ocultarSwitchTema: true,
+            marca: { href: 'sistema.html', texto: '🛋️ ComfyApp' },
+        });
+        iniciarWidgetDeSesion('sistema.html');
+
+        // --- Oscuro/claro propio de ComfyApp (ver el comentario largo
+        // del <script> del <head>) — independiente del switch de
+        // GastosApp/GamingApp, que acá ni se muestra (ocultarSwitchTema
+        // arriba) porque tocaría la clave de localStorage equivocada. Se
+        // vuelve a leer localStorage acá (en vez de reusar la variable
+        // "temaComfy" del <script> del <head>) a propósito: ese <script>
+        // no es un módulo, y depender de una var suya desde acá — aunque
+        // técnicamente funciona, el scope global se comparte igual —
+        // hubiera quedado más frágil de leer que repetir una línea.
+        //
+        // Hay DOS controles para el mismo tema: el botón 🌙/☀️ de la card
+        // de Inicio, y el switch del menú ☰ que se agrega acá abajo (el
+        // switch que ya trae nav.js quedó oculto arriba porque es el de
+        // GastosApp/GamingApp). Los dos se arman y actualizan siempre
+        // juntos desde aplicarTemaComfy(), para que tocar cualquiera de
+        // los dos deje al otro reflejando el mismo estado.
+        const botonTemaComfy = document.getElementById('boton-tema-comfy');
+        let temaComfyActual = localStorage.getItem('tema-comfy') || 'claro';
+
+        // El switch se inyecta a mano en el desplegable (nav.js ya
+        // terminó de armarlo más arriba) en vez de agregar una opción más
+        // a iniciarNavbar() — es algo que solo necesita esta página.
+        document.getElementById('drawer-auth-placeholder')?.insertAdjacentHTML('beforebegin', `
+            <div class="drawer-item">
+                <span>🌙 Tema oscuro</span>
+                <sl-switch id="drawer-switch-tema-comfy" ${temaComfyActual === 'oscuro' ? 'checked' : ''}></sl-switch>
+            </div>
+            <div class="drawer-separador"></div>
+        `);
+        const switchTemaComfy = document.getElementById('drawer-switch-tema-comfy');
+
+        function aplicarTemaComfy(tema) {
+            temaComfyActual = tema;
+            document.documentElement.setAttribute('data-tema', tema === 'oscuro' ? 'cafeteria-oscura' : 'cafeteria');
+            localStorage.setItem('tema-comfy', tema);
+            botonTemaComfy.textContent = tema === 'oscuro' ? '☀️' : '🌙';
+            botonTemaComfy.title = tema === 'oscuro' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro';
+            // Poner .checked a mano no dispara "sl-change" de nuevo
+            // (Shoelace solo lo emite ante una interacción real), así que
+            // no hay riesgo de loop entre esta función y el listener de
+            // abajo.
+            switchTemaComfy.checked = tema === 'oscuro';
+        }
+        aplicarTemaComfy(temaComfyActual);
+
+        botonTemaComfy.addEventListener('click', () => {
+            aplicarTemaComfy(temaComfyActual === 'oscuro' ? 'claro' : 'oscuro');
+        });
+        switchTemaComfy.addEventListener('sl-change', (evento) => {
+            aplicarTemaComfy(evento.target.checked ? 'oscuro' : 'claro');
+        });
+
+        const zonaSinSesion = document.getElementById('zona-sin-sesion');
+        const zonaConSesion = document.getElementById('zona-con-sesion');
+        const panel2fa = document.getElementById('panel-2fa');
+        let resolverPendiente = null; // "pedido pendiente" de 2FA de Firebase — vive en memoria, se pierde si se navega a otra página (por eso el 2FA se completa acá mismo, ver más abajo)
+
+        // Si algo (ej. GamingApp, ver gaming/index.html) mandó para acá a
+        // alguien sin sesión con un "?volver=...", una vez que inicia
+        // sesión se lo devuelve directo ahí en vez de dejarlo en esta
+        // pantalla. "sinPermiso" es el otro caso: alguien CON sesión que
+        // rebotó de una app porque su cuenta no la tiene habilitada (ver
+        // requerirSesionGaming/Agenda/Tareas y permisos.js) — se muestra
+        // como aviso en vez de intentar mandarla de vuelta (sería un loop).
+        const volver = new URLSearchParams(window.location.search).get('volver');
+        const sinPermiso = new URLSearchParams(window.location.search).get('sinPermiso');
+        const NOMBRE_APP = { gaming: 'GamingApp', agenda: 'AgendaApp', tareas: 'TareasApp' };
+        if (sinPermiso) {
+            avisar(`Todavía no tenés acceso a ${NOMBRE_APP[sinPermiso] || 'esa sección'} — pedile a Roy que te lo habilite.`, 'info');
+        }
+
+        // Oculta las cards de las apps opcionales que esta cuenta no
+        // tiene habilitadas — GastosApp (id "gastosapp") queda siempre
+        // visible, nunca se restringe (ver permisos.js).
+        function actualizarCardsSegunPermisos(appsPermitidas) {
+            APPS.forEach(app => {
+                const card = document.getElementById(`app-${app}app`);
+                if (card) card.style.display = tienePermiso(appsPermitidas, app) ? '' : 'none';
+            });
+        }
+
+        // Ya NO restringe a admin (antes sí) — con GamingApp abierta a
+        // cualquier usuario logueado (ver gaming/index.html, por los
+        // torneos con código), no tenía sentido que la puerta de entrada
+        // del sistema completo siguiera solo para una cuenta.
+        alCambiarSesion(async (user) => {
+            if (!user) {
+                // panel2fa NO se oculta acá: mientras se está completando
+                // el código, Firebase todavía no dio la sesión por
+                // terminada (onAuthStateChanged sigue mandando user=null)
+                // — ocultarlo acá lo taparía con la pantalla de login de
+                // nuevo antes de que la persona llegue a escribir el
+                // código.
+                if (panel2fa.style.display !== 'block') zonaSinSesion.style.display = 'block';
+                zonaConSesion.style.display = 'none';
+                return;
+            }
+            panel2fa.style.display = 'none';
+            // Se espera a que termine ANTES de leer los permisos: si es
+            // el primerísimo login de esta cuenta, marcarLoginYPermisos
+            // recién ahí escribe appsPermitidas:[] — leerlo antes de que
+            // termine mostraría todas las cards por un instante (carrera
+            // entre la escritura y la lectura).
+            await marcarLoginYPermisos(user).catch(() => {});
+            if (volver) {
+                window.location.href = volver;
+                return;
+            }
+            zonaSinSesion.style.display = 'none';
+            zonaConSesion.style.display = 'block';
+            actualizarCardsSegunPermisos(await obtenerAppsPermitidas(user.uid).catch(() => null));
+            cargarNotitas(user.uid);
+        });
+
+        document.getElementById('boton-google').addEventListener('click', () => {
+            iniciarSesionConGoogle().catch((error) => {
+                // Antes esto mandaba a completar el código en index.html
+                // — pero el resolver de 2FA que devuelve Firebase es un
+                // objeto en memoria de ESTA carga de página, no algo que
+                // se pueda pasar de una página a otra navegando. Al
+                // llegar a index.html no había ningún pedido pendiente
+                // real, así que había que tocar "Iniciar sesión con
+                // Google" de nuevo ahí para recién ahí conseguir uno y
+                // ver el código — dos clicks por un solo login. Con el
+                // panel acá mismo alcanza con uno.
+                if (requiere2FA(error)) {
+                    resolverPendiente = obtenerResolver2FA(error);
+                    zonaSinSesion.style.display = 'none';
+                    panel2fa.style.display = 'block';
+                    document.getElementById('codigo-2fa').focus();
+                    return;
+                }
+                avisar(mensajeDeError(error), 'error');
+            });
+        });
+
+        document.getElementById('form-2fa').addEventListener('submit', (evento) => {
+            evento.preventDefault();
+            const codigo = document.getElementById('codigo-2fa').value.trim();
+            completarSesionCon2FA(resolverPendiente, codigo)
+                .catch(error => avisar(mensajeDeError(error), 'error'));
+            // Sin .then(...) acá — completar el 2FA ya dispara
+            // onAuthStateChanged solo, y alCambiarSesion (arriba) se
+            // encarga de todo lo que sigue (ocultar este panel, mostrar
+            // las apps o mandar a "volver"). Repetirlo acá hubiera sido
+            // lógica duplicada.
+        });
+
+        document.getElementById('boton-cancelar-2fa').addEventListener('click', () => {
+            resolverPendiente = null;
+            panel2fa.style.display = 'none';
+            zonaSinSesion.style.display = 'block';
+            document.getElementById('form-2fa').reset();
+        });
+
+        document.getElementById('app-gastosapp').addEventListener('click', () => {
+            window.location.href = 'index.html';
+        });
+        document.getElementById('app-gamingapp').addEventListener('click', () => {
+            window.location.href = 'gaming/index.html';
+        });
+        document.getElementById('app-agendaapp').addEventListener('click', () => {
+            window.location.href = 'agenda/index.html';
+        });
+        document.getElementById('app-tareasapp').addEventListener('click', () => {
+            window.location.href = 'tareas/index.html';
+        });
+
+        // --- Clima y noticias — informativas, no dependen de sesión ni
+        // de ninguna app del sistema (viven dentro de #zona-con-sesion,
+        // así que no se VEN hasta que haya sesión, pero el pedido en sí
+        // se puede ir haciendo desde que carga la página). Si cualquiera
+        // de las dos APIs no contesta, se deja la card oculta nomás — es
+        // solo informativo, no vale la pena mostrar un error por esto.
+
+        // Botón "▾/▸" para minimizar el cuerpo de una card sin ocultarla
+        // del todo (el título se queda) — genérico para poder usarlo en
+        // clima y noticias sin repetir la misma lógica dos veces. El
+        // estado elegido se guarda en localStorage (preferencia de
+        // pantalla, no algo "de esta visita" como la ubicación del clima).
+        function iniciarMinimizable(idBoton, idCuerpo, claveStorage) {
+            const boton = document.getElementById(idBoton);
+            const cuerpo = document.getElementById(idCuerpo);
+            function aplicar(colapsado) {
+                cuerpo.style.display = colapsado ? 'none' : 'block';
+                boton.textContent = colapsado ? '▸' : '▾';
+                boton.title = colapsado ? 'Expandir' : 'Minimizar';
+            }
+            aplicar(localStorage.getItem(claveStorage) === '1');
+            boton.addEventListener('click', () => {
+                const colapsando = cuerpo.style.display !== 'none';
+                localStorage.setItem(claveStorage, colapsando ? '1' : '0');
+                aplicar(colapsando);
+            });
+        }
+        iniciarMinimizable('clima-minimizar', 'clima-cuerpo', 'clima-colapsado');
+        iniciarMinimizable('noticias-minimizar', 'noticias-cuerpo', 'noticias-colapsado');
+
+        // --- Notitas (post-its de TareasApp) ---
+
+        let notitas = [];
+        let indiceNotita = 0;
+
+        async function cargarNotitas(uid) {
+            try {
+                notitas = await obtenerTareasPendientes(uid);
+            } catch {
+                notitas = []; // si falla (ej. sin conexión), no se rompe nada más de la página — la card de notitas simplemente no aparece
+            }
+            indiceNotita = 0;
+            renderizarNotitas();
+
+            // Aviso opcional de "por vencer" (ver tareas.js) — ComfyApp
+            // suele ser la página más visitada de las 5, así que conviene
+            // revisar acá también y no solo al entrar a TareasApp en sí.
+            avisarTareasPorVencer(uid).catch(() => {});
+        }
+
+        // Mismo criterio de "vencida"/"próxima" que tareas/index.html —
+        // acá no hace falta el helper de textoVencimiento completo, solo
+        // el día/mes corto.
+        function estadoVencimientoNotita(fechaTexto) {
+            const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+            const fecha = new Date(fechaTexto + 'T00:00:00');
+            const dias = Math.round((fecha - hoy) / 86400000);
+            if (dias < 0) return 'vencida';
+            if (dias <= 2) return 'proxima';
+            return null;
+        }
+
+        function renderizarNotitas() {
+            const card = document.getElementById('card-notitas');
+            if (notitas.length === 0) {
+                card.style.display = 'none'; // nada pendiente — no tiene sentido un carrusel vacío
+                return;
+            }
+            card.style.display = 'block';
+
+            const tarea = notitas[indiceNotita];
+            const estado = tarea.fechaVencimiento ? estadoVencimientoNotita(tarea.fechaVencimiento) : null;
+            const vencimientoHtml = tarea.fechaVencimiento
+                ? `<span class="postit-card-vencimiento${estado ? ' ' + estado : ''}">📅 ${new Date(tarea.fechaVencimiento + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}</span>`
+                : '';
+
+            const postit = document.getElementById('postit-actual');
+            // Un poquito de inclinación, alternada según la posición —
+            // de ahí sale el aire "post-it de verdad" sin ninguna imagen.
+            postit.style.transform = `rotate(${indiceNotita % 2 === 0 ? '-1.2deg' : '1deg'})`;
+            postit.innerHTML = `
+                <span class="postit-card-origen">${esc(tarea.origenNombre)}</span>
+                <span class="postit-card-titulo">📌 ${esc(tarea.titulo)}</span>
+                ${vencimientoHtml}
+            `;
+            postit.onclick = () => {
+                window.location.href = tarea.origen === 'grupo'
+                    ? `tareas/grupo.html?codigo=${tarea.origenCodigo}`
+                    : 'tareas/index.html';
+            };
+
+            document.getElementById('postit-anterior').disabled = notitas.length <= 1;
+            document.getElementById('postit-siguiente').disabled = notitas.length <= 1;
+            document.getElementById('postits-puntos').innerHTML = notitas.length > 1
+                ? notitas.map((_, i) => `<span class="postits-punto${i === indiceNotita ? ' activo' : ''}"></span>`).join('')
+                : '';
+        }
+
+        document.getElementById('postit-anterior').addEventListener('click', () => {
+            indiceNotita = (indiceNotita - 1 + notitas.length) % notitas.length;
+            renderizarNotitas();
+        });
+        document.getElementById('postit-siguiente').addEventListener('click', () => {
+            indiceNotita = (indiceNotita + 1) % notitas.length;
+            renderizarNotitas();
+        });
+
+        const climaBuscador = document.getElementById('clima-buscador');
+        const climaBuscarInput = document.getElementById('clima-buscar-input');
+        const climaResultados = document.getElementById('clima-resultados');
+        const botonUsarMiUbicacion = document.getElementById('clima-usar-mi-ubicacion');
+
+        const NOMBRES_DIA_CORTO = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+        // Franja horizontal con el resumen de los próximos 7 días
+        // (clima.pronostico[0] es hoy, ya viene ordenado por clima.js).
+        function renderizarPronostico(pronostico) {
+            document.getElementById('clima-pronostico').innerHTML = pronostico.map((dia, i) => {
+                // "T00:00:00" fuerza a que se interprete en hora LOCAL —
+                // sin eso, new Date("2026-08-25") lo toma como UTC
+                // medianoche, que en Argentina (UTC-3) cae en el día
+                // anterior y mostraría el nombre de día equivocado.
+                const fecha = new Date(dia.fecha + 'T00:00:00');
+                const [emoji] = descripcionClima(dia.weatherCode);
+                const nombreDia = i === 0 ? 'Hoy' : NOMBRES_DIA_CORTO[fecha.getDay()];
+                return `
+                    <div class="clima-dia-pronostico">
+                        <div class="clima-dia-pronostico-nombre">${nombreDia}</div>
+                        <div class="clima-dia-pronostico-icono">${emoji}</div>
+                        <div class="clima-dia-pronostico-temps"><span class="max">${dia.maxima}°</span> <span class="min">${dia.minima}°</span></div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function cargarClima() {
+            obtenerClima().then((clima) => {
+                if (!clima) return; // Open-Meteo no contestó — se deja la card oculta, es solo informativo
+                const [emoji, descripcion] = descripcionClima(clima.weatherCode);
+                document.getElementById('clima-descripcion').textContent = `${emoji} ${descripcion} en ${clima.nombre}`;
+                document.getElementById('clima-actual').textContent = `${clima.actual}°`;
+                document.getElementById('clima-minima').textContent = `${clima.minima}°`;
+                document.getElementById('clima-maxima').textContent = `${clima.maxima}°`;
+                renderizarPronostico(clima.pronostico);
+                document.getElementById('card-clima').style.display = 'block';
+                // "Usar mi ubicación actual" solo tiene sentido mostrarlo
+                // si ahora mismo se está viendo una elegida a mano.
+                botonUsarMiUbicacion.style.display = hayUbicacionElegida() ? 'block' : 'none';
+            });
+        }
+        cargarClima();
+
+        document.getElementById('clima-cambiar-ubicacion').addEventListener('click', () => {
+            const abierto = climaBuscador.style.display === 'block';
+            climaBuscador.style.display = abierto ? 'none' : 'block';
+            if (!abierto) climaBuscarInput.focus();
+        });
+
+        async function buscarYMostrarCiudades() {
+            const resultados = await buscarCiudades(climaBuscarInput.value);
+            if (resultados.length === 0) {
+                climaResultados.innerHTML = '<p class="texto-muted" style="font-size:.85rem; margin: var(--space-2) 0 0;">No se encontró ninguna ciudad con ese nombre.</p>';
+                return;
+            }
+            climaResultados.innerHTML = resultados.map((ciudad, indice) => {
+                const detalle = [ciudad.region, ciudad.pais].filter(Boolean).join(', ');
+                return `
+                    <button type="button" class="drawer-link resultado-ciudad" data-indice="${indice}" style="margin-top: var(--space-1);">
+                        📍 ${esc(ciudad.nombre)}${detalle ? `<span class="texto-muted"> — ${esc(detalle)}</span>` : ''}
+                    </button>
+                `;
+            }).join('');
+            // Los datos de cada resultado se guardan en un array en vez de
+            // en el propio HTML (los data-* solo pueden ser texto, y lat/
+            // lon como texto pierden precisión al ir y volver) — el botón
+            // de abajo solo necesita el índice para encontrar el suyo.
+            climaResultados.dataset.ciudades = JSON.stringify(resultados);
+        }
+        document.getElementById('clima-buscar-boton').addEventListener('click', buscarYMostrarCiudades);
+        climaBuscarInput.addEventListener('keydown', (evento) => {
+            if (evento.key === 'Enter') buscarYMostrarCiudades();
+        });
+
+        // Delegado en el contenedor (los botones de resultado se recrean
+        // en cada búsqueda) — al elegir una ciudad, se guarda por sesión
+        // y se vuelve a pedir el clima ya con esa ubicación.
+        climaResultados.addEventListener('click', (evento) => {
+            const boton = evento.target.closest('.resultado-ciudad');
+            if (!boton) return;
+            const ciudades = JSON.parse(climaResultados.dataset.ciudades || '[]');
+            const ciudad = ciudades[Number(boton.dataset.indice)];
+            if (!ciudad) return;
+            guardarUbicacionElegida({ lat: ciudad.lat, lon: ciudad.lon, nombre: ciudad.nombre });
+            climaBuscador.style.display = 'none';
+            climaBuscarInput.value = '';
+            climaResultados.innerHTML = '';
+            cargarClima();
+        });
+
+        botonUsarMiUbicacion.addEventListener('click', () => {
+            borrarUbicacionElegida();
+            climaBuscador.style.display = 'none';
+            cargarClima();
+        });
+
+        // Mismo Worker que ya usa GamingApp para Steam (ver
+        // cloudflare-worker/src/index.js, ruta /noticias) — GNews
+        // tampoco deja pedirse directo desde el navegador.
+        const PROXY_NOTICIAS = 'https://tu-worker.tu-subdominio.workers.dev';
+
+        // El tema buscado a mano (ej. "Boca", "Dólar") y la categoría
+        // sugerida elegida son preferencias personales, no algo de "esta
+        // pestaña nomás" como la ubicación del clima — por eso
+        // localStorage, no sessionStorage: se mantienen entre visitas
+        // hasta que la persona las cambie. Son mutuamente excluyentes
+        // (elegir una categoría borra el tema buscado, y viceversa — ver
+        // el Worker, que hace lo mismo del lado del servidor: si llegan
+        // los dos, gana "q").
+        const CLAVE_NOTICIAS_TEMA = 'noticias-tema';
+        const CLAVE_NOTICIAS_CATEGORIA = 'noticias-categoria';
+
+        // Mismas categorías que CATEGORIAS_COMPARTIDAS en
+        // cloudflare-worker/src/index.js — atajos de un clic para no
+        // tener que escribir nada ("que se le recomienden qué noticias
+        // le gustaría ver", a pedido de Roy). No es un algoritmo de
+        // recomendación de verdad (nada de historial ni aprendizaje) —
+        // es, a propósito, una lista curada simple: más fácil de
+        // entender y de confiar que una "IA" adivinando gustos con los
+        // pocos datos que tendría disponibles acá.
+        const CATEGORIAS_NOTICIAS = [
+            { valor: 'general', icono: '🌐', texto: 'General' },
+            { valor: 'deportes', icono: '⚽', texto: 'Deportes' },
+            { valor: 'tecnologia', icono: '💻', texto: 'Tecnología' },
+            { valor: 'economia', icono: '💰', texto: 'Economía' },
+            { valor: 'entretenimiento', icono: '🎬', texto: 'Entretenimiento' },
+            { valor: 'salud', icono: '🩺', texto: 'Salud' },
+            { valor: 'ciencia', icono: '🔬', texto: 'Ciencia' },
+        ];
+
+        const noticiasBuscarInput = document.getElementById('noticias-buscar-input');
+        const noticiasFiltroActivo = document.getElementById('noticias-filtro-activo');
+        const noticiasContenido = document.getElementById('noticias-contenido');
+        const noticiasChipsCategoria = document.getElementById('noticias-chips-categoria');
+        const cardNoticias = document.getElementById('card-noticias');
+
+        noticiasChipsCategoria.innerHTML = CATEGORIAS_NOTICIAS.map(c => `
+            <button type="button" class="chip" data-categoria="${c.valor}" aria-pressed="false">${c.icono} ${c.texto}</button>
+        `).join('');
+
+        function renderNoticias(noticias) {
+            noticiasContenido.innerHTML = noticias.map(noticia => {
+                const fecha = noticia.fecha
+                    ? new Date(noticia.fecha).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                    : '';
+                const detalle = [noticia.fuente, fecha].filter(Boolean).join(' · ');
+                return `
+                    <a href="${esc(noticia.link)}" target="_blank" rel="noopener" class="balance-item" style="text-decoration:none; flex-direction:column; align-items:flex-start; gap:2px;">
+                        <span style="color:var(--color-text); font-weight:600; font-size:.92rem;">${esc(noticia.titulo)}</span>
+                        ${detalle ? `<span class="texto-muted" style="font-size:.75rem;">${esc(detalle)}</span>` : ''}
+                    </a>
+                `;
+            }).join('');
+        }
+
+        function cargarNoticias() {
+            const tema = localStorage.getItem(CLAVE_NOTICIAS_TEMA) || '';
+            const categoria = localStorage.getItem(CLAVE_NOTICIAS_CATEGORIA) || 'general';
+            noticiasBuscarInput.value = tema;
+
+            // Con un tema buscado a mano, ningún chip de categoría queda
+            // marcado como activo (son excluyentes) — sin tema, se marca
+            // la categoría guardada.
+            document.querySelectorAll('#noticias-chips-categoria .chip').forEach(chip => {
+                chip.setAttribute('aria-pressed', (!tema && chip.dataset.categoria === categoria) ? 'true' : 'false');
+            });
+
+            if (tema) {
+                noticiasFiltroActivo.style.display = 'block';
+                noticiasFiltroActivo.innerHTML = `Mostrando noticias sobre "${esc(tema)}" — <a href="#" id="noticias-quitar-filtro">quitar filtro</a>`;
+            } else {
+                noticiasFiltroActivo.style.display = 'none';
+            }
+
+            const url = tema
+                ? `${PROXY_NOTICIAS}/noticias?q=${encodeURIComponent(tema)}`
+                : `${PROXY_NOTICIAS}/noticias?categoria=${encodeURIComponent(categoria)}`;
+            fetch(url)
+                .then(respuesta => respuesta.json())
+                .then((datos) => {
+                    const noticias = datos.noticias || [];
+                    if (noticias.length === 0) {
+                        // Sin tema, si no hay nada mejor ocultar toda la
+                        // card (puede ser que las APIs no estén
+                        // configuradas todavía) — con un tema puesto, en
+                        // cambio, sí vale la pena mostrar la card con el
+                        // aviso de "no se encontró nada", para que quede
+                        // claro que el filtro no tuvo resultados y no que
+                        // la card esté rota.
+                        if (!tema) { cardNoticias.style.display = 'none'; return; }
+                        noticiasContenido.innerHTML = `<p class="texto-muted" style="font-size:.85rem;">No se encontraron noticias sobre "${esc(tema)}".</p>`;
+                        cardNoticias.style.display = 'block';
+                        return;
+                    }
+                    renderNoticias(noticias);
+                    cardNoticias.style.display = 'block';
+                })
+                .catch(() => {});
+        }
+        cargarNoticias();
+
+        function buscarNoticiasPorTema() {
+            const tema = noticiasBuscarInput.value.trim();
+            if (tema) localStorage.setItem(CLAVE_NOTICIAS_TEMA, tema);
+            else localStorage.removeItem(CLAVE_NOTICIAS_TEMA);
+            cargarNoticias();
+        }
+        document.getElementById('noticias-buscar-boton').addEventListener('click', buscarNoticiasPorTema);
+        noticiasBuscarInput.addEventListener('keydown', (evento) => {
+            if (evento.key === 'Enter') buscarNoticiasPorTema();
+        });
+
+        // Delegado en el contenedor (los chips ya están armados de una,
+        // no se recrean, así que esto también podría ir directo en cada
+        // uno — se deja delegado igual, por consistencia con el resto de
+        // los listeners de esta sección).
+        noticiasChipsCategoria.addEventListener('click', (evento) => {
+            const chip = evento.target.closest('.chip');
+            if (!chip) return;
+            localStorage.setItem(CLAVE_NOTICIAS_CATEGORIA, chip.dataset.categoria);
+            localStorage.removeItem(CLAVE_NOTICIAS_TEMA); // una categoría sugerida reemplaza cualquier búsqueda libre activa
+            cargarNoticias();
+        });
+
+        // Delegado en el contenedor (el link "quitar filtro" se recrea
+        // cada vez que cambia el filtro) — quita el tema buscado y
+        // vuelve a mostrar la categoría sugerida guardada.
+        noticiasFiltroActivo.addEventListener('click', (evento) => {
+            if (evento.target.id !== 'noticias-quitar-filtro') return;
+            evento.preventDefault();
+            localStorage.removeItem(CLAVE_NOTICIAS_TEMA);
+            cargarNoticias();
+        });
+    </script>
+</body>
+</html>

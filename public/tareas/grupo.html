@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grupo de tareas — TareasApp</title>
+    <meta name="theme-color" content="#fdf9ec">
+    <!-- Mismo tema propio "mostaza" que index.html — ver el comentario
+         largo ahí. -->
+    <script>
+        var temaTareas = localStorage.getItem('tema-tareas') || 'claro';
+        document.documentElement.setAttribute('data-tema', temaTareas === 'oscuro' ? 'tareas-oscura' : 'tareas');
+        if (temaTareas === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page">
+        <div id="zona-cargando-sesion" style="text-align:center;">
+            <p class="texto-muted">Comprobando tu sesión…</p>
+        </div>
+
+        <div id="zona-sin-grupo" style="display:none;" class="estado-vacio">
+            <span class="icono-grande">🤷</span>
+            Este grupo ya no existe (o el código no es válido).
+            <p><a href="index.html">← Volver a Mis tareas</a></p>
+        </div>
+
+        <div id="zona-contenido" style="display:none;">
+            <div class="card" id="grupo-info-card"></div>
+
+            <div class="card" id="card-tareas-grupo">
+                <div class="card-header" style="align-items:center;">
+                    <h3 style="margin:0;">📋 Tareas del grupo</h3>
+                    <button type="button" id="boton-nueva-tarea-grupo" style="width:auto; padding: 6px 14px;">+ Nueva</button>
+                </div>
+                <div id="lista-tareas-grupo"></div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { avisar, esc, confirmar, abrirModal, cerrarModal, copiarAlPortapapeles } from '../ui.js';
+        import { iniciarNavbarTareas, requerirSesionTareas } from './nav-tareas.js';
+        import {
+            escucharGrupoTareas, escucharTareasGrupo,
+            agregarTareaGrupo, actualizarTareaGrupo, marcarTareaGrupoCompletada, eliminarTareaGrupo,
+            eliminarGrupoTareas, quitarGrupoDeMisGruposTareas,
+            avisarTareasPorVencer,
+        } from './tareas.js';
+
+        iniciarNavbarTareas();
+
+        const codigo = new URLSearchParams(window.location.search).get('codigo');
+        const zonaCargandoSesion = document.getElementById('zona-cargando-sesion');
+        const zonaSinGrupo = document.getElementById('zona-sin-grupo');
+        const zonaContenido = document.getElementById('zona-contenido');
+
+        if (!codigo) {
+            window.location.href = 'index.html';
+        }
+
+        let usuarioActual = null;
+        let grupoActual = null;
+        let tareasGrupo = [];
+        const dejarDeEscuchar = [];
+
+        requerirSesionTareas('grupo.html', (user) => {
+            usuarioActual = user;
+            zonaCargandoSesion.style.display = 'none';
+
+            dejarDeEscuchar.push(escucharGrupoTareas(codigo, (grupo) => {
+                if (!grupo) {
+                    zonaContenido.style.display = 'none';
+                    zonaSinGrupo.style.display = 'block';
+                    return;
+                }
+                grupoActual = grupo;
+                zonaContenido.style.display = 'block';
+                zonaSinGrupo.style.display = 'none';
+                renderInfoGrupo(grupo);
+                renderTareasGrupo(); // los nombres para "asignado a" pueden haber cambiado
+            }));
+
+            dejarDeEscuchar.push(escucharTareasGrupo(codigo, (tareas) => {
+                tareasGrupo = tareas;
+                renderTareasGrupo();
+            }));
+
+            // Aviso opcional de "por vencer" (ver tareas.js) — revisa
+            // TODOS mis grupos, no solo este, así que igual conviene
+            // llamarlo también desde acá (por si se entra directo a un
+            // grupo puntual sin pasar antes por index.html).
+            avisarTareasPorVencer(user.uid).catch(() => {});
+        });
+
+        // --- Info del grupo (nombre, código, miembros, eliminar) ---
+
+        function renderInfoGrupo(grupo) {
+            const miembrosHtml = Object.entries(grupo.nombresPorUid || {})
+                .map(([, nombre]) => `<span class="chip estatico">${esc(nombre)}</span>`)
+                .join('');
+
+            document.getElementById('grupo-info-card').innerHTML = `
+                <div class="card-header">
+                    <h2 style="margin:0;">👥 ${esc(grupo.nombre)}</h2>
+                </div>
+                <p style="margin-bottom: 8px;">Compartí este código para que se sumen al grupo:</p>
+                <span class="codigo-invitacion" id="codigo-invitacion">${esc(codigo)}</span>
+                <button type="button" class="secundario icono" id="boton-copiar-codigo" title="Copiar código" style="margin-left:8px;">📋</button>
+                <div class="chips" style="margin-top: 16px;">${miembrosHtml}</div>
+
+                <details style="margin-top: 16px;">
+                    <summary style="cursor:pointer; color: var(--color-text-muted); font-size:.85rem;">⚙️ Más opciones</summary>
+                    <div style="margin-top: 12px;">
+                        <button type="button" id="boton-eliminar-grupo" class="peligro" style="width:auto;">🗑️ Eliminar grupo</button>
+                    </div>
+                </details>
+            `;
+
+            document.getElementById('boton-copiar-codigo').addEventListener('click', () => copiarAlPortapapeles(codigo));
+
+            document.getElementById('boton-eliminar-grupo').addEventListener('click', async () => {
+                const ok = confirmar(`¿Eliminar "${grupo.nombre}" para siempre? Se borran todas sus tareas. Esto NO se puede deshacer.`);
+                if (!ok) return;
+
+                // Dejar de escuchar ANTES de borrar — si no, el propio
+                // listener de este grupo se entera solo del borrado (vía
+                // escucharGrupoTareas) y dispara el mismo aviso de "ya no
+                // existe" de zonaSinGrupo, duplicando el mensaje.
+                dejarDeEscuchar.forEach(fn => fn());
+
+                try {
+                    await eliminarGrupoTareas(codigo);
+                    await quitarGrupoDeMisGruposTareas(usuarioActual.uid, codigo).catch(() => {});
+                    avisar(`"${grupo.nombre}" eliminado`, 'info');
+                    window.location.href = 'index.html';
+                } catch (error) {
+                    avisar('No se pudo eliminar el grupo: ' + error.message, 'error');
+                }
+            });
+        }
+
+        // --- Tareas del grupo ---
+
+        // "T00:00:00" fuerza hora LOCAL — mismo motivo que en index.html
+        // (evita el corrimiento de un día que da new Date("YYYY-MM-DD") a
+        // secas en Argentina).
+        function estadoVencimiento(fechaTexto) {
+            const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+            const fecha = new Date(fechaTexto + 'T00:00:00');
+            const dias = Math.round((fecha - hoy) / 86400000);
+            if (dias < 0) return 'vencida';
+            if (dias <= 2) return 'proxima';
+            return null;
+        }
+
+        function textoVencimiento(fechaTexto) {
+            return new Date(fechaTexto + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+        }
+
+        // Resumen de la configuración del aviso — mismo texto que
+        // index.html.
+        function textoConfigAviso(tarea) {
+            const dias = tarea.avisarDiasAntes || 0;
+            const cuando = dias === 0 ? 'el mismo día' : (dias === 7 ? '1 semana antes' : `${dias} día${dias === 1 ? '' : 's'} antes`);
+            return `Avisa ${cuando}${tarea.avisarRepetir ? ', repitiendo todos los días hasta completarla' : ''}`;
+        }
+
+        // Opciones de "¿cuánto tiempo antes?" — mismo listado que
+        // index.html.
+        function opcionesDiasAntesHtml(diasSeleccionados) {
+            const opciones = [
+                [0, 'El mismo día'], [1, '1 día antes'], [2, '2 días antes'],
+                [3, '3 días antes'], [7, '1 semana antes'],
+            ];
+            return opciones.map(([dias, texto]) =>
+                `<option value="${dias}" ${dias === diasSeleccionados ? 'selected' : ''}>${texto}</option>`
+            ).join('');
+        }
+
+        function renderTareasGrupo() {
+            const contenedor = document.getElementById('lista-tareas-grupo');
+            if (!grupoActual) return;
+
+            if (tareasGrupo.length === 0) {
+                contenedor.innerHTML = `
+                    <div class="estado-vacio">
+                        <span class="icono-grande">📋</span>
+                        Todavía no hay tareas en este grupo. Creá la primera con "+ Nueva".
+                    </div>
+                `;
+                return;
+            }
+
+            const nombresPorUid = grupoActual.nombresPorUid || {};
+            const pendientes = [...tareasGrupo].filter(t => !t.completada)
+                .sort((a, b) => (a.fechaVencimiento || '9999').localeCompare(b.fechaVencimiento || '9999'));
+            const completadas = tareasGrupo.filter(t => t.completada);
+
+            contenedor.innerHTML = [...pendientes, ...completadas].map(tarea => {
+                const estado = tarea.fechaVencimiento ? estadoVencimiento(tarea.fechaVencimiento) : null;
+                const vencimientoHtml = tarea.fechaVencimiento
+                    ? `<span class="tarea-item-vencimiento${estado ? ' ' + estado : ''}">📅 ${textoVencimiento(tarea.fechaVencimiento)}</span>`
+                    : '';
+                const asignadoHtml = `<span>👤 ${tarea.asignadoA ? esc(nombresPorUid[tarea.asignadoA] || '?') : 'Cualquiera'}</span>`;
+                const avisoHtml = (tarea.avisar && !tarea.completada)
+                    ? `<span title="${esc(textoConfigAviso(tarea))}">🔔${tarea.avisarRepetir ? '🔁' : ''}</span>`
+                    : '';
+
+                return `
+                    <div class="tarea-item${tarea.completada ? ' completada' : ''}" data-id="${esc(tarea.id)}">
+                        <input type="checkbox" class="tarea-item-check" ${tarea.completada ? 'checked' : ''} title="Marcar como completada">
+                        <div class="tarea-item-cuerpo">
+                            <div class="tarea-item-titulo">${esc(tarea.titulo)}</div>
+                            ${tarea.descripcion ? `<div class="texto-muted" style="font-size:.82rem; margin-top:2px;">${esc(tarea.descripcion)}</div>` : ''}
+                            <div class="tarea-item-meta">${vencimientoHtml}${asignadoHtml}${avisoHtml}</div>
+                        </div>
+                        <div class="tarea-item-acciones">
+                            <button type="button" class="icono" data-editar title="Editar">✏️</button>
+                            <button type="button" class="icono" data-borrar title="Borrar">🗑️</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function abrirModalTareaGrupo(tareaExistente) {
+            const esEdicion = !!tareaExistente;
+            const nombresPorUid = grupoActual.nombresPorUid || {};
+            const opcionesAsignado = ['<option value="">Cualquiera</option>', ...Object.entries(nombresPorUid).map(([uid, nombre]) =>
+                `<option value="${esc(uid)}" ${tareaExistente?.asignadoA === uid ? 'selected' : ''}>${esc(nombre)}</option>`
+            )].join('');
+            const fechaInicial = esEdicion ? (tareaExistente.fechaVencimiento || '') : '';
+            const diasInicial = esEdicion ? (tareaExistente.avisarDiasAntes || 0) : 0;
+
+            abrirModal(`
+                <h3 style="margin-top:0;">${esEdicion ? 'Editar tarea' : 'Nueva tarea'}</h3>
+                <form id="form-tarea-grupo" class="form">
+                    <div class="campo-ancho">
+                        <label for="tarea-titulo">Título</label>
+                        <input type="text" id="tarea-titulo" maxlength="150" required value="${esEdicion ? esc(tareaExistente.titulo) : ''}">
+                    </div>
+                    <div class="campo-ancho">
+                        <label for="tarea-descripcion">Descripción (opcional)</label>
+                        <textarea id="tarea-descripcion" rows="2">${esEdicion ? esc(tareaExistente.descripcion || '') : ''}</textarea>
+                    </div>
+                    <div>
+                        <label for="tarea-vencimiento">Vencimiento (opcional)</label>
+                        <input type="date" id="tarea-vencimiento" value="${esc(fechaInicial)}">
+                    </div>
+                    <div>
+                        <label for="tarea-asignado">Asignada a</label>
+                        <select id="tarea-asignado">${opcionesAsignado}</select>
+                    </div>
+                    <div class="campo-ancho drawer-item" style="padding:0;">
+                        <label for="tarea-avisar" style="font-weight:400; cursor:pointer;">🔔 Avisar cuando venza (a quien esté asignada, o a quien la creó)</label>
+                        <!-- width:auto: sin esto, la regla global "input,
+                             select { width:100% }" de main.css (pensada
+                             para campos de texto) también le pega a este
+                             checkbox — adentro de .drawer-item (flex) eso
+                             le infla la base flexible al 100% del ancho de
+                             fila, robándole espacio al label de al lado
+                             (mismo bug real ya encontrado y corregido en el
+                             filtro de calendarios de AgendaApp; acá el
+                             label encima es más largo, más riesgo todavía). -->
+                        <input type="checkbox" id="tarea-avisar" style="flex:none; width:auto;" ${esEdicion && tareaExistente.avisar ? 'checked' : ''} ${fechaInicial ? '' : 'disabled'}>
+                    </div>
+                    <div class="campo-ancho" id="tarea-avisar-opciones" style="display:none; padding-left: var(--space-3); border-left: 2px solid var(--color-border);">
+                        <label for="tarea-avisar-dias">¿Cuánto tiempo antes?</label>
+                        <select id="tarea-avisar-dias">${opcionesDiasAntesHtml(diasInicial)}</select>
+                        <div class="drawer-item" style="padding: var(--space-2) 0 0;">
+                            <label for="tarea-avisar-repetir" style="font-weight:400; cursor:pointer;">🔁 Repetir todos los días hasta completarla</label>
+                            <input type="checkbox" id="tarea-avisar-repetir" style="flex:none; width:auto;" ${esEdicion && tareaExistente.avisarRepetir ? 'checked' : ''}>
+                        </div>
+                    </div>
+                    <div class="campo-ancho" style="display:flex; gap:8px; margin-top: var(--space-2);">
+                        <button type="submit">${esEdicion ? 'Guardar' : 'Crear'}</button>
+                        <button type="button" class="secundario" id="boton-cancelar-tarea-grupo">Cancelar</button>
+                    </div>
+                </form>
+            `);
+
+            document.getElementById('boton-cancelar-tarea-grupo').addEventListener('click', cerrarModal);
+
+            // Mismo criterio que en index.html: sin fecha, no tiene
+            // sentido dejar tildado "avisar", y las opciones de abajo
+            // solo se muestran con el aviso prendido.
+            const inputVencimiento = document.getElementById('tarea-vencimiento');
+            const inputAvisar = document.getElementById('tarea-avisar');
+            const zonaAvisarOpciones = document.getElementById('tarea-avisar-opciones');
+
+            function actualizarVisibilidadOpcionesAvisar() {
+                zonaAvisarOpciones.style.display = inputAvisar.checked ? 'block' : 'none';
+            }
+            inputVencimiento.addEventListener('change', () => {
+                const hayFecha = !!inputVencimiento.value;
+                inputAvisar.disabled = !hayFecha;
+                if (!hayFecha) inputAvisar.checked = false;
+                actualizarVisibilidadOpcionesAvisar();
+            });
+            inputAvisar.addEventListener('change', actualizarVisibilidadOpcionesAvisar);
+            actualizarVisibilidadOpcionesAvisar(); // estado inicial, según lo que ya tenía la tarea al editar
+
+            document.getElementById('form-tarea-grupo').addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const datos = {
+                    titulo: document.getElementById('tarea-titulo').value.trim(),
+                    descripcion: document.getElementById('tarea-descripcion').value.trim(),
+                    fechaVencimiento: document.getElementById('tarea-vencimiento').value || null,
+                    asignadoA: document.getElementById('tarea-asignado').value || null,
+                    avisar: document.getElementById('tarea-avisar').checked,
+                    avisarDiasAntes: Number(document.getElementById('tarea-avisar-dias').value),
+                    avisarRepetir: document.getElementById('tarea-avisar-repetir').checked,
+                };
+                try {
+                    if (esEdicion) {
+                        await actualizarTareaGrupo(codigo, tareaExistente, datos, usuarioActual);
+                    } else {
+                        await agregarTareaGrupo(codigo, datos, usuarioActual);
+                    }
+                    cerrarModal();
+                } catch (error) {
+                    avisar('No se pudo guardar la tarea: ' + error.message, 'error');
+                }
+            });
+        }
+
+        document.getElementById('boton-nueva-tarea-grupo').addEventListener('click', () => abrirModalTareaGrupo(null));
+
+        document.getElementById('lista-tareas-grupo').addEventListener('click', async (evento) => {
+            const fila = evento.target.closest('.tarea-item');
+            if (!fila) return;
+            const tarea = tareasGrupo.find(t => t.id === fila.dataset.id);
+            if (!tarea) return;
+
+            if (evento.target.matches('.tarea-item-check')) {
+                marcarTareaGrupoCompletada(codigo, tarea, evento.target.checked, usuarioActual);
+            } else if (evento.target.closest('[data-editar]')) {
+                abrirModalTareaGrupo(tarea);
+            } else if (evento.target.closest('[data-borrar]')) {
+                if (!confirmar('¿Borrar esta tarea?')) return;
+                eliminarTareaGrupo(codigo, tarea.id);
+            }
+        });
+    </script>
+</body>
+</html>

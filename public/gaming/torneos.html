@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torneos · GamingApp</title>
+    <meta name="theme-color" content="#0f0e0c">
+    <script>
+        var tema = localStorage.getItem('tema') || 'oscuro';
+        document.documentElement.setAttribute('data-tema', tema);
+        if (tema === 'oscuro') document.documentElement.classList.add('sl-theme-dark');
+    </script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/dark.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+    <link rel="stylesheet" href="../styles/main.css"><!-- sl-switch (premio) necesita el autoloader de arriba -->
+</head>
+<body>
+    <header class="navbar" id="navbar-placeholder"></header>
+
+    <main class="page">
+        <div class="card" style="text-align:center;">
+            <span style="font-size: 2.4rem;">🏆</span>
+            <h1 style="margin: var(--space-3) 0 4px;">Torneos</h1>
+            <p class="texto-muted" style="margin: 0;">Armá un torneo de cualquier juego y compartí el código para que se sumen.</p>
+        </div>
+
+        <div id="zona-cargando-sesion" style="text-align:center;">
+            <p class="texto-muted">Comprobando tu sesión…</p>
+        </div>
+
+        <div id="zona-contenido" style="display:none;">
+            <div class="card" id="card-crear-torneo">
+                <div class="card-header"><h3 style="margin:0;">✨ Crear torneo</h3></div>
+                <form id="form-crear-torneo" class="form">
+                    <div class="campo-ancho">
+                        <label for="torneo-nombre">Nombre del torneo</label>
+                        <input type="text" id="torneo-nombre" placeholder="Ej: Copa de los viernes" maxlength="60" required>
+                    </div>
+
+                    <div class="campo-ancho">
+                        <label>Juego</label>
+                        <div id="chips-juegos" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+                        <div id="zona-juego-otro" style="display:none; margin-top: var(--space-2); gap:6px;">
+                            <input type="text" id="torneo-juego-icono" placeholder="🎮" maxlength="2" style="width:70px; text-align:center; flex:none;">
+                            <input type="text" id="torneo-juego-otro" placeholder="¿Cuál?" maxlength="40" style="flex:1;">
+                        </div>
+                    </div>
+
+                    <div class="campo-ancho drawer-item" style="padding:0;">
+                        <span>🏅 ¿Tiene premios?</span>
+                        <sl-switch id="switch-premio"></sl-switch>
+                    </div>
+                    <div class="subgrupo-campos campo-ancho" id="campo-premio" style="display:none;">
+                        <div class="campo-ancho" style="margin:0;">
+                            <label for="torneo-premio-primero">🥇 1er puesto</label>
+                            <input type="text" id="torneo-premio-primero" placeholder="Ej: $10.000" maxlength="100">
+                        </div>
+                        <div class="campo-ancho" style="margin:0;">
+                            <label for="torneo-premio-segundo">🥈 2do puesto (opcional)</label>
+                            <input type="text" id="torneo-premio-segundo" placeholder="Ej: una pizza" maxlength="100">
+                        </div>
+                        <div class="campo-ancho" style="margin:0;">
+                            <label for="torneo-premio-tercero">🥉 3er puesto (opcional)</label>
+                            <input type="text" id="torneo-premio-tercero" placeholder="Ej: fanfarronear un mes" maxlength="100">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="torneo-fecha">Fecha (opcional)</label>
+                        <input type="date" id="torneo-fecha">
+                    </div>
+                    <div>
+                        <label for="torneo-cupo">Cupo máximo (opcional)</label>
+                        <input type="number" id="torneo-cupo" min="2" max="500" placeholder="Sin límite">
+                    </div>
+
+                    <div class="campo-ancho">
+                        <label>Formato</label>
+                        <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                            <button type="button" class="chip" data-formato="liga" aria-pressed="true">🏆 Liga</button>
+                            <button type="button" class="chip" data-formato="eliminacion" aria-pressed="false">🔀 Eliminación</button>
+                            <button type="button" class="chip" data-formato="grupos_eliminacion" aria-pressed="false">🎯 Grupos + Eliminación</button>
+                        </div>
+                    </div>
+
+                    <div class="subgrupo-campos campo-ancho" id="config-liga">
+                        <div class="campo-ancho" style="margin:0;">
+                            <p class="texto-muted" style="font-size:.82rem; margin:0;" id="texto-config-liga">Todos contra todos una vez, gana quien más puntos suma. Los partidos se generan más adelante, cuando ya se haya anotado todo el mundo.</p>
+                        </div>
+                        <div>
+                            <label for="torneo-puntos-victoria">Puntos por victoria</label>
+                            <input type="number" id="torneo-puntos-victoria" min="1" max="100" value="3" required>
+                        </div>
+                        <div class="campo-ancho drawer-item" style="padding:0;">
+                            <span>🤝 ¿Existen los empates en este juego?</span>
+                            <sl-switch id="switch-empate"></sl-switch>
+                        </div>
+                        <div class="campo-ancho" id="campo-puntos-empate" style="display:none; margin:0;">
+                            <label for="torneo-puntos-empate">Puntos por empate</label>
+                            <input type="number" id="torneo-puntos-empate" min="0" max="100" value="1">
+                        </div>
+                    </div>
+
+                    <div class="subgrupo-campos campo-ancho" id="config-eliminacion" style="display:none;">
+                        <div class="campo-ancho" style="margin:0;">
+                            <p class="texto-muted" style="font-size:.82rem; margin:0;">Cuadro de eliminación directa (cuartos, semifinal, final — según cuánta gente se anote). El "mejor de cuántos" de cada ronda se configura más adelante, cuando ya se sepa cuántas rondas va a haber.</p>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="campo-ancho">Crear torneo</button>
+                </form>
+            </div>
+
+            <div class="card" id="card-unirse-torneo">
+                <div class="card-header"><h3 style="margin:0;">🔑 Unirme con un código</h3></div>
+                <form id="form-unirse-torneo" class="form">
+                    <div class="campo-ancho">
+                        <label for="input-codigo-torneo">Código de invitación</label>
+                        <input type="text" id="input-codigo-torneo" placeholder="Ej: AB3XQ9" maxlength="6" required style="text-transform:uppercase;">
+                    </div>
+                    <button type="submit" class="secundario">Unirme</button>
+                </form>
+            </div>
+
+            <div class="card" id="card-mis-torneos">
+                <div class="card-header"><h3 style="margin:0;">📋 Mis torneos</h3></div>
+                <div id="lista-mis-torneos"><p class="texto-muted" style="font-size:.85rem;">Todavía no creaste ni te uniste a ningún torneo.</p></div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { avisar, esc, copiarAlPortapapeles, abrirModal } from '../ui.js';
+        import { iniciarNavbarGaming, requerirSesionGaming } from './nav-gaming.js';
+        import {
+            JUEGOS_POPULARES, iconoDeJuego, etiquetaDeJuego, crearTorneo, unirseATorneo, obtenerTorneo, obtenerMisTorneos,
+            generarPartidosLiga, registrarResultadoLiga, finalizarLiga, calcularTablaLiga,
+            cantidadDeRondas, nombreDeRonda, generarBracketEliminacion, registrarResultadoEliminacion,
+            calcularPodio, generarFaseDeGrupos, registrarResultadoGrupo, calcularTablaGrupo, generarFaseEliminatoriaDeGrupos,
+        } from './torneos.js';
+
+        iniciarNavbarGaming('torneos.html');
+
+        const zonaCargandoSesion = document.getElementById('zona-cargando-sesion');
+        const zonaContenido = document.getElementById('zona-contenido');
+        let usuarioActual = null;
+
+        requerirSesionGaming('torneos.html', (user) => {
+            usuarioActual = user;
+            zonaCargandoSesion.style.display = 'none';
+            zonaContenido.style.display = 'block';
+            cargarMisTorneos();
+        });
+
+        // --- Selector de juego (chips de un solo elegido) ---
+        let juegoElegido = JUEGOS_POPULARES[0].valor;
+        const inputOtro = document.getElementById('torneo-juego-otro');
+        const zonaJuegoOtro = document.getElementById('zona-juego-otro');
+
+        function renderChipsJuegos() {
+            document.getElementById('chips-juegos').innerHTML = JUEGOS_POPULARES.map(j => `
+                <button type="button" class="chip" data-juego="${j.valor}" aria-pressed="${j.valor === juegoElegido}">${j.icono} ${esc(j.nombre)}</button>
+            `).join('');
+            document.querySelectorAll('#chips-juegos .chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    juegoElegido = chip.dataset.juego;
+                    zonaJuegoOtro.style.display = juegoElegido === 'otro' ? 'flex' : 'none';
+                    renderChipsJuegos();
+                });
+            });
+        }
+        renderChipsJuegos();
+
+        // --- Selector de formato ---
+        // config-liga se muestra también para "grupos_eliminacion" —
+        // los puntos por victoria/empate se usan en la fase de grupos de
+        // ese formato también (la cantidad de grupos y cuántos clasifican
+        // se configuran más adelante, al generar la fase de grupos, no
+        // acá — recién ahí se sabe cuánta gente se anotó).
+        let formatoElegido = 'liga';
+        const configLiga = document.getElementById('config-liga');
+        const configEliminacion = document.getElementById('config-eliminacion');
+        const textoConfigLiga = document.getElementById('texto-config-liga');
+        document.querySelectorAll('[data-formato]').forEach(chip => {
+            chip.addEventListener('click', () => {
+                formatoElegido = chip.dataset.formato;
+                document.querySelectorAll('[data-formato]').forEach(c => c.setAttribute('aria-pressed', c === chip));
+                configLiga.style.display = (formatoElegido === 'liga' || formatoElegido === 'grupos_eliminacion') ? 'grid' : 'none';
+                configEliminacion.style.display = (formatoElegido === 'eliminacion' || formatoElegido === 'grupos_eliminacion') ? 'grid' : 'none';
+                textoConfigLiga.textContent = formatoElegido === 'grupos_eliminacion'
+                    ? 'Puntos de la fase de grupos — cuántos grupos y cuántos clasifican de cada uno se elige más adelante, cuando ya se haya anotado todo el mundo.'
+                    : 'Todos contra todos una vez, gana quien más puntos suma. Los partidos se generan más adelante, cuando ya se haya anotado todo el mundo.';
+            });
+        });
+
+        // --- Switch de premios (1°/2°/3°) ---
+        const switchPremio = document.getElementById('switch-premio');
+        const campoPremio = document.getElementById('campo-premio');
+        switchPremio.addEventListener('sl-change', () => {
+            campoPremio.style.display = switchPremio.checked ? 'grid' : 'none';
+            if (!switchPremio.checked) {
+                ['torneo-premio-primero', 'torneo-premio-segundo', 'torneo-premio-tercero'].forEach(id => {
+                    document.getElementById(id).value = '';
+                });
+            }
+        });
+
+        // --- Switch de empate (formato Liga / Grupos+Eliminación) ---
+        const switchEmpate = document.getElementById('switch-empate');
+        const campoPuntosEmpate = document.getElementById('campo-puntos-empate');
+        switchEmpate.addEventListener('sl-change', () => {
+            campoPuntosEmpate.style.display = switchEmpate.checked ? 'block' : 'none';
+        });
+
+        function resetearFormularioCrear() {
+            document.getElementById('form-crear-torneo').reset();
+            switchPremio.checked = false;
+            campoPremio.style.display = 'none';
+            switchEmpate.checked = false;
+            campoPuntosEmpate.style.display = 'none';
+            juegoElegido = JUEGOS_POPULARES[0].valor;
+            renderChipsJuegos();
+            zonaJuegoOtro.style.display = 'none';
+            formatoElegido = 'liga';
+            document.querySelectorAll('[data-formato]').forEach(c => c.setAttribute('aria-pressed', c.dataset.formato === 'liga'));
+            configLiga.style.display = 'grid';
+            configEliminacion.style.display = 'none';
+            textoConfigLiga.textContent = 'Todos contra todos una vez, gana quien más puntos suma. Los partidos se generan más adelante, cuando ya se haya anotado todo el mundo.';
+        }
+
+        // --- Crear torneo ---
+        document.getElementById('form-crear-torneo').addEventListener('submit', async (evento) => {
+            evento.preventDefault();
+            const nombre = document.getElementById('torneo-nombre').value.trim();
+            if (!nombre) return;
+
+            const juegoOtro = juegoElegido === 'otro' ? inputOtro.value.trim() : null;
+            const juegoIcono = juegoElegido === 'otro' ? document.getElementById('torneo-juego-icono').value.trim() : null;
+            const premios = switchPremio.checked ? {
+                primero: document.getElementById('torneo-premio-primero').value.trim(),
+                segundo: document.getElementById('torneo-premio-segundo').value.trim(),
+                tercero: document.getElementById('torneo-premio-tercero').value.trim(),
+            } : {};
+            const fecha = document.getElementById('torneo-fecha').value || null;
+            const cupoTexto = document.getElementById('torneo-cupo').value;
+            const maxParticipantes = cupoTexto ? parseInt(cupoTexto, 10) : null;
+            const puntosVictoria = parseInt(document.getElementById('torneo-puntos-victoria').value, 10) || 1;
+            const puntosEmpate = switchEmpate.checked
+                ? (parseInt(document.getElementById('torneo-puntos-empate').value, 10) || 0)
+                : null;
+
+            try {
+                const codigo = await crearTorneo(usuarioActual, {
+                    nombre, juego: juegoElegido, juegoOtro, juegoIcono, premios, fecha, maxParticipantes,
+                    formato: formatoElegido, puntosVictoria, puntosEmpate,
+                });
+                avisar('¡Torneo creado!', 'exito');
+                resetearFormularioCrear();
+                mostrarCodigoCreado(codigo, nombre);
+                cargarMisTorneos();
+            } catch (error) {
+                avisar(error.message, 'error');
+            }
+        });
+
+        function mostrarCodigoCreado(codigo, nombre) {
+            abrirModal(`
+                <h3 style="margin-top:0;">🎉 "${esc(nombre)}" está listo</h3>
+                <p class="texto-muted" style="font-size:.85rem;">Compartí este código para que se sumen — nadie puede entrar al torneo sin él.</p>
+                <p style="text-align:center; font-size:2rem; font-weight:800; letter-spacing:.15em; color:var(--color-primary); margin: var(--space-4) 0;">${esc(codigo)}</p>
+                <button type="button" class="campo-ancho" id="boton-copiar-codigo-nuevo">Copiar código</button>
+            `);
+            document.getElementById('boton-copiar-codigo-nuevo').addEventListener('click', () => copiarAlPortapapeles(codigo));
+        }
+
+        // --- Unirse a un torneo ---
+        document.getElementById('form-unirse-torneo').addEventListener('submit', async (evento) => {
+            evento.preventDefault();
+            const codigo = document.getElementById('input-codigo-torneo').value.trim();
+            if (!codigo) return;
+            try {
+                const torneo = await unirseATorneo(usuarioActual, codigo);
+                avisar(`Te uniste a "${torneo.nombre}"`, 'exito');
+                document.getElementById('form-unirse-torneo').reset();
+                cargarMisTorneos();
+            } catch (error) {
+                avisar(error.message, 'error');
+            }
+        });
+
+        // --- Mis torneos ---
+        async function cargarMisTorneos() {
+            const contenedor = document.getElementById('lista-mis-torneos');
+            try {
+                const misTorneos = await obtenerMisTorneos(usuarioActual.uid);
+                if (misTorneos.length === 0) {
+                    contenedor.innerHTML = '<p class="texto-muted" style="font-size:.85rem;">Todavía no creaste ni te uniste a ningún torneo.</p>';
+                    return;
+                }
+                contenedor.innerHTML = misTorneos.map(t => `
+                    <button type="button" class="boton-grupo" data-codigo="${esc(t.codigo)}" style="width:100%; justify-content:space-between; margin-bottom:8px;">
+                        <span>🏆 ${esc(t.nombre)}</span>
+                        <span aria-hidden="true">→</span>
+                    </button>
+                `).join('');
+                contenedor.querySelectorAll('[data-codigo]').forEach(boton => {
+                    boton.addEventListener('click', () => verDetalleTorneo(boton.dataset.codigo));
+                });
+            } catch (error) {
+                contenedor.innerHTML = `<p class="texto-muted" style="font-size:.85rem;">No se pudieron cargar tus torneos: ${esc(error.message)}</p>`;
+            }
+        }
+
+        // Formato Liga: tabla de posiciones (se recalcula sola a partir
+        // de los partidos, ver calcularTablaLiga en torneos.js) + la
+        // lista de partidos, cada uno con botones para cargar el
+        // resultado si todavía no lo tiene. "Abierto" (antes de generar
+        // los partidos) muestra el botón de arrancar en vez de todo esto.
+        function contenidoLiga(torneo, soyCreador) {
+            if (torneo.estado === 'abierto') {
+                return soyCreador ? `
+                    <div class="drawer-separador" style="margin: var(--space-3) 0;"></div>
+                    <p class="texto-muted" style="font-size:.82rem;">Cuando ya se haya anotado todo el mundo, generá los partidos — a partir de ahí no se puede sumar más gente al torneo.</p>
+                    <button type="button" class="campo-ancho" id="boton-generar-liga">▶ Generar partidos y arrancar la liga</button>
+                ` : `<p class="texto-muted" style="font-size:.85rem; margin: var(--space-3) 0 0;">El torneo todavía no arrancó — esperando a que el creador genere los partidos.</p>`;
+            }
+
+            const tabla = calcularTablaLiga(torneo);
+            const tablaHtml = tabla.map((fila, indice) => `
+                <div class="balance-item">
+                    <span>${torneo.estado === 'finalizado' && indice === 0 ? '🥇 ' : `${indice + 1}. `}${esc(torneo.nombresPorUid?.[fila.uid] || 'Alguien')}</span>
+                    <span class="monto">${fila.puntos} pts <span class="texto-muted" style="font-weight:400;">(${fila.victorias}-${fila.empates}-${fila.derrotas})</span></span>
+                </div>
+            `).join('');
+
+            const partidosHtml = (torneo.partidos || []).map(p => {
+                const nombreA = esc(torneo.nombresPorUid?.[p.jugadorA] || 'Alguien');
+                const nombreB = esc(torneo.nombresPorUid?.[p.jugadorB] || 'Alguien');
+                if (p.resultado) {
+                    const texto = p.resultado === 'empate'
+                        ? `${nombreA} <strong>empate</strong> ${nombreB}`
+                        : p.resultado === 'A' ? `<strong>${nombreA}</strong> venció a ${nombreB}` : `${nombreA} perdió con <strong>${nombreB}</strong>`;
+                    return `<p style="margin:0 0 6px; font-size:.85rem;">${texto}</p>`;
+                }
+                return `
+                    <div style="margin-bottom: var(--space-3);">
+                        <p style="margin:0 0 4px; font-size:.85rem;">${nombreA} vs ${nombreB}</p>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <button type="button" class="secundario" data-partido="${p.id}" data-resultado="A" style="font-size:.78rem; width:auto;">Ganó ${nombreA}</button>
+                            ${torneo.puntosEmpate !== null ? `<button type="button" class="secundario" data-partido="${p.id}" data-resultado="empate" style="font-size:.78rem; width:auto;">Empate</button>` : ''}
+                            <button type="button" class="secundario" data-partido="${p.id}" data-resultado="B" style="font-size:.78rem; width:auto;">Ganó ${nombreB}</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="drawer-separador" style="margin: var(--space-3) 0;"></div>
+                <p style="margin:0 0 6px; font-weight:700;">📊 Tabla de posiciones</p>
+                ${tablaHtml}
+                <p style="margin: var(--space-4) 0 6px; font-weight:700;">⚔️ Partidos</p>
+                ${partidosHtml || '<p class="texto-muted" style="font-size:.85rem;">Sin partidos.</p>'}
+                ${soyCreador && torneo.estado === 'en curso' ? '<button type="button" class="secundario campo-ancho" id="boton-finalizar-liga" style="margin-top: var(--space-2);">🏁 Finalizar liga</button>' : ''}
+            `;
+        }
+
+        // Formato Eliminación: antes de generar el cuadro, el creador
+        // elige el "mejor de cuántos" de cada ronda (la cantidad de
+        // rondas la decide sola la cantidad de participantes — ver
+        // cantidadDeRondas en torneos.js, no se puede elegir otra). Ya
+        // generado, se muestra el cuadro agrupado por ronda: cada cruce
+        // con el marcador de partidas ganadas hasta ahora, y botones
+        // para cargar la próxima si todavía no tiene ganador.
+        function cruceHtml(torneo, p) {
+            const nombreDe = (uid, vacio) => uid ? esc(torneo.nombresPorUid?.[uid] || 'Alguien') : vacio;
+            const nombreA = nombreDe(p.jugadorA, p.ronda === 0 ? 'Bye' : 'Por definir');
+            const nombreB = nombreDe(p.jugadorB, p.ronda === 0 ? 'Bye' : 'Por definir');
+            const ganadosA = (p.resultados || []).filter(r => r === 'A').length;
+            const ganadosB = (p.resultados || []).filter(r => r === 'B').length;
+
+            if (p.ganador) {
+                const ganadorEsA = p.ganador === p.jugadorA;
+                return `<p style="margin:0 0 6px; font-size:.85rem;">${ganadorEsA ? `<strong>${nombreA}</strong>` : nombreA} ${ganadosA}-${ganadosB} ${ganadorEsA ? nombreB : `<strong>${nombreB}</strong>`}</p>`;
+            }
+            if (!p.jugadorA || !p.jugadorB) {
+                return `<p class="texto-muted" style="margin:0 0 6px; font-size:.85rem;">${nombreA} vs ${nombreB}</p>`;
+            }
+            return `
+                <div style="margin-bottom: var(--space-3);">
+                    <p style="margin:0 0 4px; font-size:.85rem;">${nombreA} ${ganadosA}-${ganadosB} ${nombreB}</p>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <button type="button" class="secundario" data-cruce="${p.id}" data-resultado="A" style="font-size:.78rem; width:auto;">Ganó ${nombreA}</button>
+                        <button type="button" class="secundario" data-cruce="${p.id}" data-resultado="B" style="font-size:.78rem; width:auto;">Ganó ${nombreB}</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Premios por puesto — el nombre de quién ganó cada uno recién
+        // se muestra si el torneo ya está finalizado (calcularPodio, en
+        // torneos.js, funciona para liga y para cualquier cosa que
+        // termine en bracket, incluida la fase eliminatoria de
+        // grupos+eliminación). El 3er puesto puede tener más de un
+        // nombre en eliminación (bronce compartido, ver el comentario
+        // de calcularPodio).
+        function podioHtml(torneo) {
+            if (!torneo.tienePremio) return '';
+            const premios = torneo.premios || {};
+            const podio = torneo.estado === 'finalizado' ? calcularPodio(torneo) : null;
+            const nombreDe = (uid) => esc(torneo.nombresPorUid?.[uid] || 'Alguien');
+
+            const filas = [];
+            if (premios.primero) {
+                filas.push(`<p style="margin:0 0 4px;">🥇 ${esc(premios.primero)}${podio?.primero ? ` — <strong>${nombreDe(podio.primero)}</strong>` : ''}</p>`);
+            }
+            if (premios.segundo) {
+                filas.push(`<p style="margin:0 0 4px;">🥈 ${esc(premios.segundo)}${podio?.segundo ? ` — <strong>${nombreDe(podio.segundo)}</strong>` : ''}</p>`);
+            }
+            if (premios.tercero) {
+                const terceros = podio?.terceros?.length ? podio.terceros.map(nombreDe).join(' y ') : '';
+                filas.push(`<p style="margin:0 0 4px;">🥉 ${esc(premios.tercero)}${terceros ? ` — <strong>${terceros}</strong>` : ''}</p>`);
+            }
+            return filas.join('');
+        }
+
+        // Formato Grupos + Eliminación: fase 1 arma grupos chicos (mismo
+        // motor que Liga, uno por grupo) — el creador elige cuántos
+        // grupos y cuántos clasifican de cada uno recién acá, porque
+        // antes no se sabe cuánta gente se anotó. Fase 2 (una vez
+        // avanzada) se muestra igual que Eliminación pura — reutiliza
+        // contenidoEliminacion tal cual, ver verDetalleTorneo más abajo.
+        function contenidoGrupos(torneo, soyCreador) {
+            if (torneo.estado === 'abierto') {
+                if (!soyCreador) {
+                    return `<p class="texto-muted" style="font-size:.85rem; margin: var(--space-3) 0 0;">El torneo todavía no arrancó — esperando a que el creador configure los grupos.</p>`;
+                }
+                return `
+                    <div class="drawer-separador" style="margin: var(--space-3) 0;"></div>
+                    <p class="texto-muted" style="font-size:.82rem;">Elegí cuántos grupos armar y cuántos clasifican de cada uno a la fase eliminatoria:</p>
+                    <div class="form" style="margin-bottom: var(--space-3);">
+                        <div>
+                            <label for="input-cantidad-grupos">Cantidad de grupos</label>
+                            <input type="number" id="input-cantidad-grupos" min="2" max="${Math.max(2, Math.floor(torneo.participantes.length / 2))}" value="2">
+                        </div>
+                        <div>
+                            <label for="input-clasificados-grupo">Clasifican por grupo</label>
+                            <input type="number" id="input-clasificados-grupo" min="1" value="2">
+                        </div>
+                    </div>
+                    <button type="button" class="campo-ancho" id="boton-generar-grupos">▶ Generar grupos y arrancar</button>
+                `;
+            }
+
+            const gruposHtml = Array.from({ length: torneo.cantidadGrupos }, (_, numeroGrupo) => {
+                const tabla = calcularTablaGrupo(torneo, numeroGrupo);
+                const tablaHtml = tabla.map((fila, indice) => `
+                    <div class="balance-item">
+                        <span>${indice < torneo.clasificadosPorGrupo ? '✅ ' : ''}${esc(torneo.nombresPorUid?.[fila.uid] || 'Alguien')}</span>
+                        <span class="monto">${fila.puntos} pts <span class="texto-muted" style="font-weight:400;">(${fila.victorias}-${fila.empates}-${fila.derrotas})</span></span>
+                    </div>
+                `).join('');
+
+                const partidosHtml = (torneo.partidosGrupos || []).filter(p => p.grupo === numeroGrupo).map(p => {
+                    const nombreA = esc(torneo.nombresPorUid?.[p.jugadorA] || 'Alguien');
+                    const nombreB = esc(torneo.nombresPorUid?.[p.jugadorB] || 'Alguien');
+                    if (p.resultado) {
+                        const texto = p.resultado === 'empate'
+                            ? `${nombreA} <strong>empate</strong> ${nombreB}`
+                            : p.resultado === 'A' ? `<strong>${nombreA}</strong> venció a ${nombreB}` : `${nombreA} perdió con <strong>${nombreB}</strong>`;
+                        return `<p style="margin:0 0 6px; font-size:.85rem;">${texto}</p>`;
+                    }
+                    return `
+                        <div style="margin-bottom: var(--space-3);">
+                            <p style="margin:0 0 4px; font-size:.85rem;">${nombreA} vs ${nombreB}</p>
+                            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                <button type="button" class="secundario" data-partido-grupo="${p.id}" data-resultado="A" style="font-size:.78rem; width:auto;">Ganó ${nombreA}</button>
+                                ${torneo.puntosEmpate !== null ? `<button type="button" class="secundario" data-partido-grupo="${p.id}" data-resultado="empate" style="font-size:.78rem; width:auto;">Empate</button>` : ''}
+                                <button type="button" class="secundario" data-partido-grupo="${p.id}" data-resultado="B" style="font-size:.78rem; width:auto;">Ganó ${nombreB}</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                return `
+                    <p style="margin: var(--space-3) 0 6px; font-weight:700;">Grupo ${String.fromCharCode(65 + numeroGrupo)} <span class="texto-muted" style="font-weight:400; font-size:.78rem;">(✅ clasifica)</span></p>
+                    ${tablaHtml}
+                    <div style="margin-top: var(--space-2);">${partidosHtml || '<p class="texto-muted" style="font-size:.85rem;">Sin partidos.</p>'}</div>
+                `;
+            }).join('');
+
+            let avanceHtml = '';
+            if (soyCreador) {
+                const clasificados = Array.from({ length: torneo.cantidadGrupos }, (_, numeroGrupo) =>
+                    calcularTablaGrupo(torneo, numeroGrupo).slice(0, torneo.clasificadosPorGrupo).length
+                ).reduce((suma, cantidad) => suma + cantidad, 0);
+                const totalRondas = cantidadDeRondas(clasificados);
+                const rondasHtml = Array.from({ length: totalRondas }, (_, i) => `
+                    <div>
+                        <label for="mejor-de-grupo-ronda-${i}">${esc(nombreDeRonda(i, totalRondas))}</label>
+                        <select id="mejor-de-grupo-ronda-${i}">
+                            <option value="1">Al mejor de 1</option>
+                            <option value="3" selected>Al mejor de 3</option>
+                            <option value="5">Al mejor de 5</option>
+                            <option value="7">Al mejor de 7</option>
+                        </select>
+                    </div>
+                `).join('');
+                avanceHtml = `
+                    <div class="drawer-separador" style="margin: var(--space-3) 0;"></div>
+                    <p class="texto-muted" style="font-size:.82rem;">Cuando termine la fase de grupos, avanzá a la eliminatoria con los ${clasificados} clasificados (${totalRondas} ronda${totalRondas === 1 ? '' : 's'}):</p>
+                    <div class="form" style="margin-bottom: var(--space-3);">${rondasHtml}</div>
+                    <button type="button" class="campo-ancho" id="boton-generar-fase-eliminatoria" data-clasificados="${clasificados}">▶ Generar fase eliminatoria</button>
+                `;
+            }
+
+            return `
+                <div class="drawer-separador" style="margin: var(--space-3) 0;"></div>
+                ${gruposHtml}
+                ${avanceHtml}
+            `;
+        }
+
+        function contenidoEliminacion(torneo, soyCreador) {
+            if (torneo.estado === 'abierto') {
+                if (!soyCreador) {
+                    return `<p class="texto-muted" style="font-size:.85rem; margin: var(--space-3) 0 0;">El torneo todavía no arrancó — esperando a que el creador configure y genere el cuadro.</p>`;
+                }
+                const totalRondas = cantidadDeRondas(torneo.participantes.length);
+                const rondasHtml = Array.from({ length: totalRondas }, (_, i) => `
+                    <div>
+                        <label for="mejor-de-ronda-${i}">${esc(nombreDeRonda(i, totalRondas))}</label>
+                        <select id="mejor-de-ronda-${i}">
+                            <option value="1">Al mejor de 1</option>
+                            <option value="3" selected>Al mejor de 3</option>
+                            <option value="5">Al mejor de 5</option>
+                            <option value="7">Al mejor de 7</option>
+                        </select>
+                    </div>
+                `).join('');
+                return `
+                    <div class="drawer-separador" style="margin: var(--space-3) 0;"></div>
+                    <p class="texto-muted" style="font-size:.82rem;">Con ${torneo.participantes.length} participante${torneo.participantes.length === 1 ? '' : 's'} el cuadro tiene ${totalRondas} ronda${totalRondas === 1 ? '' : 's'}. Elegí al mejor de cuántos se juega cada una:</p>
+                    <div class="form" style="margin-bottom: var(--space-3);" id="form-mejor-de">${rondasHtml}</div>
+                    <button type="button" class="campo-ancho" id="boton-generar-eliminacion">▶ Generar cuadro y arrancar</button>
+                `;
+            }
+
+            const totalRondas = torneo.totalRondas;
+            const rondasHtml = Array.from({ length: totalRondas }, (_, ronda) => {
+                const cruces = (torneo.partidos || []).filter(p => p.ronda === ronda).sort((a, b) => a.posicion - b.posicion);
+                return `
+                    <p style="margin: var(--space-3) 0 6px; font-weight:700;">${esc(nombreDeRonda(ronda, totalRondas))} <span class="texto-muted" style="font-weight:400; font-size:.78rem;">(mejor de ${cruces[0]?.mejorDe || '?'})</span></p>
+                    ${cruces.map(p => cruceHtml(torneo, p)).join('')}
+                `;
+            }).join('');
+
+            const campeonHtml = torneo.estado === 'finalizado' && torneo.campeon
+                ? `<p style="text-align:center; font-size:1.1rem; margin: var(--space-3) 0;">🏆 <strong>${esc(torneo.nombresPorUid?.[torneo.campeon] || 'Alguien')}</strong> es el campeón</p>`
+                : '';
+
+            return `
+                <div class="drawer-separador" style="margin: var(--space-3) 0;"></div>
+                ${campeonHtml}
+                ${rondasHtml}
+            `;
+        }
+
+        async function verDetalleTorneo(codigo) {
+            const torneo = await obtenerTorneo(codigo);
+            if (!torneo) {
+                avisar('Ese torneo ya no existe.', 'error');
+                return;
+            }
+            const soyCreador = torneo.creadoPor === usuarioActual.uid;
+            const participantesHtml = torneo.participantes
+                .map(uid => `<li>${esc(torneo.nombresPorUid?.[uid] || 'Alguien')}${uid === torneo.creadoPor ? ' 👑' : ''}</li>`)
+                .join('');
+
+            let contenidoFormato;
+            if (torneo.formato === 'eliminacion') {
+                contenidoFormato = contenidoEliminacion(torneo, soyCreador);
+            } else if (torneo.formato === 'grupos_eliminacion') {
+                contenidoFormato = torneo.fase === 'eliminacion' ? contenidoEliminacion(torneo, soyCreador) : contenidoGrupos(torneo, soyCreador);
+            } else {
+                contenidoFormato = contenidoLiga(torneo, soyCreador);
+            }
+
+            abrirModal(`
+                <h3 style="margin-top:0;">${iconoDeJuego(torneo)} ${esc(torneo.nombre)}</h3>
+                <p class="texto-muted" style="font-size:.85rem; margin-top:-8px;">${esc(etiquetaDeJuego(torneo))}${torneo.fecha ? ` — ${esc(torneo.fecha)}` : ''}</p>
+                ${podioHtml(torneo)}
+                <p style="margin:0 0 8px;">👥 <strong>${torneo.participantes.length}</strong> participante${torneo.participantes.length === 1 ? '' : 's'}${torneo.maxParticipantes ? ` de ${torneo.maxParticipantes}` : ''}</p>
+                <ul style="margin: 0 0 var(--space-3); padding-left: 20px;">${participantesHtml}</ul>
+                ${contenidoFormato}
+                ${soyCreador ? `
+                    <div class="drawer-separador" style="margin: var(--space-3) 0;"></div>
+                    <p class="texto-muted" style="font-size:.82rem; margin: 0 0 4px;">Código para invitar más gente:</p>
+                    <p style="text-align:center; font-size:1.4rem; font-weight:800; letter-spacing:.15em; color:var(--color-primary); margin: 0 0 var(--space-3);">${esc(codigo)}</p>
+                    <button type="button" class="campo-ancho" id="boton-copiar-codigo-detalle">Copiar código</button>
+                ` : ''}
+            `);
+
+            if (soyCreador) {
+                document.getElementById('boton-copiar-codigo-detalle').addEventListener('click', () => copiarAlPortapapeles(codigo));
+            }
+
+            document.getElementById('boton-generar-liga')?.addEventListener('click', async () => {
+                try {
+                    await generarPartidosLiga(codigo);
+                    avisar('¡Liga arrancada! Ya se pueden cargar resultados.', 'exito');
+                    verDetalleTorneo(codigo); // re-renderiza el modal con los partidos ya generados
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+
+            document.getElementById('boton-finalizar-liga')?.addEventListener('click', async () => {
+                await finalizarLiga(codigo);
+                avisar('Liga finalizada — quedó la tabla como está ahora.', 'exito');
+                verDetalleTorneo(codigo);
+            });
+
+            document.querySelectorAll('[data-partido]').forEach(boton => {
+                boton.addEventListener('click', async () => {
+                    try {
+                        await registrarResultadoLiga(codigo, boton.dataset.partido, boton.dataset.resultado);
+                        verDetalleTorneo(codigo); // re-renderiza: tabla actualizada, este partido ya con resultado
+                    } catch (error) {
+                        avisar(error.message, 'error');
+                    }
+                });
+            });
+
+            document.getElementById('boton-generar-eliminacion')?.addEventListener('click', async () => {
+                const totalRondas = cantidadDeRondas(torneo.participantes.length);
+                const mejoresDe = Array.from({ length: totalRondas }, (_, i) =>
+                    parseInt(document.getElementById(`mejor-de-ronda-${i}`).value, 10)
+                );
+                try {
+                    await generarBracketEliminacion(codigo, mejoresDe);
+                    avisar('¡Cuadro generado! Ya se pueden cargar resultados.', 'exito');
+                    verDetalleTorneo(codigo);
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+
+            document.querySelectorAll('[data-cruce]').forEach(boton => {
+                boton.addEventListener('click', async () => {
+                    try {
+                        await registrarResultadoEliminacion(codigo, boton.dataset.cruce, boton.dataset.resultado);
+                        verDetalleTorneo(codigo); // re-renderiza: si alguien ganó el cruce, ya avanzó solo
+                    } catch (error) {
+                        avisar(error.message, 'error');
+                    }
+                });
+            });
+
+            document.getElementById('boton-generar-grupos')?.addEventListener('click', async () => {
+                const cantidadGrupos = parseInt(document.getElementById('input-cantidad-grupos').value, 10);
+                const clasificadosPorGrupo = parseInt(document.getElementById('input-clasificados-grupo').value, 10);
+                try {
+                    await generarFaseDeGrupos(codigo, cantidadGrupos, clasificadosPorGrupo);
+                    avisar('¡Grupos armados! Ya se pueden cargar resultados.', 'exito');
+                    verDetalleTorneo(codigo);
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+
+            document.querySelectorAll('[data-partido-grupo]').forEach(boton => {
+                boton.addEventListener('click', async () => {
+                    try {
+                        await registrarResultadoGrupo(codigo, boton.dataset.partidoGrupo, boton.dataset.resultado);
+                        verDetalleTorneo(codigo); // re-renderiza: tabla del grupo actualizada
+                    } catch (error) {
+                        avisar(error.message, 'error');
+                    }
+                });
+            });
+
+            document.getElementById('boton-generar-fase-eliminatoria')?.addEventListener('click', async (evento) => {
+                const clasificados = parseInt(evento.target.dataset.clasificados, 10);
+                const totalRondas = cantidadDeRondas(clasificados);
+                const mejoresDe = Array.from({ length: totalRondas }, (_, i) =>
+                    parseInt(document.getElementById(`mejor-de-grupo-ronda-${i}`).value, 10)
+                );
+                try {
+                    await generarFaseEliminatoriaDeGrupos(codigo, mejoresDe);
+                    avisar('¡Fase eliminatoria generada! Ya se pueden cargar resultados.', 'exito');
+                    verDetalleTorneo(codigo);
+                } catch (error) {
+                    avisar(error.message, 'error');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
