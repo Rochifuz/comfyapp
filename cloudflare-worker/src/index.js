@@ -150,7 +150,7 @@ async function reenviarDeRiot(riotUrl, env, cors) {
 // tiene que pasar por acá (un fetch desde el navegador directo a
 // oauth2.googleapis.com necesitaría mandar el secreto en JS, visible
 // para cualquiera). Mismo Client ID que usa public/agenda/calendario.js.
-const GOOGLE_CLIENT_ID = '630042456129-5mfucf21ce3ijc5en1fkfhqq1sbditae.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = 'TU_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 
 // Dos casos, según qué mande el navegador:
 //  - `code` + `redirectUri`: primera conexión — recién autorizada por la

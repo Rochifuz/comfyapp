@@ -22,7 +22,7 @@ import { doc, getDoc, setDoc, deleteField } from 'https://www.gstatic.com/fireba
 // No es secreto — viaja igual en la URL de autorización que arma el
 // navegador. El Client Secret (el que sí es secreto) vive SOLO en el
 // Worker (GOOGLE_CLIENT_SECRET), nunca acá.
-const GOOGLE_CLIENT_ID = '630042456129-5mfucf21ce3ijc5en1fkfhqq1sbditae.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = 'TU_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 const SCOPE_CALENDAR = 'https://www.googleapis.com/auth/calendar';
 const PROXY_CALENDAR_TOKEN = 'https://tu-worker.tu-subdominio.workers.dev/calendar-token';
 
