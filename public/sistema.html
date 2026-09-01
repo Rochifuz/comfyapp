@@ -291,7 +291,7 @@
         const sinPermiso = new URLSearchParams(window.location.search).get('sinPermiso');
         const NOMBRE_APP = { gaming: 'GamingApp', agenda: 'AgendaApp', tareas: 'TareasApp' };
         if (sinPermiso) {
-            avisar(`Todavía no tenés acceso a ${NOMBRE_APP[sinPermiso] || 'esa sección'} — pedile a Roy que te lo habilite.`, 'info');
+            avisar(`Todavía no tenés acceso a ${NOMBRE_APP[sinPermiso] || 'esa sección'} — pedile a quien administra la cuenta que te lo habilite.`, 'info');
         }
 
         // Oculta las cards de las apps opcionales que esta cuenta no
