@@ -1,7 +1,7 @@
 // Sistema de permisos por app del mega sistema (GastosApp/ComfyApp
 // siempre disponibles, GamingApp/AgendaApp/TareasApp opcionales) —
-// pedido de Roy (2026-08-30) para poder controlar el onboarding de
-// gente nueva sin darle acceso a todo de entrada.
+// permite controlar el onboarding de gente nueva sin darle acceso a
+// todo de entrada.
 //
 // Modelo de datos: `usuarios/{uid}.appsPermitidas` (array de strings,
 // valores 'gaming'/'agenda'/'tareas'). Dos casos:
@@ -13,7 +13,7 @@
 //   - El campo SÍ EXISTE (array, puede ser vacío) -> se respeta tal
 //     cual. Un usuario nuevo (primer login de su vida) se crea
 //     explícitamente con `appsPermitidas: []` (ver marcarLoginYPermisos
-//     más abajo) — arranca solo con GastosApp hasta que Roy le sume
+//     más abajo) — arranca solo con GastosApp hasta que se le sume
 //     algo desde el panel de admin.
 //
 // Este gate es de PRODUCTO/onboarding, no de seguridad de datos: por

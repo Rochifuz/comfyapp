@@ -199,7 +199,7 @@ async function intercambiarTokenGoogle(env, { code, redirectUri, refreshToken })
 
 // --- /noticias — titulares del día (GNews + NewsData, Argentina) ---
 //
-// Se combinan DOS proveedores (a pedido de Roy, "para ofrecer lo mejor")
+// Se combinan DOS proveedores, para tener mejor cobertura de noticias,
 // en vez de uno solo — GNews (https://gnews.io) y NewsData
 // (https://newsdata.io), ambas pensadas para consumirse desde un backend
 // como este (a diferencia del RSS de un medio, que varios ya bloquean si

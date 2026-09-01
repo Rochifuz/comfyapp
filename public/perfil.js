@@ -54,8 +54,8 @@ export function guardarPresupuestosPorCategoria(uid, mapa) {
 // --- Preferencias de notificaciones (campanita 🔔, ver
 // notificacionesCentro.js) ---
 //
-// A pedido de Roy: cada tipo de aviso automático de GastosApp se puede
-// prender/apagar por separado, y el de cierre de tarjeta además permite
+// Cada tipo de aviso automático de GastosApp se puede prender/apagar
+// por separado, y el de cierre de tarjeta además permite
 // elegir con cuánta anticipación (mismo espíritu que el aviso
 // configurable de TareasApp — ver tareas/tareas.js). Se guardan todas
 // juntas en un solo campo (en vez de uno suelto por preferencia) para no

@@ -224,7 +224,7 @@ export function crearCalendario(nombre) {
     });
 }
 
-// --- Colores de evento ("categorías", a pedido de Roy) ---
+// --- Colores de evento ("categorías") ---
 //
 // Google Calendar tiene, además del color de cada CALENDARIO (el que ya
 // se usa para diferenciar, por ejemplo, Feriados de Argentina del resto),

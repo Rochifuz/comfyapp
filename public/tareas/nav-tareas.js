@@ -45,7 +45,7 @@ export function iniciarNavbarTareas() {
             <span id="auth-placeholder"></span>
             <span id="campanita-placeholder"></span>
             <!-- Atajo para volver a ComfyApp sin abrir el desplegable —
-                 mismo pedido de Roy que en nav.js/nav-gaming.js/nav-agenda.js. -->
+                 mismo criterio que en nav.js/nav-gaming.js/nav-agenda.js. -->
             <a class="boton-navbar-icono" href="../sistema.html" title="Volver a ComfyApp" aria-label="Volver a ComfyApp">🛋️</a>
             <button type="button" id="boton-menu" class="boton-navbar-icono" title="Menú" aria-label="Abrir menú">☰</button>
         </div>

@@ -12374,7 +12374,7 @@ export const META_BLITZ = [
 // que sí están completos aunque el roster de campeones de esa misma
 // fuente NO lo esté para este set puntual — anomalía real de esa
 // fuente, no un error nuestro); el roster de 65 campeones con
-// costo+rasgos lo pasó Roy desde tftactics.gg — cruzado contra los
+// costo+rasgos viene de tftactics.gg — cruzado contra los
 // umbrales de Riot y coinciden en los que se pudieron comparar (ej.
 // Fae 2/4, Vanguard 2/4/6, Elderwood 3/5/7/9/11), buena señal de que
 // la fuente es confiable. `icono`: null en las unidades TFT-
@@ -13325,9 +13325,8 @@ export const TFT_RASGOS = [
 // Coven ("Aquelarres"): el único rasgo de este set que da más
 // recompensa por PERDER rondas (acumula "Essence" — más por derrota
 // que por kill, y se puede cambiar por recompensas en varios
-// umbrales) — a pedido de un tester de Roy. Datos de tftflow.com/
-// tables/set18/coven, un pull manual puntual, mismo criterio que el
-// resto de datos curados de este archivo.
+// umbrales). Datos de tftflow.com/tables/set18/coven, un pull manual
+// puntual, mismo criterio que el resto de datos curados de este archivo.
 export const TFT_COVEN_RECOMPENSAS = {
     porNivel: [
         { rasgoNivel: 3, esenciaPorKill: 2, esenciaPorDerrota: 18 },
@@ -13598,9 +13597,9 @@ export const TFT_ITEMS = [
   }
 ];
 
-// --- TFT_AUGMENTS_TOP / TFT_AUGMENTS_POR_RASGO: a pedido de Roy (y de
-// un tester), recomendaciones de augments para el armador de
-// composiciones. Fuente: la MISMA API interna de metatft.com que el
+// --- TFT_AUGMENTS_TOP / TFT_AUGMENTS_POR_RASGO: recomendaciones de
+// augments para el armador de composiciones. Fuente: la MISMA API
+// interna de metatft.com que el
 // resto del Tracker (`api-hc.metatft.com/tft-stat-api/augments_tiers`,
 // encontrada inspeccionando su bundle de JS igual que las demás — un
 // pull manual puntual, mismo criterio de siempre) — es la tier list
@@ -13864,8 +13863,8 @@ export const TFT_AUGMENTS_POR_RASGO = [
 // 2do ESTILO de juego genuinamente jugado (ej. Kayle AP vs Kayle Crit
 // — se probó 1-2 estilos candidatos según el rol oficial del campeón y
 // se exige al menos 3% de las partidas del principal para contar como
-// real). `porRol` (agregado 2026-08-30, a pedido de Roy tras
-// feedback de testers) es la MISMA lógica pero agrupada por ROL/
+// real). `porRol` (agregado 2026-08-30, tras feedback de testers) es
+// la MISMA lógica pero agrupada por ROL/
 // POSICIÓN en vez de por estilo — hasta 5 claves ('top'/'jungla'/
 // 'medio'/'adc'/'soporte'), cada una con el build de más partidas
 // reales jugado en ESA posición puntual, mismo umbral de 3% relativo
@@ -13885,7 +13884,7 @@ export const TFT_AUGMENTS_POR_RASGO = [
 // A diferencia de los 5 campeones curados de antes, ACÁ NO hay
 // "fuerteContra"/"debilContra" (ese dato salía de una sección
 // separada de op.gg que no se volvió a investigar) ni un tier S/A/B
-// editorial — si Roy los quiere de vuelta, hay que sumarlos aparte.
+// editorial — quedan pendientes de sumar aparte si hacen falta.
 // Los 173 campeones tienen build cargado.
 export const LOL_BUILDS = {
   "Annie": {

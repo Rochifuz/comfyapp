@@ -489,7 +489,7 @@
         // Selector VISUAL de campeón (ícono + nombre + buscador) para
         // "Build y runas" — mismo criterio que el picker de campeones
         // del armador de composiciones de TFT (más fácil clickear un
-        // ícono que escribir el nombre exacto, a pedido de Roy).
+        // ícono que escribir el nombre exacto).
         // Separado de LOL_BUILDS a propósito: la lista de campeones es
         // un hecho del juego (CAMPEONES_LOL, ver campeonesLoL.js), el
         // build en sí es un dato real de u.gg que puede faltar para
@@ -775,8 +775,8 @@
         // cada card, donde ya se ve el nombre debajo en texto) — pero
         // SÍ con una fila de mini íconos de sus ítems recomendados,
         // superpuesta abajo del círculo (hasta 3 — con más quedaba
-        // saturado), a pedido de Roy, para verlos de un vistazo sin
-        // tener que abrir "Ver tablero" y pasar el mouse por cada ficha.
+        // saturado), para verlos de un vistazo sin tener que abrir
+        // "Ver tablero" y pasar el mouse por cada ficha.
         function iconoCampeonHtml(campeon) {
             const insignias = campeon.items.length
                 ? `<span style="position:absolute; bottom:-3px; left:50%; transform:translateX(-50%); display:flex; gap:1px;">

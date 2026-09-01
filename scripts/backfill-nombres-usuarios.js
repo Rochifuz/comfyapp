@@ -2,8 +2,8 @@
 // para todas las cuentas que YA existen, sin esperar a que cada quien
 // vuelva a loguearse — permisos.js (marcarLoginYPermisos) ya guarda estos
 // 2 campos en cada login nuevo de acá en más, pero alguien que no volvió
-// a entrar desde que se agregó eso (2026-08-30) todavía no los tiene, y
-// Roy quiere verlos YA en el panel de admin, no esperar.
+// a entrar desde que se agregó eso (2026-08-30) todavía no los tiene —
+// esto los completa de una, para verlos ya en el panel de admin.
 //
 // Mismos requisitos que scripts/habilitar-2fa.js (service-account-key.json
 // en la raíz, con acceso administrativo total — nunca se sube a git).

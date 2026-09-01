@@ -50,9 +50,9 @@ export function iniciarNavbar(paginaActual, opciones = {}) {
     // de GastosApp.
     const marca = opciones.marca || { href: 'index.html', texto: '💸 GastosApp' };
 
-    // Atajo "🛋️" para volver a ComfyApp sin abrir el desplegable — a
-    // pedido de Roy, para no tener que ir hasta "Otras apps" del menú ☰
-    // cada vez. No se muestra en la propia sistema.html (ya estás ahí,
+    // Atajo "🛋️" para volver a ComfyApp sin abrir el desplegable — para
+    // no tener que ir hasta "Otras apps" del menú ☰ cada vez. No se
+    // muestra en la propia sistema.html (ya estás ahí,
     // "volver a donde ya estás" no tendría sentido).
     const botonVolverHtml = paginaActual === 'sistema.html'
         ? ''

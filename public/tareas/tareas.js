@@ -13,8 +13,8 @@
 // `asignadoA` (uid de un miembro, o null = "cualquiera") y `creadaPor`.
 //
 // El aviso de "esta tarea está por vencer" es OPCIONAL y configurable
-// (a pedido de Roy — cada tarea decide si lo quiere, con cuánta
-// anticipación, y si una sola vez o repetido — no es automático como
+// (cada tarea decide si lo quiere, con cuánta anticipación, y si una
+// sola vez o repetido — no es automático como
 // "te asignaron"/"la completaron"):
 //   - `avisar`: prendido/apagado, lo tilda quien crea/edita la tarea.
 //   - `avisarDiasAntes`: 0 = el mismo día que vence, 1/2/3/7 = esa

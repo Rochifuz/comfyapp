@@ -12,8 +12,8 @@
 // siempre, tal cual como si no hubiera service worker.
 const CACHE = 'gastosapp-shell-v1';
 
-// Mejora agregada 2026-08-25 (detectada al revisar AgendaApp, a pedido
-// de Roy): esta lista solo tenía los archivos de GastosApp — ComfyApp/
+// Mejora agregada 2026-08-25 (detectada al revisar AgendaApp): esta
+// lista solo tenía los archivos de GastosApp — ComfyApp/
 // GamingApp/AgendaApp quedaban afuera. No era un bug (una vez que se
 // visita una página online, igual queda cacheada para la próxima vez sin
 // conexión — ver el "fetch" más abajo, que cachea CUALQUIER pedido

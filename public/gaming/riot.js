@@ -2,8 +2,8 @@
 // win rate, KDA, últimas partidas) vía la API oficial de Riot, a través
 // del mismo Worker de Cloudflare que ya usa la conexión con Steam (ver
 // cloudflare-worker/README.md — necesita el secreto RIOT_API_KEY
-// cargado ahí, y ojo que la key "de desarrollo" vence cada 24hs si Roy
-// todavía no consiguió la Personal API Key permanente).
+// cargado ahí, y ojo que la key "de desarrollo" vence cada 24hs — hace
+// falta la Personal API Key permanente para que no se corte solo).
 //
 // Lo que NO vive acá: las recomendaciones de build/runas/composiciones
 // "meta" (qué está fuerte en el parche actual) — eso es una tabla
@@ -203,7 +203,7 @@ export async function obtenerHistorialRango(uid, juego) {
 
 // --- Composiciones propias de TFT (gaming/{uid}/tftComps) ---
 //
-// A pedido de Roy: guardadas por "temporada" (campo de texto libre, no
+// Se guardan por "temporada" (campo de texto libre, no
 // una lista fija de sets a mantener — ver metaCurada.js sobre por qué
 // se evita eso) para poder compararlas cuando cambia el set sin perder
 // las viejas.
