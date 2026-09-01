@@ -58,24 +58,94 @@ firebase.json         → hosting, headers de seguridad, CSP
 scripts/              → scripts puntuales de administración (Admin SDK)
 ```
 
-## Poner esto a andar (opcional)
+## Poner esto a andar
 
-Este repo no es un producto "un click y anda" — necesita tu propio
-proyecto de Firebase y, para algunas apps, tus propias credenciales de
-API. Para probarlo:
+No es un producto "un click y anda" — es una app real, así que hace falta
+tu propio proyecto de Firebase y (para algunas apps) tus propias
+credenciales de API, todas gratis y sin pedir tarjeta. GastosApp/ComfyApp/
+TareasApp andan solo con Firebase (pasos 1-4); GamingApp y AgendaApp
+necesitan además el Worker de Cloudflare (paso 5).
 
-1. Creá un proyecto en [Firebase Console](https://console.firebase.google.com),
-   habilitá Authentication (Google + Email/contraseña) y Firestore.
-2. Copiá la configuración del SDK web a `public/firebase-config.js`
-   (los valores de acá vienen vacíos a propósito).
-3. Reemplazá `TU_UID_DE_FIREBASE` en `firestore.rules` por tu propio UID
-   (Firebase Console → Authentication → Users) y desplegalas:
-   `npx firebase deploy --only firestore:rules`.
-4. `npx firebase deploy --only hosting` (o `npm start` para probar local
-   con `http-server`).
-5. Opcional — GamingApp/AgendaApp necesitan además: una cuenta de
-   Cloudflare Workers gratis (ver `cloudflare-worker/README.md`), una API
-   key de Riot Games, y un cliente OAuth de Google Calendar.
+### 1. Requisitos
+
+- [Node.js](https://nodejs.org) (para `npx`/`npm`) y una cuenta de Google
+  (para Firebase).
+- `npm install` en la raíz del repo (instala `firebase-tools` y
+  `http-server`, ya en `package.json`).
+
+### 2. Crear el proyecto de Firebase
+
+1. [Firebase Console](https://console.firebase.google.com) → crear
+   proyecto nuevo (plan **Spark**, el gratuito, alcanza de sobra).
+2. **Authentication** → pestaña "Sign-in method" → habilitar los
+   proveedores **Google** y **Email/contraseña**.
+3. **Firestore Database** → crear base de datos (modo producción, la
+   región que prefieras).
+4. **Configuración del proyecto** (⚙️) → "Tus apps" → agregar una app
+   **Web** (</> ) → copiá el objeto `firebaseConfig` que te muestra.
+
+### 3. Conectar el código a tu proyecto
+
+1. Pegá esos valores en `public/firebase-config.js` (reemplazando los
+   placeholders `TU_API_KEY`, `tu-proyecto`, etc.).
+2. `.firebaserc` → cambiá `"default": "tu-proyecto-de-firebase"` por el
+   ID real de tu proyecto.
+3. En `firestore.rules`, buscá `TU_UID_DE_FIREBASE` (dentro de la función
+   `esAdmin()`) y reemplazalo por tu propio UID — te logueás una vez en
+   la app, y lo copiás de Firebase Console → Authentication → Users →
+   columna "User UID". Sin este paso, igual anda todo excepto el panel
+   de administración (`admin.html`).
+
+### 4. Correr o desplegar
+
+```bash
+npx firebase login                              # una sola vez
+npx firebase deploy --only firestore:rules      # sube las reglas de seguridad
+
+npm start                                       # probar en local, http://localhost:8080
+# — o bien —
+npx firebase deploy --only hosting              # publicarla de verdad (te da una URL tipo tu-proyecto.web.app)
+```
+
+Con esto ya andan GastosApp, ComfyApp (sin clima/noticias todavía) y
+TareasApp — podés crear una cuenta y probarlas.
+
+### 5. Opcional: el Worker de Cloudflare (GamingApp, AgendaApp, clima/noticias)
+
+Estas funciones necesitan un pequeño proxy (gratis, plan Free de
+Cloudflare Workers, sin tarjeta) porque dependen de una API key que no
+puede vivir en el navegador, o de un servicio sin CORS habilitado:
+
+- 🎮 **GamingApp**: login con Steam, biblioteca de Steam, y el Tracker de
+  League of Legends/TFT (necesita una API key de Riot Games).
+- 🗓️ **AgendaApp**: conectar Google Calendar (necesita un cliente OAuth
+  de Google Cloud).
+- 🌤️ **ComfyApp**: noticias (clima funciona sin esto, es una API pública
+  sin key).
+
+La guía completa, paso a paso — conseguir cada API key gratis, cargarlas
+como secretos con Wrangler, crear el cliente OAuth de Google, deployar el
+Worker — está en **[`cloudflare-worker/README.md`](cloudflare-worker/README.md)**.
+Al terminar esos pasos vas a tener que actualizar 2 placeholders más en
+el código con tus propios valores (el mismo README te dice exactamente
+en qué archivos): la URL de tu Worker ya deployado (reemplaza
+`tu-worker.tu-subdominio.workers.dev`, aparece en 4 archivos) y el
+Client ID de OAuth de Google que crees (reemplaza `TU_GOOGLE_CLIENT_ID`,
+en 2 archivos).
+
+### Scripts sueltos (`scripts/`, opcionales)
+
+- `npm run habilitar-2fa` — habilita TOTP como segundo factor de login
+  para el proyecto (una sola vez).
+- `npm run backfill-nombres` — completa nombre/email de las cuentas ya
+  existentes en el panel de admin, sin esperar a que cada quien vuelva a
+  loguearse.
+
+Los dos necesitan una clave de servicio de Firebase Admin SDK (Firebase
+Console → ⚙️ Configuración del proyecto → "Cuentas de servicio" →
+"Generar nueva clave privada") guardada como `service-account-key.json`
+en la raíz del repo — **nunca se sube a git** (ya está en `.gitignore`),
+le da acceso administrativo total a tu proyecto.
 
 ## Sobre este repo
 
@@ -85,11 +155,15 @@ con usuarios reales). Para publicarla:
 - Se sacaron todos los secretos (claves de API, tokens) — nunca vivieron
   en el repo original tampoco, siempre en variables de entorno/secretos
   de Cloudflare, así que no hizo falta reescribir historial.
-- Se reemplazaron los valores de configuración de Firebase, el UID de
-  admin, y la URL del Worker de Cloudflare por placeholders.
+- Se reemplazaron por placeholders: los valores de configuración de
+  Firebase, el UID de admin, la URL del Worker de Cloudflare, el Client
+  ID de OAuth de Google, y el email de contacto de las páginas de
+  Privacidad/Términos.
 - Se sacó cualquier dato de usuarios reales (que de todas formas nunca
   vive en el repo — Firestore es la única base de datos).
 
-No es un template pensado para que cualquiera lo clone y tenga la app
-andando en 5 minutos — es una muestra del código y la arquitectura reales
-detrás de una app en producción.
+No es un proyecto open source mantenido activamente ni pensado para
+recibir contribuciones — es una foto del código y la arquitectura reales
+detrás de una app en producción, pensada para portfolio. Los pasos de
+arriba alcanzan para levantarla con tu propio proyecto de Firebase si
+querés probarla en serio.
